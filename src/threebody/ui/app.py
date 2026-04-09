@@ -1,0 +1,363 @@
+from __future__ import annotations
+
+import numpy as np
+import plotly.graph_objects as go
+import streamlit as st
+
+from threebody.diagnostics import InvariantMonitor, PhaseSpaceTools, StabilityAnalyzer
+from threebody.experiments import CompactModelFitter, InitialConditionScanner, OrbitLibrary
+from threebody.solvers import AdaptiveIntegrator, AnalyticTwoBodySolver, StructureAwareIntegrator
+
+
+st.set_page_config(page_title="ThreeBody", layout="wide")
+
+
+def line_figure(x: np.ndarray, y: np.ndarray, title: str, yaxis_title: str) -> go.Figure:
+    figure = go.Figure()
+    figure.add_trace(go.Scatter(x=x, y=y, mode="lines", line={"width": 2}))
+    figure.update_layout(
+        title=title,
+        xaxis_title="Time",
+        yaxis_title=yaxis_title,
+        template="plotly_white",
+        margin={"l": 30, "r": 20, "t": 50, "b": 30},
+        height=280,
+    )
+    return figure
+
+
+def orbit_figure_2d(paths: list[np.ndarray], labels: list[str], title: str) -> go.Figure:
+    figure = go.Figure()
+    palette = ["#0b84f3", "#f95d6a", "#00a878", "#ffa600", "#6c63ff"]
+    for index, (path, label) in enumerate(zip(paths, labels, strict=True)):
+        figure.add_trace(
+            go.Scatter(
+                x=path[:, 0],
+                y=path[:, 1],
+                mode="lines",
+                name=label,
+                line={"width": 2.5, "color": palette[index % len(palette)]},
+            )
+        )
+        figure.add_trace(
+            go.Scatter(
+                x=[path[0, 0]],
+                y=[path[0, 1]],
+                mode="markers",
+                marker={"size": 7, "symbol": "circle-open", "color": palette[index % len(palette)]},
+                showlegend=False,
+            )
+        )
+    figure.update_layout(
+        title=title,
+        xaxis_title="x",
+        yaxis_title="y",
+        yaxis={"scaleanchor": "x", "scaleratio": 1.0},
+        template="plotly_white",
+        margin={"l": 30, "r": 20, "t": 50, "b": 30},
+        height=600,
+    )
+    return figure
+
+
+def orbit_figure_3d(paths: list[np.ndarray], labels: list[str], title: str) -> go.Figure:
+    figure = go.Figure()
+    palette = ["#0b84f3", "#f95d6a", "#00a878", "#ffa600", "#6c63ff"]
+    for index, (path, label) in enumerate(zip(paths, labels, strict=True)):
+        figure.add_trace(
+            go.Scatter3d(
+                x=path[:, 0],
+                y=path[:, 1],
+                z=path[:, 2],
+                mode="lines",
+                name=label,
+                line={"width": 6, "color": palette[index % len(palette)]},
+            )
+        )
+    figure.update_layout(
+        title=title,
+        scene={"aspectmode": "data", "xaxis_title": "x", "yaxis_title": "y", "zaxis_title": "z"},
+        margin={"l": 0, "r": 0, "t": 50, "b": 0},
+        height=600,
+    )
+    return figure
+
+
+def restricted_zero_velocity_figure(system: object, jacobi_constant: float) -> go.Figure:
+    x_values = np.linspace(-1.6, 1.6, 220)
+    y_values = np.linspace(-1.4, 1.4, 200)
+    x_grid, y_grid = np.meshgrid(x_values, y_values)
+    zvc = system.zero_velocity_curve(x_grid, y_grid, jacobi_constant)
+    figure = go.Figure()
+    figure.add_trace(
+        go.Contour(
+            x=x_values,
+            y=y_values,
+            z=zvc,
+            contours={"start": 0.0, "end": 0.0, "size": 1.0, "coloring": "lines"},
+            line={"color": "#2f4858", "width": 2},
+            showscale=False,
+            name="Zero Velocity Curve",
+        )
+    )
+    lagrange = system.lagrange_points()
+    for label, point in lagrange.items():
+        figure.add_trace(
+            go.Scatter(
+                x=[point[0]],
+                y=[point[1]],
+                mode="markers+text",
+                text=[label],
+                textposition="top center",
+                marker={"size": 8, "color": "#bc5090"},
+                showlegend=False,
+            )
+        )
+    primaries = system.primary_positions
+    figure.add_trace(
+        go.Scatter(
+            x=primaries[:, 0],
+            y=primaries[:, 1],
+            mode="markers",
+            marker={"size": 12, "color": "#003f5c"},
+            name="Primaries",
+        )
+    )
+    figure.update_layout(
+        title="Restricted Three-Body Zero-Velocity Geometry",
+        xaxis_title="x",
+        yaxis_title="y",
+        yaxis={"scaleanchor": "x", "scaleratio": 1.0},
+        template="plotly_white",
+        height=600,
+        margin={"l": 30, "r": 20, "t": 50, "b": 30},
+    )
+    return figure
+
+
+def render_two_body() -> None:
+    st.subheader("Two-Body Baseline")
+    library = OrbitLibrary()
+    analytic = AnalyticTwoBodySolver()
+    adaptive = AdaptiveIntegrator()
+    structure_aware = StructureAwareIntegrator()
+
+    col1, col2, col3 = st.columns(3)
+    semimajor_axis = col1.slider("Semimajor axis", 0.5, 3.0, 1.0, 0.1)
+    eccentricity = col2.slider("Eccentricity", 0.0, 0.9, 0.2, 0.01)
+    periods = col3.slider("Periods", 1.0, 5.0, 1.0, 0.5)
+
+    scenario = library.two_body_elliptic(semimajor_axis=semimajor_axis, eccentricity=eccentricity, periods=periods)
+    integrator_name = st.radio("Integrator", ["Adaptive", "Structure-Aware"], horizontal=True)
+    if integrator_name == "Adaptive":
+        trajectory = adaptive.integrate(scenario.system, scenario.t_span, scenario.initial_state, t_eval=scenario.t_eval)
+    else:
+        trajectory = structure_aware.integrate(scenario.system, scenario.t_span, scenario.initial_state)
+    analytic_solution = analytic.propagate(scenario.system, scenario.initial_state, trajectory.t)
+    monitor = InvariantMonitor(scenario.system)
+    invariants = monitor.evaluate(trajectory)
+
+    numerical_positions = trajectory.y[:, :2]
+    analytic_positions = analytic_solution.y[:, :2]
+    error = np.linalg.norm(numerical_positions - analytic_positions, axis=1)
+
+    left, right = st.columns([2, 1])
+    left.plotly_chart(
+        orbit_figure_2d([analytic_positions, numerical_positions], ["Analytic", "Numerical"], "Two-Body Orbit"),
+        use_container_width=True,
+    )
+    right.metric("Max position error", f"{np.max(error):.2e}")
+    right.metric("Max energy drift", f"{np.max(np.abs(invariants['energy_drift'])):.2e}")
+    right.metric("Max angular drift", f"{np.max(np.abs(invariants['angular_momentum_drift'])):.2e}")
+
+    lower_left, lower_right = st.columns(2)
+    lower_left.plotly_chart(line_figure(trajectory.t, error, "Analytic vs Numerical Error", "Position error"), use_container_width=True)
+    lower_right.plotly_chart(line_figure(trajectory.t, invariants["energy_drift"], "Energy Drift", "ΔE"), use_container_width=True)
+
+
+def render_restricted_three_body() -> None:
+    st.subheader("Restricted Three-Body")
+    library = OrbitLibrary()
+    adaptive = AdaptiveIntegrator()
+    phase_tools = PhaseSpaceTools()
+    scanner = InitialConditionScanner(adaptive)
+    fitter = CompactModelFitter()
+
+    col1, col2, col3 = st.columns(3)
+    mass_ratio = col1.slider("Mass ratio μ", 0.001, 0.2, 0.0121505856, 0.001)
+    perturb_x = col2.slider("L4 x perturbation", -0.08, 0.08, 0.01, 0.005)
+    periods = col3.slider("Periods", 5.0, 30.0, 15.0, 1.0)
+
+    st.caption("Restricted problem uses the adaptive solver because the rotating-frame equations include velocity coupling.")
+    scenario = library.restricted_l4(mass_ratio=mass_ratio, perturbation=(perturb_x, 0.0, 0.0, 0.0), periods=periods)
+    trajectory = adaptive.integrate(scenario.system, scenario.t_span, scenario.initial_state, t_eval=scenario.t_eval)
+    monitor = InvariantMonitor(scenario.system)
+    invariants = monitor.evaluate(trajectory)
+    section = phase_tools.planar_poincare_section(trajectory, x_index=0, y_index=1, vx_index=2, vy_index=3)
+
+    left, right = st.columns([2, 1])
+    left.plotly_chart(restricted_zero_velocity_figure(scenario.system, invariants["jacobi_constant"][0]), use_container_width=True)
+    right.metric("Jacobi drift max", f"{np.max(np.abs(invariants['jacobi_drift'])):.2e}")
+    right.metric("Section points", f"{len(section)}")
+    right.metric("Primary minimum approach", f"{np.min(scenario.system.distances(trajectory.y[:, :2])[0]):.3f}")
+
+    orbit_panel, drift_panel = st.columns(2)
+    orbit_panel.plotly_chart(
+        orbit_figure_2d([trajectory.y[:, :2]], ["Test particle"], "Rotating-Frame Trajectory"),
+        use_container_width=True,
+    )
+    drift_panel.plotly_chart(line_figure(trajectory.t, invariants["jacobi_drift"], "Jacobi Constant Drift", "ΔC"), use_container_width=True)
+
+    section_left, section_right = st.columns(2)
+    if len(section) >= 2:
+        x_n, x_next = phase_tools.return_map(section)
+        map_figure = go.Figure(go.Scatter(x=x_n, y=x_next, mode="markers", marker={"size": 6, "color": "#ef5675"}))
+        map_figure.update_layout(
+            title="Poincare Return Map",
+            xaxis_title="x_n",
+            yaxis_title="x_(n+1)",
+            template="plotly_white",
+            height=320,
+            margin={"l": 30, "r": 20, "t": 50, "b": 30},
+        )
+        section_left.plotly_chart(map_figure, use_container_width=True)
+    else:
+        section_left.info("No Poincare crossings detected for the current trajectory.")
+
+    if st.checkbox("Run a small basin scan", value=False):
+        x_values = np.linspace(0.6, 1.2, 16)
+        y_values = np.linspace(0.2, 1.0, 16)
+        classes = scanner.scan_restricted_grid(scenario.system, invariants["jacobi_constant"][0], x_values, y_values)
+        mapping = {"bounded": 0, "escape": 1, "collision": 2, "forbidden": 3}
+        numeric = np.vectorize(mapping.get)(classes)
+        heatmap = go.Figure(
+            go.Heatmap(
+                x=x_values,
+                y=y_values,
+                z=numeric,
+                colorscale=[
+                    [0.0, "#00a878"],
+                    [0.33, "#00a878"],
+                    [0.34, "#ffa600"],
+                    [0.66, "#ffa600"],
+                    [0.67, "#ef5675"],
+                    [0.9, "#ef5675"],
+                    [0.91, "#58508d"],
+                    [1.0, "#58508d"],
+                ],
+                showscale=False,
+            )
+        )
+        heatmap.update_layout(
+            title="Restricted Basin Scan",
+            xaxis_title="x",
+            yaxis_title="y",
+            template="plotly_white",
+            height=320,
+            margin={"l": 30, "r": 20, "t": 50, "b": 30},
+        )
+        section_right.plotly_chart(heatmap, use_container_width=True)
+    else:
+        compact_inputs = section[:, :2] if len(section) else np.array([[perturb_x, 0.0], [perturb_x * 1.1, 0.02], [perturb_x * 0.9, -0.02]])
+        compact_outputs = np.sum(compact_inputs**2, axis=1)
+        fit = fitter.fit(compact_inputs, compact_outputs, ("x", "vx"), "local_action_proxy")
+        section_right.write(
+            {
+                "compact_model": fit.target_name,
+                "rmse": fit.rmse,
+                "valid_radius": fit.valid_radius,
+                "center": fit.center.tolist(),
+            }
+        )
+
+
+def render_general_three_body() -> None:
+    st.subheader("General Newtonian Three-Body")
+    library = OrbitLibrary()
+    adaptive = AdaptiveIntegrator()
+    structure_aware = StructureAwareIntegrator()
+    stability = StabilityAnalyzer()
+
+    col1, col2, col3 = st.columns(3)
+    periods = col1.slider("Figure-eight periods", 0.5, 2.0, 1.0, 0.25)
+    perturbation = col2.slider("Initial perturbation", 0.0, 0.05, 0.001, 0.001)
+    integrator_name = col3.radio("Integrator", ["Adaptive", "Structure-Aware"], horizontal=False)
+
+    reference = library.general_figure_eight(periods=periods, perturbation_scale=0.0)
+    perturbed = library.general_figure_eight(periods=periods, perturbation_scale=perturbation)
+
+    if integrator_name == "Adaptive":
+        reference_traj = adaptive.integrate(reference.system, reference.t_span, reference.initial_state, t_eval=reference.t_eval)
+        perturbed_traj = adaptive.integrate(perturbed.system, perturbed.t_span, perturbed.initial_state, t_eval=perturbed.t_eval)
+    else:
+        reference_traj = structure_aware.integrate(reference.system, reference.t_span, reference.initial_state)
+        perturbed_traj = structure_aware.integrate(perturbed.system, perturbed.t_span, perturbed.initial_state)
+
+    monitor = InvariantMonitor(reference.system)
+    invariants = monitor.evaluate(reference_traj)
+    stability_report = stability.finite_time_lyapunov(reference_traj, perturbed_traj)
+    positions_final, _ = reference.system.split_state(reference_traj.y[-1])
+    positions_initial, _ = reference.system.split_state(reference_traj.y[0])
+    return_error = np.linalg.norm(positions_final - positions_initial)
+
+    body_paths = reference_traj.y[:, : reference.system.body_count * reference.system.dimension].reshape(
+        reference_traj.y.shape[0],
+        reference.system.body_count,
+        reference.system.dimension,
+    )
+
+    left, right = st.columns([2, 1])
+    if reference.system.dimension == 3:
+        left.plotly_chart(
+            orbit_figure_3d([body_paths[:, i, :] for i in range(reference.system.body_count)], ["Body 1", "Body 2", "Body 3"], "Three-Body Trajectories"),
+            use_container_width=True,
+        )
+    else:
+        left.plotly_chart(
+            orbit_figure_2d([body_paths[:, i, :] for i in range(reference.system.body_count)], ["Body 1", "Body 2", "Body 3"], "Three-Body Trajectories"),
+            use_container_width=True,
+        )
+    right.metric("Return error", f"{return_error:.2e}")
+    right.metric("Energy drift max", f"{np.max(np.abs(invariants['energy_drift'])):.2e}")
+    right.metric("Finite-time Lyapunov", f"{stability_report['finite_time_lyapunov']:.3e}")
+    right.write({"classification": stability_report["classification"]})
+
+    lower_left, lower_right = st.columns(2)
+    lower_left.plotly_chart(line_figure(reference_traj.t, invariants["energy_drift"], "Three-Body Energy Drift", "ΔE"), use_container_width=True)
+    lower_right.plotly_chart(
+        line_figure(reference_traj.t, stability_report["lyapunov_series"], "Finite-Time Lyapunov Series", "λ(t)"),
+        use_container_width=True,
+    )
+
+
+def main() -> None:
+    st.title("ThreeBody Dynamics Lab")
+    st.caption("Analytic two-body baseline, structured restricted three-body analysis, and precision-focused general three-body experiments.")
+    st.markdown(
+        """
+        This application is intentionally solver-first.
+        It exposes invariants, return maps, and sensitivity metrics instead of treating visualization as a standalone demo.
+        """
+    )
+
+    mode = st.sidebar.selectbox("Mode", ["Two-Body", "Restricted Three-Body", "General Three-Body"])
+    st.sidebar.markdown(
+        """
+        **Scientific framing**
+
+        - Two-body is the analytic reference.
+        - Restricted three-body is the first nonlinear structured target.
+        - General three-body is handled numerically with invariant monitoring.
+        """
+    )
+
+    if mode == "Two-Body":
+        render_two_body()
+    elif mode == "Restricted Three-Body":
+        render_restricted_three_body()
+    else:
+        render_general_three_body()
+
+
+if __name__ == "__main__":
+    main()
