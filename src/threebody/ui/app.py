@@ -4,7 +4,13 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-from threebody.analysis import AnalysisAtlas, FeatureConditionedTransitionModel, feature_vector_for_report
+from threebody.analysis import (
+    AnalysisAtlas,
+    ChartType,
+    FeatureConditionedTransitionModel,
+    feature_vector_for_report,
+    hierarchical_elements,
+)
 from threebody.diagnostics import InvariantMonitor, PhaseSpaceTools, StabilityAnalyzer
 from threebody.experiments import CompactModelFitter, InitialConditionScanner, OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator, AnalyticTwoBodySolver, StructureAwareIntegrator
@@ -395,6 +401,27 @@ def render_analysis_atlas(system: object, trajectory: object, stride: int | None
         ]
         if prediction_rows:
             st.dataframe(prediction_rows, use_container_width=True, hide_index=True)
+
+    if getattr(system, "body_count", None) == 3 and reports:
+        latest = reports[-1]
+        hierarchy_score = next((score.score for score in latest.scores if score.chart == ChartType.TWO_BODY_HIERARCHY), 0.0)
+        if hierarchy_score > 0.2:
+            elements = hierarchical_elements(system, trajectory.y[-1])
+            st.dataframe(
+                [
+                    {
+                        "inner_pair": str(elements.inner_pair),
+                        "outer_body": elements.outer_body,
+                        "a_inner": elements.inner_semimajor_axis,
+                        "e_inner": elements.inner_eccentricity,
+                        "perturbation": elements.perturbation_strength,
+                        "hierarchy_ratio": elements.hierarchy_ratio,
+                        "inner_bound": elements.is_inner_bound,
+                    }
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
 
 
 def render_two_body() -> None:

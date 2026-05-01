@@ -1,0 +1,57 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from ..types import TrajectoryResult
+from .atlas import AnalysisAtlas
+from .transition_graph import TransitionGraph
+from .transition_model import FeatureConditionedTransitionModel, transition_samples_from_reports
+from .types import AnalysisReport
+
+
+@dataclass(frozen=True, slots=True)
+class TransitionSurveyResult:
+    reports_by_name: dict[str, tuple[AnalysisReport, ...]]
+    graph: TransitionGraph
+    model: FeatureConditionedTransitionModel
+
+    def chart_distribution_rows(self) -> list[dict[str, float | str]]:
+        rows: list[dict[str, float | str]] = []
+        for name, reports in self.reports_by_name.items():
+            distribution = AnalysisAtlas.chart_distribution(reports)
+            for chart, share in distribution.items():
+                rows.append({"scenario": name, "chart": str(chart), "share": share})
+        return rows
+
+
+@dataclass(slots=True)
+class TransitionSurvey:
+    """Batch analysis loop for building transition evidence from trajectories."""
+
+    atlas: AnalysisAtlas = field(default_factory=AnalysisAtlas)
+
+    def run(
+        self,
+        cases: dict[str, tuple[object, TrajectoryResult]],
+        stride: int = 1,
+    ) -> TransitionSurveyResult:
+        graph = TransitionGraph()
+        all_samples = []
+        reports_by_name: dict[str, tuple[AnalysisReport, ...]] = {}
+
+        for name, (system, trajectory) in cases.items():
+            reports = self.atlas.analyze_trajectory(system, trajectory, stride=stride)
+            reports_by_name[name] = reports
+            graph.add(self.atlas.transitions(system, trajectory, stride=stride))
+            all_samples.extend(transition_samples_from_reports(reports))
+
+        model = FeatureConditionedTransitionModel()
+        model.fit(all_samples)
+        if not model.graph.counts:
+            model.graph = graph
+
+        return TransitionSurveyResult(
+            reports_by_name=reports_by_name,
+            graph=graph,
+            model=model,
+        )

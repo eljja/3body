@@ -19,7 +19,7 @@
 
 ## Phase 3: General Three-Body Robustness
 
-- implement Jacobi coordinate features and asymptotic Kepler elements
+- expand `hierarchical_elements` into full Jacobi coordinates and asymptotic Kepler elements
 - add close-encounter regularization
 - improve long-horizon drift tracking
 - add more benchmark families beyond figure-eight
@@ -44,5 +44,6 @@
 
 - parameter sweep automation
 - dataset export for structured experiments
+- batch transition surveys over perturbation ensembles
 - richer reporting notebooks or dashboards
 - remote repository and collaboration workflow

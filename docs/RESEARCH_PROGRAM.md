@@ -81,6 +81,13 @@ It stores feature prototypes for observed transitions and predicts likely next c
 This is not meant to be a final theory.
 It is the first falsifiable mechanism for asking whether a transition such as hierarchy to chaotic transport to escape has a repeatable condition.
 
+The first chart-specific analyzer is `hierarchical_elements`.
+When a two-body hierarchy is detected, it extracts the inner binary, its Kepler-like elements, the outer perturber, and a perturbation-strength estimate.
+This turns the hierarchy chart from a label into a concrete analysis model.
+
+`TransitionSurvey` is the batch loop for this program.
+It runs the atlas over multiple trajectories and returns chart reports, an empirical transition graph, and a feature-conditioned transition model.
+
 The long-term claim should be measured by coverage:
 
 - how much of state space is assigned to useful charts,
