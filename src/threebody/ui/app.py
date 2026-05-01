@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-from threebody.analysis import AnalysisAtlas
+from threebody.analysis import AnalysisAtlas, FeatureConditionedTransitionModel, feature_vector_for_report
 from threebody.diagnostics import InvariantMonitor, PhaseSpaceTools, StabilityAnalyzer
 from threebody.experiments import CompactModelFitter, InitialConditionScanner, OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator, AnalyticTwoBodySolver, StructureAwareIntegrator
@@ -377,6 +377,24 @@ def render_analysis_atlas(system: object, trajectory: object, stride: int | None
         right.dataframe(transition_rows, use_container_width=True, hide_index=True)
     else:
         right.info("No chart transitions detected at the current sampling stride.")
+
+    model = FeatureConditionedTransitionModel.from_reports(reports)
+    if reports and model.centroids:
+        current_report = reports[-1]
+        predictions = model.predict(current_report.primary_chart, feature_vector_for_report(current_report))
+        prediction_rows = [
+            {
+                "from": str(prediction.previous),
+                "to": str(prediction.current),
+                "score": round(prediction.score, 4),
+                "prior": round(prediction.prior, 4),
+                "distance": round(prediction.feature_distance, 4),
+                "samples": prediction.samples,
+            }
+            for prediction in predictions
+        ]
+        if prediction_rows:
+            st.dataframe(prediction_rows, use_container_width=True, hide_index=True)
 
 
 def render_two_body() -> None:

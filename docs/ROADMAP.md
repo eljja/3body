@@ -27,7 +27,7 @@
 
 ## Phase 4: Transition Laws
 
-- expand `TransitionGraph` from counts into feature-conditioned transition models
+- expand `FeatureConditionedTransitionModel` from centroids into validated feature-conditioned transition laws
 - collect chart transition events across trajectory ensembles
 - build transition graphs over state-space features
 - validate gateway, close-encounter, hierarchy, and escape transitions

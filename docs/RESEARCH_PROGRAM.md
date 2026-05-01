@@ -76,6 +76,11 @@ The working method is `Invariant-Transport Atlas`:
 The current codebase now contains the first version of that graph object through `TransitionGraph`.
 It is deliberately empirical: transitions are counted first, then promoted into candidate laws only after enough trajectories have been sampled.
 
+The next layer is `FeatureConditionedTransitionModel`.
+It stores feature prototypes for observed transitions and predicts likely next charts from the current feature vector.
+This is not meant to be a final theory.
+It is the first falsifiable mechanism for asking whether a transition such as hierarchy to chaotic transport to escape has a repeatable condition.
+
 The long-term claim should be measured by coverage:
 
 - how much of state space is assigned to useful charts,

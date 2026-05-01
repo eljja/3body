@@ -35,6 +35,7 @@ Turns trajectories into interpretive structure.
 - `ChartScore`
 - `ChartTransition`
 - `TransitionGraph`
+- `FeatureConditionedTransitionModel`
 - `finite_difference_jacobian`
 - `local_linearization`
 
