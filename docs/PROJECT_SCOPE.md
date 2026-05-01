@@ -2,31 +2,38 @@
 
 ## Purpose
 
-This project studies the two-body and three-body problems through code, with emphasis on:
+This project tries to build an analysis method for the three-body problem through code.
+The visualizer exists only to support intuition while developing that method.
 
-- high-precision numerical integration,
-- invariant tracking,
-- phase-space interpretation,
-- interactive visualization,
-- and regime-specific compact modeling.
+The working objective is an analysis atlas:
 
-The project does not claim a universal closed-form solution of the general three-body problem.
+- classify each state into an interpretive chart,
+- apply the best known method inside that chart,
+- detect transitions between charts,
+- preserve or measure the drift of relevant invariants,
+- and construct local compact models with explicit validity conditions.
+
+The project does not claim a single universal closed-form solution of the general three-body problem.
+It aims to make the problem analyzable by decomposing it into connected local descriptions.
 
 ## Why This Exists
 
 The two-body problem is analytically tractable after reduction to a central-force problem.
-The three-body problem is not generically integrable in the same way, so a practical research workflow must combine:
+The three-body problem is not generically integrable in the same way, so the project should combine:
 
-- trusted numerical solvers,
-- physical diagnostics,
-- structured benchmark orbits,
-- and local reduced models with explicit validity limits.
+- trusted numerical solvers as measurement devices,
+- invariant and variational diagnostics,
+- chart-specific classical methods,
+- transition maps between charts,
+- and structure-aware model discovery.
 
 ## Current Deliverables
 
 - reusable Python package under `src/threebody`
 - analytic and numerical solvers
 - diagnostics for conserved quantities and sensitivity
+- first-pass analysis atlas and chart classifier
+- finite-difference local linearization tools
 - reference orbit scenarios
 - Streamlit visualizer
 - automated tests

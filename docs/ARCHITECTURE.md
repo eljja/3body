@@ -26,6 +26,18 @@ Converts trajectories into interpretable physical signals.
 - `StabilityAnalyzer`
 - `PhaseSpaceTools`
 
+### `src/threebody/analysis`
+
+Turns trajectories into interpretive structure.
+
+- `AnalysisAtlas`
+- `ChartClassifier`
+- `ChartScore`
+- `ChartTransition`
+- `TransitionGraph`
+- `finite_difference_jacobian`
+- `local_linearization`
+
 ### `src/threebody/experiments`
 
 Packages repeatable experiment setup.
@@ -50,8 +62,9 @@ Contains the Streamlit interface for interactive inspection.
 1. A scenario is created by `OrbitLibrary`.
 2. A solver integrates the chosen system.
 3. Diagnostics derive invariant drift, sensitivity, or phase-space summaries.
-4. The UI renders trajectories and diagnostic panels.
-5. Compact modeling tools fit local surrogates from generated data.
+4. The analysis atlas classifies trajectory segments into interpretive charts.
+5. The UI renders trajectories, diagnostic panels, chart distributions, and transition events.
+6. Compact modeling tools fit local surrogates only after a chart has been identified.
 
 ## Immediate Extension Points
 
@@ -59,3 +72,5 @@ Contains the Streamlit interface for interactive inspection.
 - richer phase-space sampling
 - manifold tracking near equilibrium points
 - better compact-model validation and reporting
+- chart-specific normal forms
+- transition maps between analysis charts

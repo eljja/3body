@@ -1,13 +1,14 @@
 # ThreeBody
 
-`ThreeBody` is a Python research sandbox for the two-body problem, the circular restricted three-body problem, and the general Newtonian three-body problem.
+`ThreeBody` is a research project for building an analysis atlas of the two-body, restricted three-body, and general Newtonian three-body problems.
 
-The project is built around four ideas:
+The project is built around five ideas:
 
 - Use the two-body problem as an analytic baseline.
-- Treat the restricted three-body problem as the first structured nonlinear target.
-- Treat the general three-body problem as a high-precision numerical and dynamical-systems problem.
-- Only propose compact models inside clearly declared validity regimes.
+- Treat simulation as instrumentation, not as the final objective.
+- Combine classical mechanics, perturbation theory, regularization, continuation, invariant manifolds, and data-assisted discovery.
+- Decompose state space into interpretive charts and track transitions between them.
+- Build compact models only inside explicitly identified charts.
 
 ## What Is Implemented
 
@@ -23,6 +24,11 @@ The project is built around four ideas:
   - `InvariantMonitor`
   - `StabilityAnalyzer`
   - `PhaseSpaceTools`
+- `analysis`
+  - `AnalysisAtlas`
+  - `ChartClassifier`
+  - `finite_difference_jacobian`
+  - local chart transition detection
 - `experiments`
   - `OrbitLibrary`
   - `InitialConditionScanner`
@@ -32,11 +38,13 @@ The project is built around four ideas:
 
 ## Scientific Position
 
-The project does not attempt a universal closed-form solution of the three-body problem.
+The project does not treat the three-body problem as something to merely visualize.
+The goal is to construct a working analysis method.
 
-- The two-body problem is integrable because center-of-mass separation and relative-coordinate reduction turn it into a one-body central-force problem.
-- The general three-body problem is not generically integrable in the same way because simultaneous interactions prevent the same variable separation and the system lacks enough independent first integrals for a global closed-form solution.
-- The practical path is precise integration, invariant monitoring, phase-space analysis, and regime-specific reduced models.
+- The two-body problem remains the analytic reference because center-of-mass separation and relative-coordinate reduction turn it into a one-body central-force problem.
+- The general three-body problem is not generically integrable by one global formula, so the project treats it as an atlas problem.
+- Each region of state space should be assigned an interpretive chart: hierarchy, restricted/Lagrange, close encounter, periodic-orbit neighborhood, chaotic transport, or escape/scattering.
+- A real result is a chart, a validity condition, a reduced model, and a transition rule to neighboring charts.
 
 ## Quick Start
 
@@ -64,11 +72,12 @@ Launch the visualizer:
 - [Science Foundation](docs/SCIENCE_FOUNDATION.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development Guide](docs/DEVELOPMENT.md)
+- [Research Program](docs/RESEARCH_PROGRAM.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## Suggested Workflow
 
-1. Validate the integrators against the analytic two-body baseline.
-2. Explore Lagrange points, Jacobi drift, and zero-velocity curves in the restricted problem.
-3. Reproduce the figure-eight orbit and perturb it to inspect sensitivity.
-4. Fit compact local models only after selecting a narrow regime and declaring a validity radius.
+1. Use the simulator to generate trusted trajectories and invariant diagnostics.
+2. Classify each trajectory segment into an analysis chart.
+3. Apply the chart-specific method: Kepler reduction, restricted manifolds, regularization, continuation, sections, or local linearization.
+4. Record where chart transitions occur and build reduced models only inside validated chart domains.

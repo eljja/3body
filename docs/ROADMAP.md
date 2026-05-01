@@ -11,6 +11,7 @@
 
 ## Phase 2: Restricted Three-Body Depth
 
+- promote the analysis atlas from first-pass classification to validated chart assignment
 - improve basin scanning performance
 - add explicit L1/L2/L3 orbit experiments
 - expose zero-velocity energy slicing more clearly
@@ -18,19 +19,28 @@
 
 ## Phase 3: General Three-Body Robustness
 
+- implement Jacobi coordinate features and asymptotic Kepler elements
 - add close-encounter regularization
 - improve long-horizon drift tracking
 - add more benchmark families beyond figure-eight
 - add configurable softening and comparison studies
 
-## Phase 4: Compact Models
+## Phase 4: Transition Laws
+
+- expand `TransitionGraph` from counts into feature-conditioned transition models
+- collect chart transition events across trajectory ensembles
+- build transition graphs over state-space features
+- validate gateway, close-encounter, hierarchy, and escape transitions
+- compare transition prediction against direct integration
+
+## Phase 5: Compact Models
 
 - define target regimes explicitly
 - fit local reduced models from trajectory ensembles
 - report validity radius and error envelopes
 - compare surrogate predictions against full integration
 
-## Phase 5: Research Tooling
+## Phase 6: Research Tooling
 
 - parameter sweep automation
 - dataset export for structured experiments

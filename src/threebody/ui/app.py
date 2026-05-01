@@ -4,12 +4,15 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
+from threebody.analysis import AnalysisAtlas
 from threebody.diagnostics import InvariantMonitor, PhaseSpaceTools, StabilityAnalyzer
 from threebody.experiments import CompactModelFitter, InitialConditionScanner, OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator, AnalyticTwoBodySolver, StructureAwareIntegrator
 
 
 st.set_page_config(page_title="ThreeBody", layout="wide")
+
+PALETTE = ["#0b84f3", "#f95d6a", "#00a878", "#ffa600", "#6c63ff"]
 
 
 def line_figure(x: np.ndarray, y: np.ndarray, title: str, yaxis_title: str) -> go.Figure:
@@ -28,15 +31,15 @@ def line_figure(x: np.ndarray, y: np.ndarray, title: str, yaxis_title: str) -> g
 
 def orbit_figure_2d(paths: list[np.ndarray], labels: list[str], title: str) -> go.Figure:
     figure = go.Figure()
-    palette = ["#0b84f3", "#f95d6a", "#00a878", "#ffa600", "#6c63ff"]
     for index, (path, label) in enumerate(zip(paths, labels, strict=True)):
+        color = PALETTE[index % len(PALETTE)]
         figure.add_trace(
             go.Scatter(
                 x=path[:, 0],
                 y=path[:, 1],
                 mode="lines",
                 name=label,
-                line={"width": 2.5, "color": palette[index % len(palette)]},
+                line={"width": 2.5, "color": color},
             )
         )
         figure.add_trace(
@@ -44,7 +47,7 @@ def orbit_figure_2d(paths: list[np.ndarray], labels: list[str], title: str) -> g
                 x=[path[0, 0]],
                 y=[path[0, 1]],
                 mode="markers",
-                marker={"size": 7, "symbol": "circle-open", "color": palette[index % len(palette)]},
+                marker={"size": 7, "symbol": "circle-open", "color": color},
                 showlegend=False,
             )
         )
@@ -62,7 +65,6 @@ def orbit_figure_2d(paths: list[np.ndarray], labels: list[str], title: str) -> g
 
 def orbit_figure_3d(paths: list[np.ndarray], labels: list[str], title: str) -> go.Figure:
     figure = go.Figure()
-    palette = ["#0b84f3", "#f95d6a", "#00a878", "#ffa600", "#6c63ff"]
     for index, (path, label) in enumerate(zip(paths, labels, strict=True)):
         figure.add_trace(
             go.Scatter3d(
@@ -71,7 +73,7 @@ def orbit_figure_3d(paths: list[np.ndarray], labels: list[str], title: str) -> g
                 z=path[:, 2],
                 mode="lines",
                 name=label,
-                line={"width": 6, "color": palette[index % len(palette)]},
+                line={"width": 6, "color": PALETTE[index % len(PALETTE)]},
             )
         )
     figure.update_layout(
@@ -79,6 +81,217 @@ def orbit_figure_3d(paths: list[np.ndarray], labels: list[str], title: str) -> g
         scene={"aspectmode": "data", "xaxis_title": "x", "yaxis_title": "y", "zaxis_title": "z"},
         margin={"l": 0, "r": 0, "t": 50, "b": 0},
         height=600,
+    )
+    return figure
+
+
+def animation_indices(sample_count: int, target_frames: int = 180) -> np.ndarray:
+    frame_count = min(sample_count, max(30, target_frames))
+    return np.unique(np.linspace(0, sample_count - 1, frame_count, dtype=int))
+
+
+def padded_axis_ranges(
+    paths: list[np.ndarray],
+    frame_index: int,
+    static_points: np.ndarray | None = None,
+    padding_ratio: float = 0.12,
+    min_span: float = 0.5,
+) -> tuple[list[float], list[float]]:
+    visible_points = [path[: frame_index + 1] for path in paths]
+    if static_points is not None:
+        visible_points.append(np.asarray(static_points, dtype=float))
+    points = np.vstack(visible_points)
+
+    x_min = float(np.min(points[:, 0]))
+    x_max = float(np.max(points[:, 0]))
+    y_min = float(np.min(points[:, 1]))
+    y_max = float(np.max(points[:, 1]))
+
+    x_span = max(x_max - x_min, min_span)
+    y_span = max(y_max - y_min, min_span)
+    span = max(x_span, y_span)
+    padding = span * padding_ratio
+
+    x_center = 0.5 * (x_min + x_max)
+    y_center = 0.5 * (y_min + y_max)
+    half_span = 0.5 * span + padding
+
+    return [x_center - half_span, x_center + half_span], [y_center - half_span, y_center + half_span]
+
+
+def smooth_axis_ranges(
+    raw_ranges: list[tuple[list[float], list[float]]],
+    easing: float = 0.18,
+) -> list[tuple[list[float], list[float]]]:
+    if not raw_ranges:
+        return []
+
+    smoothed: list[tuple[list[float], list[float]]] = []
+    current_x = np.asarray(raw_ranges[0][0], dtype=float)
+    current_y = np.asarray(raw_ranges[0][1], dtype=float)
+    smoothed.append((current_x.tolist(), current_y.tolist()))
+
+    for x_range, y_range in raw_ranges[1:]:
+        target_x = np.asarray(x_range, dtype=float)
+        target_y = np.asarray(y_range, dtype=float)
+        current_x = current_x + easing * (target_x - current_x)
+        current_y = current_y + easing * (target_y - current_y)
+        smoothed.append((current_x.tolist(), current_y.tolist()))
+
+    return smoothed
+
+
+def animated_orbit_figure_2d(
+    paths: list[np.ndarray],
+    labels: list[str],
+    times: np.ndarray,
+    title: str,
+    static_points: np.ndarray | None = None,
+    static_labels: list[str] | None = None,
+    frame_count: int = 180,
+) -> go.Figure:
+    indices = animation_indices(len(times), target_frames=frame_count)
+    figure = go.Figure()
+    raw_ranges = [padded_axis_ranges(paths, int(frame_index), static_points=static_points) for frame_index in indices]
+    smoothed_ranges = smooth_axis_ranges(raw_ranges)
+    initial_x_range, initial_y_range = smoothed_ranges[0]
+
+    for index, (path, label) in enumerate(zip(paths, labels, strict=True)):
+        color = PALETTE[index % len(PALETTE)]
+        figure.add_trace(
+            go.Scatter(
+                x=path[:1, 0],
+                y=path[:1, 1],
+                mode="lines",
+                name=f"{label} trail",
+                line={"width": 2.5, "color": color},
+            )
+        )
+        figure.add_trace(
+            go.Scatter(
+                x=[path[0, 0]],
+                y=[path[0, 1]],
+                mode="markers",
+                name=label,
+                marker={"size": 10, "color": color},
+            )
+        )
+
+    if static_points is not None:
+        static_points = np.asarray(static_points, dtype=float)
+        figure.add_trace(
+            go.Scatter(
+                x=static_points[:, 0],
+                y=static_points[:, 1],
+                mode="markers+text",
+                name="Fixed bodies",
+                text=static_labels,
+                textposition="top center",
+                marker={"size": 12, "color": "#2f4858", "symbol": "diamond"},
+            )
+        )
+
+    frames: list[go.Frame] = []
+    for range_index, frame_index in enumerate(indices):
+        traces: list[go.Scatter] = []
+        for index, path in enumerate(paths):
+            color = PALETTE[index % len(PALETTE)]
+            traces.append(
+                go.Scatter(
+                    x=path[: frame_index + 1, 0],
+                    y=path[: frame_index + 1, 1],
+                    mode="lines",
+                    line={"width": 2.5, "color": color},
+                )
+            )
+            traces.append(
+                go.Scatter(
+                    x=[path[frame_index, 0]],
+                    y=[path[frame_index, 1]],
+                    mode="markers",
+                    marker={"size": 10, "color": color},
+                )
+            )
+        if static_points is not None:
+            traces.append(
+                go.Scatter(
+                    x=static_points[:, 0],
+                    y=static_points[:, 1],
+                    mode="markers+text",
+                    text=static_labels,
+                    textposition="top center",
+                    marker={"size": 12, "color": "#2f4858", "symbol": "diamond"},
+                )
+            )
+        x_range, y_range = smoothed_ranges[range_index]
+        frames.append(
+            go.Frame(
+                data=traces,
+                name=str(frame_index),
+                layout=go.Layout(xaxis={"range": x_range}, yaxis={"range": y_range}),
+            )
+        )
+
+    figure.frames = frames
+    figure.update_layout(
+        title={"text": title, "x": 0.18, "xanchor": "left"},
+        xaxis_title="x",
+        yaxis_title="y",
+        xaxis={"range": initial_x_range},
+        yaxis={"scaleanchor": "x", "scaleratio": 1.0, "range": initial_y_range},
+        template="plotly_white",
+        height=620,
+        margin={"l": 30, "r": 20, "t": 60, "b": 30},
+        updatemenus=[
+            {
+                "type": "buttons",
+                "direction": "left",
+                "x": 0.0,
+                "xanchor": "left",
+                "y": 1.16,
+                "yanchor": "top",
+                "buttons": [
+                    {
+                        "label": "Play",
+                        "method": "animate",
+                        "args": [
+                            None,
+                            {
+                                "frame": {"duration": 65, "redraw": True},
+                                "transition": {"duration": 45, "easing": "cubic-in-out"},
+                                "fromcurrent": True,
+                            },
+                        ],
+                    },
+                    {
+                        "label": "Pause",
+                        "method": "animate",
+                        "args": [
+                            [None],
+                            {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}},
+                        ],
+                    },
+                ],
+            }
+        ],
+        sliders=[
+            {
+                "active": 0,
+                "currentvalue": {"prefix": "Sample index: "},
+                "pad": {"t": 45},
+                "steps": [
+                    {
+                        "label": str(frame_index),
+                        "method": "animate",
+                        "args": [
+                            [str(frame_index)],
+                            {"frame": {"duration": 0, "redraw": True}, "mode": "immediate", "transition": {"duration": 0}},
+                        ],
+                    }
+                    for frame_index in indices
+                ],
+            }
+        ],
     )
     return figure
 
@@ -133,6 +346,37 @@ def restricted_zero_velocity_figure(system: object, jacobi_constant: float) -> g
         margin={"l": 30, "r": 20, "t": 50, "b": 30},
     )
     return figure
+
+
+def render_analysis_atlas(system: object, trajectory: object, stride: int | None = None) -> None:
+    atlas = AnalysisAtlas()
+    if stride is None:
+        stride = max(1, len(trajectory.t) // 120)
+    reports = atlas.analyze_trajectory(system, trajectory, stride=stride)
+    distribution = atlas.chart_distribution(reports)
+    transitions = atlas.transitions(system, trajectory, stride=stride)
+
+    distribution_rows = [
+        {"chart": str(chart), "share": round(share, 3)}
+        for chart, share in sorted(distribution.items(), key=lambda item: item[1], reverse=True)
+    ]
+    transition_rows = [
+        {
+            "time": round(transition.time, 4),
+            "from": str(transition.previous),
+            "to": str(transition.current),
+            "reason": transition.reason,
+        }
+        for transition in transitions[:20]
+    ]
+
+    st.subheader("Analysis Atlas")
+    left, right = st.columns(2)
+    left.dataframe(distribution_rows, use_container_width=True, hide_index=True)
+    if transition_rows:
+        right.dataframe(transition_rows, use_container_width=True, hide_index=True)
+    else:
+        right.info("No chart transitions detected at the current sampling stride.")
 
 
 def render_two_body() -> None:
@@ -207,6 +451,19 @@ def render_restricted_three_body() -> None:
         use_container_width=True,
     )
     drift_panel.plotly_chart(line_figure(trajectory.t, invariants["jacobi_drift"], "Jacobi Constant Drift", "ΔC"), use_container_width=True)
+
+    st.plotly_chart(
+        animated_orbit_figure_2d(
+            [trajectory.y[:, :2]],
+            ["Test particle"],
+            trajectory.t,
+            "Restricted Three-Body Animation",
+            static_points=scenario.system.primary_positions,
+            static_labels=["Primary 1", "Primary 2"],
+        ),
+        use_container_width=True,
+    )
+    render_analysis_atlas(scenario.system, trajectory)
 
     section_left, section_right = st.columns(2)
     if len(section) >= 2:
@@ -329,6 +586,17 @@ def render_general_three_body() -> None:
         use_container_width=True,
     )
 
+    st.plotly_chart(
+        animated_orbit_figure_2d(
+            [body_paths[:, i, :] for i in range(reference.system.body_count)],
+            ["Body 1", "Body 2", "Body 3"],
+            reference_traj.t,
+            "General Three-Body Animation",
+        ),
+        use_container_width=True,
+    )
+    render_analysis_atlas(reference.system, reference_traj)
+
 
 def main() -> None:
     st.title("ThreeBody Dynamics Lab")
@@ -361,3 +629,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+

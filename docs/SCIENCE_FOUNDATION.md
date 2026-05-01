@@ -90,6 +90,21 @@ The right standard is: explicit validity region, measurable error, and preserved
 This project follows:
 
 - analytic baseline for two-body,
-- structured exploration of the restricted three-body problem,
-- precision-first simulation for the general problem,
-- and only then local compact modeling.
+- analysis charts for restricted and general three-body states,
+- precision-first simulation as an instrument,
+- variational and transport diagnostics,
+- and chart-specific compact modeling.
+
+The intended object is an atlas, not a single formula.
+An orbit segment should carry a label explaining which theory currently applies:
+
+- two-body hierarchy,
+- democratic three-body interaction,
+- close encounter,
+- restricted Lagrange neighborhood,
+- zero-velocity gateway,
+- periodic-orbit neighborhood,
+- chaotic transport,
+- or escape/scattering transport.
+
+The research question becomes: how do these charts cover state space, and what laws govern transitions between them?
