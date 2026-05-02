@@ -106,6 +106,9 @@ The `ResearchRunResult.summary()` method exposes the output as chart distributio
 The command-line survey runner writes those summaries to JSON artifacts under `.runtime/research_runs/`.
 That gives the project a reproducible evidence trail: every proposed transition rule can be traced back to a concrete perturbation ensemble and rerun with tighter tolerances or larger samples.
 
+`TransitionLawValidator` is the next guardrail.
+Candidate laws discovered on one ensemble can now be tested on a held-out ensemble, producing precision and recall instead of relying on visual plausibility.
+
 The long-term claim should be measured by coverage:
 
 - how much of state space is assigned to useful charts,

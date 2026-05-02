@@ -40,6 +40,7 @@ Turns trajectories into interpretive structure.
 - `shape_space_coordinates`
 - `TransitionSurvey`
 - `ResearchPipeline`
+- `TransitionLawValidator`
 - `finite_difference_jacobian`
 - `local_linearization`
 

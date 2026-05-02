@@ -32,6 +32,12 @@ def build_parser() -> argparse.ArgumentParser:
     survey.add_argument("--stride", type=int, default=15, help="Classification stride through each trajectory.")
     survey.add_argument("--position-scale", type=float, default=1.0e-3, help="Position perturbation scale.")
     survey.add_argument("--velocity-scale", type=float, default=1.0e-3, help="Velocity perturbation scale.")
+    survey.add_argument(
+        "--validation-count",
+        type=int,
+        default=0,
+        help="If positive, mine laws on --count trajectories and validate them on this many held-out trajectories.",
+    )
     survey.add_argument("--rtol", type=float, default=1.0e-9, help="Adaptive integrator relative tolerance.")
     survey.add_argument("--atol", type=float, default=1.0e-11, help="Adaptive integrator absolute tolerance.")
     survey.add_argument(
@@ -49,13 +55,31 @@ def run_survey_command(args: argparse.Namespace) -> int:
     pipeline = ResearchPipeline(
         integrator=AdaptiveIntegrator(rtol=args.rtol, atol=args.atol),
     )
-    result = pipeline.run_perturbation_study(
-        scenario,
-        count=args.count,
-        position_scale=args.position_scale,
-        velocity_scale=args.velocity_scale,
-        stride=args.stride,
-    )
+    if args.validation_count > 0:
+        result = pipeline.run_discovery_validation_study(
+            scenario,
+            discovery_count=args.count,
+            validation_count=args.validation_count,
+            position_scale=args.position_scale,
+            velocity_scale=args.velocity_scale,
+            stride=args.stride,
+        )
+        summary = result.summary()
+        trajectory_count = len(result.discovery.trajectories) + len(result.validation.trajectories)
+        transition_count = len(result.discovery.survey.graph.rows()) + len(result.validation.survey.graph.rows())
+        candidate_law_count = len(result.discovery.candidate_laws)
+    else:
+        result = pipeline.run_perturbation_study(
+            scenario,
+            count=args.count,
+            position_scale=args.position_scale,
+            velocity_scale=args.velocity_scale,
+            stride=args.stride,
+        )
+        summary = result.summary()
+        trajectory_count = len(result.trajectories)
+        transition_count = len(result.survey.graph.rows())
+        candidate_law_count = len(result.candidate_laws)
     output = args.output or _default_output_path(args.scenario)
     output.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -73,14 +97,15 @@ def run_survey_command(args: argparse.Namespace) -> int:
                 "velocity_scale": args.velocity_scale,
                 "rtol": args.rtol,
                 "atol": args.atol,
+                "validation_count": args.validation_count,
             },
         },
-        "summary": result.summary(),
+        "summary": summary,
     }
     output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"wrote {output}")
-    print(f"trajectories={len(result.trajectories)} transitions={len(result.survey.graph.rows())}")
-    print(f"candidate_laws={len(result.candidate_laws)}")
+    print(f"trajectories={trajectory_count} transitions={transition_count}")
+    print(f"candidate_laws={candidate_law_count}")
     return 0
 
 
