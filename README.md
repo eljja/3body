@@ -69,7 +69,7 @@ Launch the visualizer:
 Run a transition survey:
 
 ```powershell
-& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli survey --scenario figure-eight --count 16 --periods 0.5 --samples 1200 --stride 20
+& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli survey --scenario hierarchical-flyby --count 16 --validation-count 16 --periods 8 --samples 1200 --stride 20
 ```
 
 ## Documentation

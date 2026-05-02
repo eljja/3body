@@ -22,12 +22,17 @@ def build_parser() -> argparse.ArgumentParser:
     survey = subparsers.add_parser("survey", help="Run a perturbation survey and export transition evidence.")
     survey.add_argument(
         "--scenario",
-        choices=("figure-eight", "restricted-l4", "restricted-l5"),
+        choices=("figure-eight", "hierarchical-flyby", "restricted-l4", "restricted-l5"),
         default="figure-eight",
         help="Reference scenario to perturb.",
     )
     survey.add_argument("--count", type=int, default=8, help="Number of perturbed trajectories.")
-    survey.add_argument("--periods", type=float, default=0.25, help="Scenario duration in orbital periods.")
+    survey.add_argument(
+        "--periods",
+        type=float,
+        default=0.25,
+        help="Scenario duration. For periodic scenarios this is periods; for flyby it is integration time.",
+    )
     survey.add_argument("--samples", type=int, default=600, help="Number of solver sample times.")
     survey.add_argument("--stride", type=int, default=15, help="Classification stride through each trajectory.")
     survey.add_argument("--position-scale", type=float, default=1.0e-3, help="Position perturbation scale.")
@@ -113,6 +118,8 @@ def _scenario_from_args(args: argparse.Namespace) -> Scenario:
     library = OrbitLibrary()
     if args.scenario == "figure-eight":
         return library.general_figure_eight(periods=args.periods, samples=args.samples)
+    if args.scenario == "hierarchical-flyby":
+        return library.general_hierarchical_flyby(duration=args.periods, samples=args.samples)
     if args.scenario == "restricted-l4":
         return library.restricted_l4(periods=args.periods, samples=args.samples)
     if args.scenario == "restricted-l5":

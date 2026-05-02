@@ -8,6 +8,12 @@ The command-line survey runner executes a perturbation ensemble, integrates each
 threebody survey --scenario figure-eight --count 16 --periods 0.5 --samples 1200 --stride 20
 ```
 
+For transition-law discovery, start with the hierarchical flyby benchmark because it is designed to leave and re-enter a binary hierarchy chart:
+
+```powershell
+threebody survey --scenario hierarchical-flyby --count 16 --validation-count 16 --periods 8 --samples 1200 --stride 20
+```
+
 To split the run into discovery and validation ensembles:
 
 ```powershell

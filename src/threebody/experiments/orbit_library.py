@@ -140,3 +140,58 @@ class OrbitLibrary:
             metadata={"period": figure_eight_period, "perturbation_scale": perturbation_scale},
         )
 
+    def general_hierarchical_flyby(
+        self,
+        binary_separation: float = 0.2,
+        intruder_mass: float = 0.2,
+        intruder_position: tuple[float, float] = (0.0, -2.0),
+        intruder_velocity: tuple[float, float] = (0.8, 1.2),
+        duration: float = 8.0,
+        samples: int = 1200,
+    ) -> Scenario:
+        system = GeneralThreeBodySystem(masses=(1.0, 1.0, intruder_mass), dimension=2)
+        half = 0.5 * binary_separation
+        positions = np.array(
+            [
+                [-half, 0.0],
+                [half, 0.0],
+                [intruder_position[0], intruder_position[1]],
+            ],
+            dtype=float,
+        )
+        binary_speed = 0.5 * math.sqrt(
+            system.gravitational_constant * (system.masses[0] + system.masses[1]) / binary_separation
+        )
+        velocities = np.array(
+            [
+                [0.0, binary_speed],
+                [0.0, -binary_speed],
+                [intruder_velocity[0], intruder_velocity[1]],
+            ],
+            dtype=float,
+        )
+        positions, velocities = _recenter(system, positions, velocities)
+        initial_state = system.flatten_state(positions, velocities)
+        t_eval = np.linspace(0.0, duration, samples)
+        return Scenario(
+            name="general-hierarchical-flyby",
+            system=system,
+            initial_state=initial_state,
+            t_span=(0.0, duration),
+            t_eval=t_eval,
+            description="Tight binary perturbed by a third-body flyby, designed to create chart transitions.",
+            metadata={
+                "binary_separation": binary_separation,
+                "intruder_mass": intruder_mass,
+                "intruder_position": intruder_position,
+                "intruder_velocity": intruder_velocity,
+            },
+        )
+
+
+def _recenter(system: GeneralThreeBodySystem, positions: np.ndarray, velocities: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    masses = np.asarray(system.masses, dtype=float)
+    center = np.average(positions, axis=0, weights=masses)
+    center_velocity = np.average(velocities, axis=0, weights=masses)
+    return positions - center, velocities - center_velocity
+

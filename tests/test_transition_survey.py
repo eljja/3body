@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from threebody.analysis import TransitionSurvey
+from threebody.analysis import AnalysisAtlas
 from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
 
@@ -23,3 +24,17 @@ def test_transition_survey_collects_reports_for_multiple_cases() -> None:
 
     assert set(result.reports_by_name) == {"figure-eight", "perturbed"}
     assert result.chart_distribution_rows()
+
+
+def test_hierarchical_flyby_produces_chart_transitions() -> None:
+    scenario = OrbitLibrary().general_hierarchical_flyby(duration=8.0, samples=600)
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    transitions = AnalysisAtlas().transitions(scenario.system, trajectory, stride=20)
+
+    assert transitions
