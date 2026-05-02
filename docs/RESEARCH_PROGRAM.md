@@ -85,8 +85,26 @@ The first chart-specific analyzer is `hierarchical_elements`.
 When a two-body hierarchy is detected, it extracts the inner binary, its Kepler-like elements, the outer perturber, and a perturbation-strength estimate.
 This turns the hierarchy chart from a label into a concrete analysis model.
 
+The general three-body feature vector now includes scale-separated shape-space coordinates: normalized triangle area, hyperradius, and side-length anisotropy.
+This matters because democratic motion, close approaches, hierarchy formation, and escape are not only energy events; they are also changes in triangle geometry.
+
 `TransitionSurvey` is the batch loop for this program.
 It runs the atlas over multiple trajectories and returns chart reports, an empirical transition graph, and a feature-conditioned transition model.
+
+`ResearchPipeline` closes the first full loop:
+
+1. perturb a base scenario,
+2. integrate each member,
+3. classify trajectory segments into charts,
+4. build transition evidence,
+5. mine simple candidate laws.
+
+This is the first version of the research machine.
+It does not solve the three-body problem by itself, but it creates the mechanism for turning many controlled perturbations into falsifiable transition hypotheses.
+The `ResearchRunResult.summary()` method exposes the output as chart distributions, transition rows, and candidate laws so runs can be compared over time.
+
+The command-line survey runner writes those summaries to JSON artifacts under `.runtime/research_runs/`.
+That gives the project a reproducible evidence trail: every proposed transition rule can be traced back to a concrete perturbation ensemble and rerun with tighter tolerances or larger samples.
 
 The long-term claim should be measured by coverage:
 

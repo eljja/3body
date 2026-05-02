@@ -20,6 +20,9 @@ dev = [
     "pytest>=8.0",
 ]
 
+[project.scripts]
+threebody = "threebody.cli:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 

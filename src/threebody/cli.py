@@ -1,0 +1,110 @@
+from __future__ import annotations
+
+import argparse
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Sequence
+
+from .analysis import ResearchPipeline
+from .experiments import OrbitLibrary
+from .solvers import AdaptiveIntegrator
+from .types import Scenario
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="threebody",
+        description="Three-body research tools for surveys, transition mining, and compact-model preparation.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    survey = subparsers.add_parser("survey", help="Run a perturbation survey and export transition evidence.")
+    survey.add_argument(
+        "--scenario",
+        choices=("figure-eight", "restricted-l4", "restricted-l5"),
+        default="figure-eight",
+        help="Reference scenario to perturb.",
+    )
+    survey.add_argument("--count", type=int, default=8, help="Number of perturbed trajectories.")
+    survey.add_argument("--periods", type=float, default=0.25, help="Scenario duration in orbital periods.")
+    survey.add_argument("--samples", type=int, default=600, help="Number of solver sample times.")
+    survey.add_argument("--stride", type=int, default=15, help="Classification stride through each trajectory.")
+    survey.add_argument("--position-scale", type=float, default=1.0e-3, help="Position perturbation scale.")
+    survey.add_argument("--velocity-scale", type=float, default=1.0e-3, help="Velocity perturbation scale.")
+    survey.add_argument("--rtol", type=float, default=1.0e-9, help="Adaptive integrator relative tolerance.")
+    survey.add_argument("--atol", type=float, default=1.0e-11, help="Adaptive integrator absolute tolerance.")
+    survey.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-<scenario>.json.",
+    )
+    survey.set_defaults(func=run_survey_command)
+    return parser
+
+
+def run_survey_command(args: argparse.Namespace) -> int:
+    scenario = _scenario_from_args(args)
+    pipeline = ResearchPipeline(
+        integrator=AdaptiveIntegrator(rtol=args.rtol, atol=args.atol),
+    )
+    result = pipeline.run_perturbation_study(
+        scenario,
+        count=args.count,
+        position_scale=args.position_scale,
+        velocity_scale=args.velocity_scale,
+        stride=args.stride,
+    )
+    output = args.output or _default_output_path(args.scenario)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "metadata": {
+            "created_at": datetime.now(UTC).isoformat(),
+            "scenario": scenario.name,
+            "description": scenario.description,
+            "t_span": list(scenario.t_span),
+            "samples": 0 if scenario.t_eval is None else int(len(scenario.t_eval)),
+            "parameters": {
+                "count": args.count,
+                "periods": args.periods,
+                "stride": args.stride,
+                "position_scale": args.position_scale,
+                "velocity_scale": args.velocity_scale,
+                "rtol": args.rtol,
+                "atol": args.atol,
+            },
+        },
+        "summary": result.summary(),
+    }
+    output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"wrote {output}")
+    print(f"trajectories={len(result.trajectories)} transitions={len(result.survey.graph.rows())}")
+    print(f"candidate_laws={len(result.candidate_laws)}")
+    return 0
+
+
+def _scenario_from_args(args: argparse.Namespace) -> Scenario:
+    library = OrbitLibrary()
+    if args.scenario == "figure-eight":
+        return library.general_figure_eight(periods=args.periods, samples=args.samples)
+    if args.scenario == "restricted-l4":
+        return library.restricted_l4(periods=args.periods, samples=args.samples)
+    if args.scenario == "restricted-l5":
+        return library.restricted_l5(periods=args.periods, samples=args.samples)
+    raise ValueError(f"Unknown scenario: {args.scenario}")
+
+
+def _default_output_path(scenario: str) -> Path:
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    return Path(".runtime") / "research_runs" / f"{stamp}-{scenario}.json"
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    return int(args.func(args))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -130,6 +130,9 @@ def feature_names_for_report(report: AnalysisReport) -> tuple[str, ...]:
             "total_energy",
             "angular_momentum_norm",
             "escape_index",
+            "normalized_area",
+            "hyperradius",
+            "shape_anisotropy",
         )
     if isinstance(features, RestrictedThreeBodyFeatures):
         return (
@@ -154,6 +157,9 @@ def feature_vector_for_report(report: AnalysisReport) -> np.ndarray:
                 features.total_energy,
                 features.angular_momentum_norm,
                 features.escape_index,
+                features.normalized_area,
+                features.hyperradius,
+                features.shape_anisotropy,
             ],
             dtype=float,
         )

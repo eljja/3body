@@ -37,9 +37,18 @@ Turns trajectories into interpretive structure.
 - `TransitionGraph`
 - `FeatureConditionedTransitionModel`
 - `hierarchical_elements`
+- `shape_space_coordinates`
 - `TransitionSurvey`
+- `ResearchPipeline`
 - `finite_difference_jacobian`
 - `local_linearization`
+
+### `src/threebody/cli.py`
+
+Runs repeatable research jobs from the command line.
+
+- `threebody survey`
+- `python -m threebody.cli survey`
 
 ### `src/threebody/experiments`
 
@@ -66,8 +75,9 @@ Contains the Streamlit interface for interactive inspection.
 2. A solver integrates the chosen system.
 3. Diagnostics derive invariant drift, sensitivity, or phase-space summaries.
 4. The analysis atlas classifies trajectory segments into interpretive charts.
-5. The UI renders trajectories, diagnostic panels, chart distributions, and transition events.
-6. Compact modeling tools fit local surrogates only after a chart has been identified.
+5. `ResearchPipeline` can perturb the initial condition, repeat the integration, and mine candidate transition laws.
+6. The UI renders trajectories, diagnostic panels, chart distributions, and transition events.
+7. Compact modeling tools fit local surrogates only after a chart has been identified.
 
 ## Immediate Extension Points
 

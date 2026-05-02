@@ -66,6 +66,12 @@ Launch the visualizer:
 & 'D:\Codex\.venv\Scripts\python.exe' -m streamlit run src/threebody/ui/app.py
 ```
 
+Run a transition survey:
+
+```powershell
+& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli survey --scenario figure-eight --count 16 --periods 0.5 --samples 1200 --stride 20
+```
+
 ## Documentation
 
 - [Project Scope](docs/PROJECT_SCOPE.md)
@@ -73,6 +79,7 @@ Launch the visualizer:
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development Guide](docs/DEVELOPMENT.md)
 - [Research Program](docs/RESEARCH_PROGRAM.md)
+- [Research Runs](docs/RESEARCH_RUNS.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## Suggested Workflow

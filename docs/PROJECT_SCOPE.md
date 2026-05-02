@@ -34,6 +34,7 @@ The three-body problem is not generically integrable in the same way, so the pro
 - diagnostics for conserved quantities and sensitivity
 - first-pass analysis atlas and chart classifier
 - finite-difference local linearization tools
+- perturbation ensembles, transition surveys, and first-pass law mining
 - reference orbit scenarios
 - Streamlit visualizer
 - automated tests

@@ -20,6 +20,9 @@ class GeneralThreeBodyFeatures:
     total_energy: float
     angular_momentum_norm: float
     escape_index: float
+    normalized_area: float
+    hyperradius: float
+    shape_anisotropy: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,10 +60,15 @@ def general_three_body_features(system: object, state: np.ndarray) -> GeneralThr
     potential = abs(_potential_energy(system, positions))
     virial_ratio = float(2.0 * kinetic / max(potential, 1.0e-12))
 
-    center = np.average(positions, axis=0, weights=np.asarray(system.masses, dtype=float))
+    masses = np.asarray(system.masses, dtype=float)
+    center = np.average(positions, axis=0, weights=masses)
     radii = np.linalg.norm(positions - center, axis=1)
     speeds_from_center = np.linalg.norm(velocities, axis=1)
     escape_index = float(np.max(radii * speeds_from_center))
+    side_sq_sum = float(np.sum(distances**2))
+    normalized_area = float(4.0 * np.sqrt(3.0) * abs(_signed_area_2d(positions)) / max(side_sq_sum, 1.0e-12))
+    hyperradius = float(np.sqrt(np.sum(masses[:, None] * (positions - center) ** 2) / np.sum(masses)))
+    shape_anisotropy = float((np.max(distances) - np.min(distances)) / max(np.mean(distances), 1.0e-12))
 
     return GeneralThreeBodyFeatures(
         pair_distances=distances,
@@ -73,6 +81,9 @@ def general_three_body_features(system: object, state: np.ndarray) -> GeneralThr
         total_energy=energy,
         angular_momentum_norm=angular,
         escape_index=escape_index,
+        normalized_area=normalized_area,
+        hyperradius=hyperradius,
+        shape_anisotropy=shape_anisotropy,
     )
 
 
@@ -114,3 +125,11 @@ def _potential_energy(system: object, positions: np.ndarray) -> float:
         distance = np.linalg.norm(positions[i] - positions[j])
         potential -= system.gravitational_constant * masses[i] * masses[j] / max(distance, 1.0e-12)
     return float(potential)
+
+
+def _signed_area_2d(positions: np.ndarray) -> float:
+    if positions.shape[1] < 2:
+        return 0.0
+    x = positions[:, 0]
+    y = positions[:, 1]
+    return float(0.5 * ((x[0] * (y[1] - y[2])) + (x[1] * (y[2] - y[0])) + (x[2] * (y[0] - y[1]))))

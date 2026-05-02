@@ -45,5 +45,13 @@
 - parameter sweep automation
 - dataset export for structured experiments
 - batch transition surveys over perturbation ensembles
+- persist `ResearchPipeline` outputs as datasets for repeated comparison
 - richer reporting notebooks or dashboards
 - remote repository and collaboration workflow
+
+## Phase 7: Law Validation
+
+- split transition evidence into discovery and validation ensembles
+- reject candidate laws that do not transfer across perturbation seeds
+- replace interval rules with chart-specific analytic criteria where possible
+- track law coverage, false positives, and missed transitions as first-class metrics
