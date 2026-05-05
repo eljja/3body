@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .analysis import ResearchPipeline
-from .experiments import OrbitLibrary
+from .experiments import HierarchicalFlybySweep, OrbitLibrary
 from .solvers import AdaptiveIntegrator
 from .types import Scenario
 
@@ -52,6 +52,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-<scenario>.json.",
     )
     survey.set_defaults(func=run_survey_command)
+    flyby_sweep = subparsers.add_parser("flyby-sweep", help="Sweep hierarchical flyby parameters and export boundary evidence.")
+    flyby_sweep.add_argument("--samples", type=int, default=600, help="Number of solver sample times per case.")
+    flyby_sweep.add_argument("--stride", type=int, default=20, help="Classification stride through each trajectory.")
+    flyby_sweep.add_argument("--duration", type=float, default=8.0, help="Integration time per flyby case.")
+    flyby_sweep.add_argument("--rtol", type=float, default=1.0e-9, help="Adaptive integrator relative tolerance.")
+    flyby_sweep.add_argument("--atol", type=float, default=1.0e-11, help="Adaptive integrator absolute tolerance.")
+    flyby_sweep.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-flyby-sweep.json.",
+    )
+    flyby_sweep.set_defaults(func=run_flyby_sweep_command)
     return parser
 
 
@@ -111,6 +124,33 @@ def run_survey_command(args: argparse.Namespace) -> int:
     print(f"wrote {output}")
     print(f"trajectories={trajectory_count} transitions={transition_count}")
     print(f"candidate_laws={candidate_law_count}")
+    return 0
+
+
+def run_flyby_sweep_command(args: argparse.Namespace) -> int:
+    sweep = HierarchicalFlybySweep(
+        integrator=AdaptiveIntegrator(rtol=args.rtol, atol=args.atol),
+    )
+    result = sweep.run(duration=args.duration, samples=args.samples, stride=args.stride)
+    output = args.output or _default_output_path("flyby-sweep")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "metadata": {
+            "created_at": datetime.now(UTC).isoformat(),
+            "kind": "hierarchical-flyby-sweep",
+            "parameters": {
+                "duration": args.duration,
+                "samples": args.samples,
+                "stride": args.stride,
+                "rtol": args.rtol,
+                "atol": args.atol,
+            },
+        },
+        "summary": result.as_dict(),
+    }
+    output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"wrote {output}")
+    print(f"cases={len(result.rows)} transitioning={result.as_dict()['transitioning_case_count']}")
     return 0
 
 

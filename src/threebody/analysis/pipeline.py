@@ -25,6 +25,8 @@ class ResearchRunResult:
             "chart_distribution": self.survey.chart_distribution_rows(),
             "transitions": self.survey.graph.rows(),
             "transition_events": self.survey.transition_event_rows(),
+            "transition_boundaries": self.survey.transition_boundary_rows(),
+            "hysteresis_loops": self.survey.hysteresis_loop_rows(),
             "candidate_laws": ResearchPipeline.law_rows(self.candidate_laws),
         }
 

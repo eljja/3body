@@ -14,6 +14,7 @@ class ChartClassifier:
 
     close_encounter_radius: float = 0.08
     hierarchy_ratio_threshold: float = 5.0
+    hierarchy_perturbation_threshold: float = 4.0e-3
     escape_index_threshold: float = 6.0
     lagrange_radius: float = 0.15
     gateway_margin_threshold: float = 0.03
@@ -84,12 +85,20 @@ class ChartClassifier:
         )
 
     def _score_hierarchy(self, features: object) -> ChartScore:
-        score = _clamped_score((features.hierarchy_ratio - 1.0) / (self.hierarchy_ratio_threshold - 1.0))
+        geometric_separation = _clamped_score((features.hierarchy_ratio - 1.0) / (self.hierarchy_ratio_threshold - 1.0))
+        perturbative_validity = _clamped_score(
+            1.0 - features.hierarchy_perturbation_strength / self.hierarchy_perturbation_threshold
+        )
+        score = _clamped_score(geometric_separation * perturbative_validity)
         return ChartScore(
             ChartType.TWO_BODY_HIERARCHY,
             score,
-            "One pair is much tighter than the third-body distance; use Jacobi coordinates and perturbed Kepler elements.",
-            {"hierarchy_ratio": features.hierarchy_ratio},
+            "One pair is separated and third-body tidal perturbation is small enough for Jacobi/Kepler analysis.",
+            {
+                "hierarchy_ratio": features.hierarchy_ratio,
+                "hierarchy_perturbation_strength": features.hierarchy_perturbation_strength,
+                "perturbative_validity": perturbative_validity,
+            },
         )
 
     def _score_escape(self, features: object) -> ChartScore:

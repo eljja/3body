@@ -33,9 +33,23 @@ Interpretation:
 The first useful hypothesis is not that `virial_ratio` alone causes the transition.
 The more physical statement is that the inner binary ceases to be the dominant chart when the third-body tidal perturbation scale crosses a local threshold, while the visible geometric symptom is a drop in hierarchy ratio.
 
+Refinement:
+
+The boundary is likely hysteretic rather than a single scalar threshold.
+In the current smoke run, leaving the hierarchy chart and returning to it occur at different crossing estimates in `hierarchy_perturbation_strength`.
+This suggests the active chart depends on both the instantaneous perturbation scale and the direction of motion through the boundary.
+
+Counter-pressure:
+
+The parameter sweep shows that the crossing estimate varies across intruder mass, impact parameter, and speed.
+Therefore H1 should not be stated as a universal constant threshold.
+The stronger and more defensible version is: `hierarchy_perturbation_strength` is a necessary boundary coordinate, but at least one additional coordinate is needed to collapse the boundary across flyby families.
+
 Next tests:
 
 - Sweep intruder mass, velocity, and impact parameter.
 - Measure whether the threshold scales with `(m_outer / m_inner_pair) * (r_inner / r_outer)^3`.
 - Replace fixed intervals with a chart boundary model in perturbation-strength and hierarchy-ratio coordinates.
+- Search for the missing collapse coordinate: impact parameter, incoming speed, angular momentum exchange, or encounter time over inner binary period.
+- The next explicit candidate is encounter adiabaticity: `encounter_time / inner_binary_period`.
 - Validate on held-out seeds and reject the law if precision or recall collapses outside the declared flyby regime.

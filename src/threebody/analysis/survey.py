@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 
 from ..types import TrajectoryResult
 from .atlas import AnalysisAtlas
+from .boundaries import estimate_transition_boundaries, transition_boundary_rows
+from .hysteresis import detect_hysteresis_loops, hysteresis_loop_rows
 from .transition_graph import TransitionGraph
 from .transition_model import FeatureConditionedTransitionModel, transition_samples_from_reports
 from .types import AnalysisReport
@@ -26,6 +28,13 @@ class TransitionSurveyResult:
 
     def transition_event_rows(self) -> list[dict[str, float | int | str]]:
         return transition_event_rows(transition_event_evidence(self.reports_by_name))
+
+    def transition_boundary_rows(self, coordinate: str = "hierarchy_perturbation_strength") -> list[dict[str, float | int | str]]:
+        return transition_boundary_rows(estimate_transition_boundaries(self.reports_by_name, coordinate=coordinate))
+
+    def hysteresis_loop_rows(self, coordinate: str = "hierarchy_perturbation_strength") -> list[dict[str, float | int | str | bool]]:
+        estimates = estimate_transition_boundaries(self.reports_by_name, coordinate=coordinate)
+        return hysteresis_loop_rows(detect_hysteresis_loops(estimates))
 
 
 @dataclass(slots=True)
