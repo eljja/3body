@@ -64,4 +64,22 @@ Next candidate:
 
 The missing coordinate is likely not another instantaneous geometry variable.
 The next model should include accumulated exchange, such as inner binary energy change, angular momentum exchange, or an impulse-like integral over the encounter.
+
+Implemented cumulative candidates:
+
+- relative inner binary energy exchange
+- relative inner binary angular momentum exchange
+- tidal impulse integral over the encounter
+
+Current cumulative-collapse result:
+
+Adding cumulative exchange variables substantially improves the flyby boundary collapse in the current sweep.
+The low-crossing improvement rises from a few percent with instantaneous variables to roughly half of the raw scatter.
+The high-crossing improvement also becomes large.
+
+Caveat:
+
+This is still not a final law.
+The current sweep has only about ten usable boundary samples, and the cumulative model has several fitted exponents.
+The next validation must use a wider held-out sweep and report whether the improvement survives.
 - Validate on held-out seeds and reject the law if precision or recall collapses outside the declared flyby regime.

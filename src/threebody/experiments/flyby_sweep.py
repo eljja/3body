@@ -8,6 +8,7 @@ import numpy as np
 from ..analysis import (
     AnalysisAtlas,
     detect_hysteresis_loops,
+    encounter_exchange_metrics,
     estimate_transition_boundaries,
     fit_power_law_boundary_collapse,
 )
@@ -28,6 +29,9 @@ class FlybySweepRow:
     case: FlybySweepCase
     incoming_speed: float
     encounter_adiabaticity: float
+    relative_inner_energy_exchange: float
+    relative_angular_momentum_exchange: float
+    tidal_impulse: float
     transition_count: int
     low_crossing: float | None
     high_crossing: float | None
@@ -43,6 +47,9 @@ class FlybySweepRow:
             "intruder_speed_y": self.case.intruder_speed_y,
             "incoming_speed": self.incoming_speed,
             "encounter_adiabaticity": self.encounter_adiabaticity,
+            "relative_inner_energy_exchange": self.relative_inner_energy_exchange,
+            "relative_angular_momentum_exchange": self.relative_angular_momentum_exchange,
+            "tidal_impulse": self.tidal_impulse,
             "transition_count": self.transition_count,
             "low_crossing": self.low_crossing,
             "high_crossing": self.high_crossing,
@@ -119,6 +126,7 @@ class HierarchicalFlybySweep:
             )
             reports = self.atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
             transitions = self.atlas.transitions(scenario.system, trajectory, stride=stride)
+            exchange = encounter_exchange_metrics(scenario.system, trajectory, inner_pair=(0, 1))
             perturbation_boundaries = estimate_transition_boundaries(
                 {"flyby": reports},
                 coordinate="hierarchy_perturbation_strength",
@@ -134,6 +142,9 @@ class HierarchicalFlybySweep:
                         case=case,
                         incoming_speed=incoming_speed,
                         encounter_adiabaticity=encounter_adiabaticity,
+                        relative_inner_energy_exchange=exchange.relative_inner_energy_exchange,
+                        relative_angular_momentum_exchange=exchange.relative_angular_momentum_exchange,
+                        tidal_impulse=exchange.tidal_impulse,
                         transition_count=len(transitions),
                         low_crossing=perturbation_loop.low_crossing,
                         high_crossing=perturbation_loop.high_crossing,
@@ -149,6 +160,9 @@ class HierarchicalFlybySweep:
                         case=case,
                         incoming_speed=incoming_speed,
                         encounter_adiabaticity=encounter_adiabaticity,
+                        relative_inner_energy_exchange=exchange.relative_inner_energy_exchange,
+                        relative_angular_momentum_exchange=exchange.relative_angular_momentum_exchange,
+                        tidal_impulse=exchange.tidal_impulse,
                         transition_count=len(transitions),
                         low_crossing=None,
                         high_crossing=None,
@@ -176,23 +190,43 @@ def _coefficient_of_variation_or_none(values: list[float]) -> float | None:
 
 def _collapse_fit_rows(rows: tuple[FlybySweepRow, ...]) -> list[dict[str, float | int | str | None]]:
     fits = []
-    for target_name, crossing_attr, hierarchy_attr in (
-        ("low_crossing", "low_crossing", "low_hierarchy_ratio"),
-        ("high_crossing", "high_crossing", "high_hierarchy_ratio"),
+    for target_name, crossing_attr, hierarchy_attr, include_cumulative in (
+        ("low_crossing_instantaneous", "low_crossing", "low_hierarchy_ratio", False),
+        ("high_crossing_instantaneous", "high_crossing", "high_hierarchy_ratio", False),
+        ("low_crossing_cumulative", "low_crossing", "low_hierarchy_ratio", True),
+        ("high_crossing_cumulative", "high_crossing", "high_hierarchy_ratio", True),
     ):
         target = []
         features = []
+        feature_names = ["encounter_adiabaticity", "hierarchy_ratio"]
+        if include_cumulative:
+            feature_names.extend(
+                [
+                    "relative_inner_energy_exchange",
+                    "relative_angular_momentum_exchange",
+                    "tidal_impulse",
+                ]
+            )
         for row in rows:
             crossing = getattr(row, crossing_attr)
             hierarchy_ratio = getattr(row, hierarchy_attr)
             if crossing is None or hierarchy_ratio is None:
                 continue
             target.append(crossing)
-            features.append([row.encounter_adiabaticity, hierarchy_ratio])
+            vector = [row.encounter_adiabaticity, hierarchy_ratio]
+            if include_cumulative:
+                vector.extend(
+                    [
+                        max(row.relative_inner_energy_exchange, 1.0e-12),
+                        max(row.relative_angular_momentum_exchange, 1.0e-12),
+                        max(row.tidal_impulse, 1.0e-12),
+                    ]
+                )
+            features.append(vector)
         fit = fit_power_law_boundary_collapse(
             np.asarray(target, dtype=float),
             np.asarray(features, dtype=float),
-            feature_names=("encounter_adiabaticity", "hierarchy_ratio"),
+            feature_names=tuple(feature_names),
             target_name=target_name,
         )
         fits.append(fit.rows())

@@ -5,6 +5,7 @@ from .collapse import BoundaryCollapseFit, fit_power_law_boundary_collapse
 from .coordinates import GeneralThreeBodyFeatures, RestrictedThreeBodyFeatures
 from .ensembles import PerturbationEnsemble, PerturbationMember
 from .events import TransitionEventEvidence, transition_event_evidence, transition_event_rows
+from .exchange import EncounterExchangeMetrics, encounter_exchange_metrics
 from .hierarchy import HierarchicalElements, hierarchical_elements
 from .hysteresis import TransitionHysteresisLoop, detect_hysteresis_loops, hysteresis_loop_rows
 from .rule_miner import CandidateTransitionLaw, TransitionRuleMiner
@@ -32,6 +33,7 @@ __all__ = [
     "ChartTransition",
     "ChartType",
     "CandidateTransitionLaw",
+    "EncounterExchangeMetrics",
     "FeatureConditionedTransitionModel",
     "GeneralThreeBodyFeatures",
     "HierarchicalElements",
@@ -59,6 +61,7 @@ __all__ = [
     "estimate_transition_boundaries",
     "fit_power_law_boundary_collapse",
     "detect_hysteresis_loops",
+    "encounter_exchange_metrics",
     "hierarchical_elements",
     "hysteresis_loop_rows",
     "local_linearization",

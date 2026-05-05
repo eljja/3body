@@ -21,4 +21,5 @@ def test_hierarchical_flyby_sweep_returns_boundary_rows() -> None:
     assert "high_crossing_cv" in summary
     assert "collapse_fits" in summary
     assert result.rows[0].encounter_adiabaticity > 0.0
+    assert result.rows[0].tidal_impulse > 0.0
     assert result.rows[0].transition_count > 0

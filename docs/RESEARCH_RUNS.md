@@ -35,6 +35,15 @@ The important metric is `improvement = 1 - collapsed_cv / raw_cv`.
 Positive improvement means the added coordinates reduce scatter in the boundary coordinate.
 Small or near-zero improvement is a negative result: it means the proposed collapse variables are not enough and the boundary model needs another physical coordinate.
 
+The cumulative collapse variants add:
+
+- `relative_inner_energy_exchange`
+- `relative_angular_momentum_exchange`
+- `tidal_impulse = integral hierarchy_perturbation_strength dt`
+
+These are encounter-level variables, not instantaneous boundary coordinates.
+When cumulative fits improve much more than instantaneous fits, the interpretation should be that hierarchy breakdown is controlled by accumulated exchange over the encounter, not only by the local tidal strength at a sampled transition point.
+
 To split the run into discovery and validation ensembles:
 
 ```powershell
