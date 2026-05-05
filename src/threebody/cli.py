@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .analysis import ResearchPipeline
-from .experiments import HierarchicalFlybySweep, OrbitLibrary
+from .experiments import BoundaryResolutionStudy, HierarchicalFlybySweep, OrbitLibrary
 from .solvers import AdaptiveIntegrator
 from .types import Scenario
 
@@ -70,6 +70,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-flyby-sweep.json.",
     )
     flyby_sweep.set_defaults(func=run_flyby_sweep_command)
+    resolution = subparsers.add_parser("boundary-resolution", help="Check boundary sensitivity to samples and stride.")
+    resolution.add_argument("--duration", type=float, default=8.0, help="Integration time per resolution case.")
+    resolution.add_argument("--rtol", type=float, default=1.0e-9, help="Adaptive integrator relative tolerance.")
+    resolution.add_argument("--atol", type=float, default=1.0e-11, help="Adaptive integrator absolute tolerance.")
+    resolution.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-boundary-resolution.json.",
+    )
+    resolution.set_defaults(func=run_boundary_resolution_command)
     return parser
 
 
@@ -168,6 +179,29 @@ def run_flyby_sweep_command(args: argparse.Namespace) -> int:
     output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"wrote {output}")
     print(f"cases={case_count} transitioning={transitioning_count}")
+    return 0
+
+
+def run_boundary_resolution_command(args: argparse.Namespace) -> int:
+    study = BoundaryResolutionStudy(integrator=AdaptiveIntegrator(rtol=args.rtol, atol=args.atol))
+    result = study.run(duration=args.duration)
+    output = args.output or _default_output_path("boundary-resolution")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "metadata": {
+            "created_at": datetime.now(UTC).isoformat(),
+            "kind": "boundary-resolution",
+            "parameters": {
+                "duration": args.duration,
+                "rtol": args.rtol,
+                "atol": args.atol,
+            },
+        },
+        "summary": result.as_dict(),
+    }
+    output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"wrote {output}")
+    print(f"cases={len(result.rows)}")
     return 0
 
 

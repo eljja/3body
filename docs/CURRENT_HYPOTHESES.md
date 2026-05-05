@@ -107,4 +107,10 @@ Working interpretation:
 
 The simplest surviving physical coordinate is the tidal impulse integral.
 Energy and angular momentum exchange refine the model, especially for the high crossing, but the impulse result suggests the core mechanism is accumulated tidal forcing over the encounter.
+
+Resolution check:
+
+The boundary-resolution smoke run indicates that the low crossing is stable across sample/stride settings.
+The high crossing is more sensitive, but its numerical-setting scatter is still smaller than the cross-family scatter that the cumulative model explains.
+This reduces the likelihood that the observed boundary collapse is only a sampling artifact.
 - Validate on held-out seeds and reject the law if precision or recall collapses outside the declared flyby regime.

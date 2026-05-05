@@ -54,6 +54,14 @@ This fits collapse exponents on the discovery grid and reports `collapse_validat
 The `best_validation_models` field selects the best held-out model separately for low and high crossings.
 Models with `passes_validation = true` currently require validation improvement above `0.25`.
 
+To check whether a boundary is a resolution artifact:
+
+```powershell
+threebody boundary-resolution --duration 8
+```
+
+This reruns the same benchmark across sample counts and classification strides, then reports crossing CV across those numerical settings.
+
 To split the run into discovery and validation ensembles:
 
 ```powershell
