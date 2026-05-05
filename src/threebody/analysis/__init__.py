@@ -2,6 +2,7 @@ from .atlas import AnalysisAtlas
 from .charts import ChartClassifier
 from .coordinates import GeneralThreeBodyFeatures, RestrictedThreeBodyFeatures
 from .ensembles import PerturbationEnsemble, PerturbationMember
+from .events import TransitionEventEvidence, transition_event_evidence, transition_event_rows
 from .hierarchy import HierarchicalElements, hierarchical_elements
 from .rule_miner import CandidateTransitionLaw, TransitionRuleMiner
 from .pipeline import ResearchPipeline, ResearchRunResult, ResearchValidationResult
@@ -38,6 +39,7 @@ __all__ = [
     "ResearchValidationResult",
     "RestrictedThreeBodyFeatures",
     "TransitionPrediction",
+    "TransitionEventEvidence",
     "TransitionGraph",
     "TransitionLawValidation",
     "TransitionLawValidator",
@@ -51,5 +53,7 @@ __all__ = [
     "hierarchical_elements",
     "local_linearization",
     "shape_space_coordinates",
+    "transition_event_evidence",
+    "transition_event_rows",
     "transition_samples_from_reports",
 ]

@@ -24,6 +24,7 @@ class ResearchRunResult:
             "trajectory_count": len(self.trajectories),
             "chart_distribution": self.survey.chart_distribution_rows(),
             "transitions": self.survey.graph.rows(),
+            "transition_events": self.survey.transition_event_rows(),
             "candidate_laws": ResearchPipeline.law_rows(self.candidate_laws),
         }
 

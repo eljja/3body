@@ -7,6 +7,7 @@ from .atlas import AnalysisAtlas
 from .transition_graph import TransitionGraph
 from .transition_model import FeatureConditionedTransitionModel, transition_samples_from_reports
 from .types import AnalysisReport
+from .events import transition_event_evidence, transition_event_rows
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +23,9 @@ class TransitionSurveyResult:
             for chart, share in distribution.items():
                 rows.append({"scenario": name, "chart": str(chart), "share": share})
         return rows
+
+    def transition_event_rows(self) -> list[dict[str, float | int | str]]:
+        return transition_event_rows(transition_event_evidence(self.reports_by_name))
 
 
 @dataclass(slots=True)

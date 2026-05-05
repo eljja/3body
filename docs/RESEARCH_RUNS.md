@@ -36,6 +36,7 @@ Each JSON artifact contains:
 - `metadata`: scenario, integration span, sample count, and survey parameters.
 - `summary.chart_distribution`: time-share of each interpretive chart for each ensemble member.
 - `summary.transitions`: empirical chart-to-chart transition counts and probabilities.
+- `summary.transition_events`: strongest feature change observed at each chart transition.
 - `summary.candidate_laws`: simple feature intervals that currently distinguish observed transitions.
 - `summary.law_validation`: precision/recall rows when `--validation-count` is used.
 
