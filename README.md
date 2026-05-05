@@ -80,6 +80,7 @@ Run a transition survey:
 - [Development Guide](docs/DEVELOPMENT.md)
 - [Research Program](docs/RESEARCH_PROGRAM.md)
 - [Research Runs](docs/RESEARCH_RUNS.md)
+- [Current Hypotheses](docs/CURRENT_HYPOTHESES.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## Suggested Workflow

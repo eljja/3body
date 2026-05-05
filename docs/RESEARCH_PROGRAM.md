@@ -111,6 +111,9 @@ That gives the project a reproducible evidence trail: every proposed transition 
 `TransitionLawValidator` is the next guardrail.
 Candidate laws discovered on one ensemble can now be tested on a held-out ensemble, producing precision and recall instead of relying on visual plausibility.
 
+Current working hypotheses are recorded in `docs/CURRENT_HYPOTHESES.md`.
+Only hypotheses with explicit scenario scope, candidate boundary variables, and validation metrics should be promoted into that file.
+
 The long-term claim should be measured by coverage:
 
 - how much of state space is assigned to useful charts,
