@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ..utils import cross_3d, pad_to_3d
+
 
 PAIR_INDICES: tuple[tuple[int, int], ...] = ((0, 1), (0, 2), (1, 2))
 
@@ -23,6 +25,11 @@ class GeneralThreeBodyFeatures:
     normalized_area: float
     hyperradius: float
     shape_anisotropy: float
+    nearest_pair_specific_energy: float
+    nearest_pair_eccentricity: float
+    nearest_pair_semimajor_axis: float
+    outer_specific_energy: float
+    hierarchy_perturbation_strength: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +76,13 @@ def general_three_body_features(system: object, state: np.ndarray) -> GeneralThr
     normalized_area = float(4.0 * np.sqrt(3.0) * abs(_signed_area_2d(positions)) / max(side_sq_sum, 1.0e-12))
     hyperradius = float(np.sqrt(np.sum(masses[:, None] * (positions - center) ** 2) / np.sum(masses)))
     shape_anisotropy = float((np.max(distances) - np.min(distances)) / max(np.mean(distances), 1.0e-12))
+    (
+        nearest_pair_specific_energy,
+        nearest_pair_eccentricity,
+        nearest_pair_semimajor_axis,
+        outer_specific_energy,
+        hierarchy_perturbation_strength,
+    ) = _nearest_pair_kepler_features(system, positions, velocities, masses, nearest_pair)
 
     return GeneralThreeBodyFeatures(
         pair_distances=distances,
@@ -84,6 +98,11 @@ def general_three_body_features(system: object, state: np.ndarray) -> GeneralThr
         normalized_area=normalized_area,
         hyperradius=hyperradius,
         shape_anisotropy=shape_anisotropy,
+        nearest_pair_specific_energy=nearest_pair_specific_energy,
+        nearest_pair_eccentricity=nearest_pair_eccentricity,
+        nearest_pair_semimajor_axis=nearest_pair_semimajor_axis,
+        outer_specific_energy=outer_specific_energy,
+        hierarchy_perturbation_strength=hierarchy_perturbation_strength,
     )
 
 
@@ -133,3 +152,38 @@ def _signed_area_2d(positions: np.ndarray) -> float:
     x = positions[:, 0]
     y = positions[:, 1]
     return float(0.5 * ((x[0] * (y[1] - y[2])) + (x[1] * (y[2] - y[0])) + (x[2] * (y[0] - y[1]))))
+
+
+def _nearest_pair_kepler_features(
+    system: object,
+    positions: np.ndarray,
+    velocities: np.ndarray,
+    masses: np.ndarray,
+    pair: tuple[int, int],
+) -> tuple[float, float, float, float, float]:
+    i, j = pair
+    outer = next(index for index in range(3) if index not in pair)
+    inner_position = positions[j] - positions[i]
+    inner_velocity = velocities[j] - velocities[i]
+    inner_radius = float(np.linalg.norm(inner_position))
+    inner_speed_sq = float(np.dot(inner_velocity, inner_velocity))
+    inner_mu = system.gravitational_constant * (masses[i] + masses[j])
+    inner_energy = 0.5 * inner_speed_sq - inner_mu / max(inner_radius, 1.0e-12)
+    inner_h = cross_3d(inner_position, inner_velocity)
+    eccentricity_vector = np.cross(pad_to_3d(inner_velocity), inner_h) / inner_mu - pad_to_3d(inner_position) / max(
+        inner_radius,
+        1.0e-12,
+    )
+    eccentricity = float(np.linalg.norm(eccentricity_vector))
+    semimajor_axis = float(-inner_mu / (2.0 * inner_energy)) if inner_energy < 0.0 else np.inf
+
+    pair_mass = masses[i] + masses[j]
+    pair_center = (masses[i] * positions[i] + masses[j] * positions[j]) / pair_mass
+    pair_velocity = (masses[i] * velocities[i] + masses[j] * velocities[j]) / pair_mass
+    outer_position = positions[outer] - pair_center
+    outer_velocity = velocities[outer] - pair_velocity
+    outer_radius = float(np.linalg.norm(outer_position))
+    outer_mu = system.gravitational_constant * (pair_mass + masses[outer])
+    outer_energy = 0.5 * float(np.dot(outer_velocity, outer_velocity)) - outer_mu / max(outer_radius, 1.0e-12)
+    perturbation_strength = float((masses[outer] / pair_mass) * (inner_radius / max(outer_radius, 1.0e-12)) ** 3)
+    return float(inner_energy), eccentricity, semimajor_axis, float(outer_energy), perturbation_strength

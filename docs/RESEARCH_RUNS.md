@@ -14,6 +14,9 @@ For transition-law discovery, start with the hierarchical flyby benchmark becaus
 threebody survey --scenario hierarchical-flyby --count 16 --validation-count 16 --periods 8 --samples 1200 --stride 20
 ```
 
+The expected first-order law in this benchmark should involve `hierarchy_perturbation_strength`.
+If the miner selects only generic features such as `virial_ratio`, the hierarchy chart is missing relevant Kepler/Jacobi features.
+
 To split the run into discovery and validation ensembles:
 
 ```powershell

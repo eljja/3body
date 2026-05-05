@@ -84,6 +84,8 @@ It is the first falsifiable mechanism for asking whether a transition such as hi
 The first chart-specific analyzer is `hierarchical_elements`.
 When a two-body hierarchy is detected, it extracts the inner binary, its Kepler-like elements, the outer perturber, and a perturbation-strength estimate.
 This turns the hierarchy chart from a label into a concrete analysis model.
+Those hierarchy variables are now part of the general transition feature vector: nearest-pair specific energy, eccentricity, semimajor axis, outer specific energy, and third-body perturbation strength.
+In the hierarchical flyby benchmark, the first mined law moves from a generic virial-ratio rule to a more interpretable perturbation-strength threshold.
 
 The general three-body feature vector now includes scale-separated shape-space coordinates: normalized triangle area, hyperradius, and side-length anisotropy.
 This matters because democratic motion, close approaches, hierarchy formation, and escape are not only energy events; they are also changes in triangle geometry.

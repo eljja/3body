@@ -133,6 +133,11 @@ def feature_names_for_report(report: AnalysisReport) -> tuple[str, ...]:
             "normalized_area",
             "hyperradius",
             "shape_anisotropy",
+            "nearest_pair_specific_energy",
+            "nearest_pair_eccentricity",
+            "nearest_pair_semimajor_axis",
+            "outer_specific_energy",
+            "hierarchy_perturbation_strength",
         )
     if isinstance(features, RestrictedThreeBodyFeatures):
         return (
@@ -160,6 +165,11 @@ def feature_vector_for_report(report: AnalysisReport) -> np.ndarray:
                 features.normalized_area,
                 features.hyperradius,
                 features.shape_anisotropy,
+                features.nearest_pair_specific_energy,
+                features.nearest_pair_eccentricity,
+                _finite_feature(features.nearest_pair_semimajor_axis),
+                features.outer_specific_energy,
+                features.hierarchy_perturbation_strength,
             ],
             dtype=float,
         )
@@ -175,3 +185,7 @@ def feature_vector_for_report(report: AnalysisReport) -> np.ndarray:
             dtype=float,
         )
     raise TypeError(f"Unsupported report feature type: {type(features)!r}")
+
+
+def _finite_feature(value: float) -> float:
+    return float(value) if np.isfinite(value) else 0.0
