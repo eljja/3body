@@ -5,7 +5,12 @@ from itertools import product
 
 import numpy as np
 
-from ..analysis import AnalysisAtlas, estimate_transition_boundaries, detect_hysteresis_loops
+from ..analysis import (
+    AnalysisAtlas,
+    detect_hysteresis_loops,
+    estimate_transition_boundaries,
+    fit_power_law_boundary_collapse,
+)
 from ..solvers import AdaptiveIntegrator
 from ..utils import orbit_period
 from .orbit_library import OrbitLibrary
@@ -26,6 +31,8 @@ class FlybySweepRow:
     transition_count: int
     low_crossing: float | None
     high_crossing: float | None
+    low_hierarchy_ratio: float | None
+    high_hierarchy_ratio: float | None
     hysteresis_width: float | None
     support: int
 
@@ -39,6 +46,8 @@ class FlybySweepRow:
             "transition_count": self.transition_count,
             "low_crossing": self.low_crossing,
             "high_crossing": self.high_crossing,
+            "low_hierarchy_ratio": self.low_hierarchy_ratio,
+            "high_hierarchy_ratio": self.high_hierarchy_ratio,
             "hysteresis_width": self.hysteresis_width,
             "support": self.support,
         }
@@ -61,6 +70,7 @@ class FlybySweepResult:
             "low_crossing_cv": _coefficient_of_variation_or_none(low_crossings),
             "high_crossing_mean": _mean_or_none(high_crossings),
             "high_crossing_cv": _coefficient_of_variation_or_none(high_crossings),
+            "collapse_fits": _collapse_fit_rows(self.rows),
         }
 
 
@@ -109,20 +119,28 @@ class HierarchicalFlybySweep:
             )
             reports = self.atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
             transitions = self.atlas.transitions(scenario.system, trajectory, stride=stride)
-            boundaries = estimate_transition_boundaries({"flyby": reports})
-            loops = detect_hysteresis_loops(boundaries)
-            if loops:
-                loop = loops[0]
+            perturbation_boundaries = estimate_transition_boundaries(
+                {"flyby": reports},
+                coordinate="hierarchy_perturbation_strength",
+            )
+            hierarchy_boundaries = estimate_transition_boundaries({"flyby": reports}, coordinate="hierarchy_ratio")
+            perturbation_loops = detect_hysteresis_loops(perturbation_boundaries)
+            hierarchy_loops = detect_hysteresis_loops(hierarchy_boundaries)
+            if perturbation_loops:
+                perturbation_loop = perturbation_loops[0]
+                hierarchy_loop = hierarchy_loops[0] if hierarchy_loops else None
                 rows.append(
                     FlybySweepRow(
                         case=case,
                         incoming_speed=incoming_speed,
                         encounter_adiabaticity=encounter_adiabaticity,
                         transition_count=len(transitions),
-                        low_crossing=loop.low_crossing,
-                        high_crossing=loop.high_crossing,
-                        hysteresis_width=loop.width,
-                        support=loop.support,
+                        low_crossing=perturbation_loop.low_crossing,
+                        high_crossing=perturbation_loop.high_crossing,
+                        low_hierarchy_ratio=None if hierarchy_loop is None else hierarchy_loop.low_crossing,
+                        high_hierarchy_ratio=None if hierarchy_loop is None else hierarchy_loop.high_crossing,
+                        hysteresis_width=perturbation_loop.width,
+                        support=perturbation_loop.support,
                     )
                 )
             else:
@@ -134,6 +152,8 @@ class HierarchicalFlybySweep:
                         transition_count=len(transitions),
                         low_crossing=None,
                         high_crossing=None,
+                        low_hierarchy_ratio=None,
+                        high_hierarchy_ratio=None,
                         hysteresis_width=None,
                         support=0,
                     )
@@ -152,3 +172,28 @@ def _coefficient_of_variation_or_none(values: list[float]) -> float | None:
     if abs(mean) < 1.0e-12:
         return None
     return float(np.std(values) / abs(mean))
+
+
+def _collapse_fit_rows(rows: tuple[FlybySweepRow, ...]) -> list[dict[str, float | int | str | None]]:
+    fits = []
+    for target_name, crossing_attr, hierarchy_attr in (
+        ("low_crossing", "low_crossing", "low_hierarchy_ratio"),
+        ("high_crossing", "high_crossing", "high_hierarchy_ratio"),
+    ):
+        target = []
+        features = []
+        for row in rows:
+            crossing = getattr(row, crossing_attr)
+            hierarchy_ratio = getattr(row, hierarchy_attr)
+            if crossing is None or hierarchy_ratio is None:
+                continue
+            target.append(crossing)
+            features.append([row.encounter_adiabaticity, hierarchy_ratio])
+        fit = fit_power_law_boundary_collapse(
+            np.asarray(target, dtype=float),
+            np.asarray(features, dtype=float),
+            feature_names=("encounter_adiabaticity", "hierarchy_ratio"),
+            target_name=target_name,
+        )
+        fits.append(fit.rows())
+    return fits

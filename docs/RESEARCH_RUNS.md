@@ -25,6 +25,15 @@ threebody flyby-sweep --duration 8 --samples 600 --stride 20
 
 The sweep varies intruder mass, impact parameter, and incoming speed, then reports transition counts and hysteresis crossing estimates per case.
 The aggregate crossing coefficient of variation is deliberately reported; a large CV means the current coordinate is useful but not yet a universal scalar threshold.
+The sweep also reports `collapse_fits`, which fit a power-law boundary collapse of the form:
+
+```text
+perturbation_strength ~= C * encounter_adiabaticity^a * hierarchy_ratio^b
+```
+
+The important metric is `improvement = 1 - collapsed_cv / raw_cv`.
+Positive improvement means the added coordinates reduce scatter in the boundary coordinate.
+Small or near-zero improvement is a negative result: it means the proposed collapse variables are not enough and the boundary model needs another physical coordinate.
 
 To split the run into discovery and validation ensembles:
 

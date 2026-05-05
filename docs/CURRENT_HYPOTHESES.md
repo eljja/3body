@@ -52,4 +52,16 @@ Next tests:
 - Replace fixed intervals with a chart boundary model in perturbation-strength and hierarchy-ratio coordinates.
 - Search for the missing collapse coordinate: impact parameter, incoming speed, angular momentum exchange, or encounter time over inner binary period.
 - The next explicit candidate is encounter adiabaticity: `encounter_time / inner_binary_period`.
+- Test whether `perturbation_strength / (encounter_adiabaticity^a * hierarchy_ratio^b)` reduces boundary scatter compared with raw perturbation strength.
+
+Current collapse result:
+
+The first power-law collapse is weak.
+In the current 12-case flyby sweep, adding encounter adiabaticity and hierarchy ratio reduces low-crossing CV only slightly and barely improves high-crossing CV.
+This is evidence against the three-variable boundary model being sufficient.
+
+Next candidate:
+
+The missing coordinate is likely not another instantaneous geometry variable.
+The next model should include accumulated exchange, such as inner binary energy change, angular momentum exchange, or an impulse-like integral over the encounter.
 - Validate on held-out seeds and reject the law if precision or recall collapses outside the declared flyby regime.
