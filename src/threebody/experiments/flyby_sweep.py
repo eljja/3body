@@ -11,6 +11,7 @@ from ..analysis import (
     encounter_exchange_metrics,
     estimate_transition_boundaries,
     fit_power_law_boundary_collapse,
+    validate_power_law_boundary_collapse,
 )
 from ..solvers import AdaptiveIntegrator
 from ..utils import orbit_period
@@ -78,6 +79,22 @@ class FlybySweepResult:
             "high_crossing_mean": _mean_or_none(high_crossings),
             "high_crossing_cv": _coefficient_of_variation_or_none(high_crossings),
             "collapse_fits": _collapse_fit_rows(self.rows),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class FlybySweepValidationResult:
+    discovery: FlybySweepResult
+    validation: FlybySweepResult
+    collapse_validations: tuple[dict[str, float | int | str | bool | None], ...]
+
+    def as_dict(self) -> dict[str, object]:
+        best = _best_validation_rows(self.collapse_validations)
+        return {
+            "discovery": self.discovery.as_dict(),
+            "validation": self.validation.as_dict(),
+            "collapse_validations": list(self.collapse_validations),
+            "best_validation_models": best,
         }
 
 
@@ -174,6 +191,44 @@ class HierarchicalFlybySweep:
                 )
         return FlybySweepResult(rows=tuple(rows))
 
+    def run_discovery_validation(
+        self,
+        discovery_intruder_masses: tuple[float, ...] = (0.1, 0.2, 0.4),
+        discovery_impact_parameters: tuple[float, ...] = (0.0, 0.2),
+        discovery_intruder_speed_y_values: tuple[float, ...] = (1.0, 1.2),
+        validation_intruder_masses: tuple[float, ...] = (0.15, 0.3, 0.5),
+        validation_impact_parameters: tuple[float, ...] = (0.1, 0.3),
+        validation_intruder_speed_y_values: tuple[float, ...] = (1.1, 1.3),
+        duration: float = 8.0,
+        samples: int = 600,
+        stride: int = 20,
+        binary_separation: float = 0.2,
+    ) -> FlybySweepValidationResult:
+        discovery = self.run(
+            intruder_masses=discovery_intruder_masses,
+            impact_parameters=discovery_impact_parameters,
+            intruder_speed_y_values=discovery_intruder_speed_y_values,
+            duration=duration,
+            samples=samples,
+            stride=stride,
+            binary_separation=binary_separation,
+        )
+        validation = self.run(
+            intruder_masses=validation_intruder_masses,
+            impact_parameters=validation_impact_parameters,
+            intruder_speed_y_values=validation_intruder_speed_y_values,
+            duration=duration,
+            samples=samples,
+            stride=stride,
+            binary_separation=binary_separation,
+        )
+        collapse_validations = _collapse_validation_rows(discovery.rows, validation.rows)
+        return FlybySweepValidationResult(
+            discovery=discovery,
+            validation=validation,
+            collapse_validations=tuple(collapse_validations),
+        )
+
 
 def _mean_or_none(values: list[float]) -> float | None:
     return None if not values else float(np.mean(values))
@@ -189,45 +244,122 @@ def _coefficient_of_variation_or_none(values: list[float]) -> float | None:
 
 
 def _collapse_fit_rows(rows: tuple[FlybySweepRow, ...]) -> list[dict[str, float | int | str | None]]:
+    return [fit.rows() for fit in _collapse_fits(rows)]
+
+
+def _collapse_fits(rows: tuple[FlybySweepRow, ...]):
     fits = []
-    for target_name, crossing_attr, hierarchy_attr, include_cumulative in (
-        ("low_crossing_instantaneous", "low_crossing", "low_hierarchy_ratio", False),
-        ("high_crossing_instantaneous", "high_crossing", "high_hierarchy_ratio", False),
-        ("low_crossing_cumulative", "low_crossing", "low_hierarchy_ratio", True),
-        ("high_crossing_cumulative", "high_crossing", "high_hierarchy_ratio", True),
-    ):
-        target = []
-        features = []
-        feature_names = ["encounter_adiabaticity", "hierarchy_ratio"]
-        if include_cumulative:
-            feature_names.extend(
-                [
-                    "relative_inner_energy_exchange",
-                    "relative_angular_momentum_exchange",
-                    "tidal_impulse",
-                ]
-            )
-        for row in rows:
-            crossing = getattr(row, crossing_attr)
-            hierarchy_ratio = getattr(row, hierarchy_attr)
-            if crossing is None or hierarchy_ratio is None:
-                continue
-            target.append(crossing)
-            vector = [row.encounter_adiabaticity, hierarchy_ratio]
-            if include_cumulative:
-                vector.extend(
-                    [
-                        max(row.relative_inner_energy_exchange, 1.0e-12),
-                        max(row.relative_angular_momentum_exchange, 1.0e-12),
-                        max(row.tidal_impulse, 1.0e-12),
-                    ]
-                )
-            features.append(vector)
+    for spec in _collapse_specs():
+        target, features = _target_and_features(rows, spec)
         fit = fit_power_law_boundary_collapse(
-            np.asarray(target, dtype=float),
-            np.asarray(features, dtype=float),
-            feature_names=tuple(feature_names),
-            target_name=target_name,
+            target,
+            features,
+            feature_names=spec["feature_names"],
+            target_name=spec["target_name"],
         )
-        fits.append(fit.rows())
+        fits.append(fit)
     return fits
+
+
+def _collapse_validation_rows(
+    discovery_rows: tuple[FlybySweepRow, ...],
+    validation_rows: tuple[FlybySweepRow, ...],
+) -> list[dict[str, float | int | str | bool | None]]:
+    rows = []
+    for spec, fit in zip(_collapse_specs(), _collapse_fits(discovery_rows), strict=True):
+        target, features = _target_and_features(validation_rows, spec)
+        validation = validate_power_law_boundary_collapse(fit, target, features)
+        rows.append(validation.rows())
+    return rows
+
+
+def _best_validation_rows(
+    rows: tuple[dict[str, float | int | str | bool | None], ...],
+) -> list[dict[str, float | int | str | bool | None]]:
+    best_by_direction: dict[str, dict[str, float | int | str | bool | None]] = {}
+    for row in rows:
+        target = str(row["target"])
+        direction = "low" if target.startswith("low_") else "high"
+        improvement = row.get("validation_improvement")
+        if improvement is None:
+            continue
+        current = best_by_direction.get(direction)
+        if current is None or float(improvement) > float(current.get("validation_improvement") or -np.inf):
+            best_by_direction[direction] = row
+    return [best_by_direction[key] for key in sorted(best_by_direction)]
+
+
+def _collapse_specs() -> tuple[dict[str, object], ...]:
+    specs = []
+    for prefix, crossing_attr, hierarchy_attr in (
+        ("low_crossing", "low_crossing", "low_hierarchy_ratio"),
+        ("high_crossing", "high_crossing", "high_hierarchy_ratio"),
+    ):
+        specs.extend(
+            [
+                {
+                    "target_name": f"{prefix}_instantaneous",
+                    "crossing_attr": crossing_attr,
+                    "hierarchy_attr": hierarchy_attr,
+                    "feature_names": ("encounter_adiabaticity", "hierarchy_ratio"),
+                },
+                {
+                    "target_name": f"{prefix}_impulse",
+                    "crossing_attr": crossing_attr,
+                    "hierarchy_attr": hierarchy_attr,
+                    "feature_names": ("encounter_adiabaticity", "hierarchy_ratio", "tidal_impulse"),
+                },
+                {
+                    "target_name": f"{prefix}_exchange",
+                    "crossing_attr": crossing_attr,
+                    "hierarchy_attr": hierarchy_attr,
+                    "feature_names": (
+                        "encounter_adiabaticity",
+                        "hierarchy_ratio",
+                        "relative_inner_energy_exchange",
+                        "relative_angular_momentum_exchange",
+                    ),
+                },
+                {
+                    "target_name": f"{prefix}_cumulative",
+                    "crossing_attr": crossing_attr,
+                    "hierarchy_attr": hierarchy_attr,
+                    "feature_names": (
+                        "encounter_adiabaticity",
+                        "hierarchy_ratio",
+                        "relative_inner_energy_exchange",
+                        "relative_angular_momentum_exchange",
+                        "tidal_impulse",
+                    ),
+                },
+            ]
+        )
+    return tuple(specs)
+
+
+def _target_and_features(rows: tuple[FlybySweepRow, ...], spec: dict[str, object]) -> tuple[np.ndarray, np.ndarray]:
+    target = []
+    features = []
+    for row in rows:
+        crossing = getattr(row, str(spec["crossing_attr"]))
+        hierarchy_ratio = getattr(row, str(spec["hierarchy_attr"]))
+        if crossing is None or hierarchy_ratio is None:
+            continue
+        target.append(crossing)
+        vector = [_feature_value(row, hierarchy_ratio, name) for name in spec["feature_names"]]
+        features.append(vector)
+    return np.asarray(target, dtype=float), np.asarray(features, dtype=float)
+
+
+def _feature_value(row: FlybySweepRow, hierarchy_ratio: float, name: str) -> float:
+    if name == "encounter_adiabaticity":
+        return row.encounter_adiabaticity
+    if name == "hierarchy_ratio":
+        return hierarchy_ratio
+    if name == "relative_inner_energy_exchange":
+        return max(row.relative_inner_energy_exchange, 1.0e-12)
+    if name == "relative_angular_momentum_exchange":
+        return max(row.relative_angular_momentum_exchange, 1.0e-12)
+    if name == "tidal_impulse":
+        return max(row.tidal_impulse, 1.0e-12)
+    raise ValueError(f"Unknown collapse feature: {name}")

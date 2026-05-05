@@ -24,7 +24,7 @@ class BoundaryCollapseFit:
         log_prediction = self.intercept + log_features @ np.asarray(self.coefficients, dtype=float)
         return np.exp(log_prediction)
 
-    def rows(self) -> dict[str, float | int | str | None]:
+    def rows(self) -> dict[str, float | int | str | bool | None]:
         row: dict[str, float | int | str | None] = {
             "target": self.target_name,
             "support": self.support,
@@ -36,6 +36,39 @@ class BoundaryCollapseFit:
         for name, coefficient in zip(self.feature_names, self.coefficients, strict=True):
             row[f"exponent_{name}"] = coefficient
         return row
+
+
+@dataclass(frozen=True, slots=True)
+class BoundaryCollapseValidation:
+    target_name: str
+    feature_names: tuple[str, ...]
+    training_support: int
+    validation_support: int
+    training_raw_cv: float | None
+    training_collapsed_cv: float | None
+    training_improvement: float | None
+    validation_raw_cv: float | None
+    validation_collapsed_cv: float | None
+    validation_improvement: float | None
+
+    @property
+    def passes_validation(self) -> bool:
+        return self.validation_improvement is not None and self.validation_improvement > 0.25
+
+    def rows(self) -> dict[str, float | int | str | bool | None]:
+        return {
+            "target": self.target_name,
+            "features": ",".join(self.feature_names),
+            "training_support": self.training_support,
+            "validation_support": self.validation_support,
+            "training_raw_cv": self.training_raw_cv,
+            "training_collapsed_cv": self.training_collapsed_cv,
+            "training_improvement": self.training_improvement,
+            "validation_raw_cv": self.validation_raw_cv,
+            "validation_collapsed_cv": self.validation_collapsed_cv,
+            "validation_improvement": self.validation_improvement,
+            "passes_validation": self.passes_validation,
+        }
 
 
 def fit_power_law_boundary_collapse(
@@ -91,6 +124,52 @@ def fit_power_law_boundary_collapse(
         collapsed_cv=collapsed_cv,
         improvement=improvement,
         support=int(target.size),
+    )
+
+
+def validate_power_law_boundary_collapse(
+    fit: BoundaryCollapseFit,
+    target: np.ndarray,
+    features: np.ndarray,
+) -> BoundaryCollapseValidation:
+    target = np.asarray(target, dtype=float)
+    features = np.asarray(features, dtype=float)
+    if target.size == 0 or features.size == 0:
+        validation_raw_cv = None
+        validation_collapsed_cv = None
+        validation_improvement = None
+        support = 0
+    else:
+        features = np.atleast_2d(features)
+        mask = np.isfinite(target) & (target > 0.0) & np.all(np.isfinite(features) & (features > 0.0), axis=1)
+        target = target[mask]
+        features = features[mask]
+        support = int(target.size)
+        if support == 0:
+            validation_raw_cv = None
+            validation_collapsed_cv = None
+            validation_improvement = None
+        else:
+            predicted = fit.predict(features)
+            collapsed = target / np.maximum(predicted, 1.0e-300)
+            validation_raw_cv = _coefficient_of_variation(target)
+            validation_collapsed_cv = _coefficient_of_variation(collapsed)
+            validation_improvement = (
+                None
+                if validation_raw_cv in (None, 0.0) or validation_collapsed_cv is None
+                else float(1.0 - validation_collapsed_cv / validation_raw_cv)
+            )
+    return BoundaryCollapseValidation(
+        target_name=fit.target_name,
+        feature_names=fit.feature_names,
+        training_support=fit.support,
+        validation_support=support,
+        training_raw_cv=fit.raw_cv,
+        training_collapsed_cv=fit.collapsed_cv,
+        training_improvement=fit.improvement,
+        validation_raw_cv=validation_raw_cv,
+        validation_collapsed_cv=validation_collapsed_cv,
+        validation_improvement=validation_improvement,
     )
 
 

@@ -23,3 +23,25 @@ def test_hierarchical_flyby_sweep_returns_boundary_rows() -> None:
     assert result.rows[0].encounter_adiabaticity > 0.0
     assert result.rows[0].tidal_impulse > 0.0
     assert result.rows[0].transition_count > 0
+
+
+def test_hierarchical_flyby_sweep_runs_heldout_validation() -> None:
+    sweep = HierarchicalFlybySweep(integrator=AdaptiveIntegrator(rtol=1.0e-8, atol=1.0e-10))
+
+    result = sweep.run_discovery_validation(
+        discovery_intruder_masses=(0.2,),
+        discovery_impact_parameters=(0.0,),
+        discovery_intruder_speed_y_values=(1.2,),
+        validation_intruder_masses=(0.3,),
+        validation_impact_parameters=(0.1,),
+        validation_intruder_speed_y_values=(1.1,),
+        duration=8.0,
+        samples=250,
+        stride=20,
+    )
+
+    summary = result.as_dict()
+    assert summary["discovery"]["case_count"] == 1
+    assert summary["validation"]["case_count"] == 1
+    assert summary["collapse_validations"]
+    assert "best_validation_models" in summary

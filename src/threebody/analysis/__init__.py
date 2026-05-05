@@ -1,7 +1,7 @@
 from .atlas import AnalysisAtlas
 from .boundaries import TransitionBoundaryEstimate, estimate_transition_boundaries, transition_boundary_rows
 from .charts import ChartClassifier
-from .collapse import BoundaryCollapseFit, fit_power_law_boundary_collapse
+from .collapse import BoundaryCollapseFit, BoundaryCollapseValidation, fit_power_law_boundary_collapse, validate_power_law_boundary_collapse
 from .coordinates import GeneralThreeBodyFeatures, RestrictedThreeBodyFeatures
 from .ensembles import PerturbationEnsemble, PerturbationMember
 from .events import TransitionEventEvidence, transition_event_evidence, transition_event_rows
@@ -28,6 +28,7 @@ __all__ = [
     "AnalysisAtlas",
     "AnalysisReport",
     "BoundaryCollapseFit",
+    "BoundaryCollapseValidation",
     "ChartClassifier",
     "ChartScore",
     "ChartTransition",
@@ -60,6 +61,7 @@ __all__ = [
     "finite_difference_jacobian",
     "estimate_transition_boundaries",
     "fit_power_law_boundary_collapse",
+    "validate_power_law_boundary_collapse",
     "detect_hysteresis_loops",
     "encounter_exchange_metrics",
     "hierarchical_elements",

@@ -44,6 +44,16 @@ The cumulative collapse variants add:
 These are encounter-level variables, not instantaneous boundary coordinates.
 When cumulative fits improve much more than instantaneous fits, the interpretation should be that hierarchy breakdown is controlled by accumulated exchange over the encounter, not only by the local tidal strength at a sampled transition point.
 
+To test overfitting, run a separate held-out flyby grid:
+
+```powershell
+threebody flyby-sweep --heldout --duration 8 --samples 600 --stride 20
+```
+
+This fits collapse exponents on the discovery grid and reports `collapse_validations` on a shifted validation grid.
+The `best_validation_models` field selects the best held-out model separately for low and high crossings.
+Models with `passes_validation = true` currently require validation improvement above `0.25`.
+
 To split the run into discovery and validation ensembles:
 
 ```powershell

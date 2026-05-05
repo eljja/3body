@@ -82,4 +82,29 @@ Caveat:
 This is still not a final law.
 The current sweep has only about ten usable boundary samples, and the cumulative model has several fitted exponents.
 The next validation must use a wider held-out sweep and report whether the improvement survives.
+
+Held-out requirement:
+
+The cumulative model should be considered credible only if validation improvement remains positive on a shifted flyby grid that was not used to fit the exponents.
+
+Held-out ablation result:
+
+Instantaneous models remain weak on held-out data.
+Models containing cumulative encounter terms pass the current validation threshold.
+The impulse-only model already captures much of the improvement, while exchange variables are especially competitive for the high crossing.
+This strengthens the interpretation that the boundary is governed by accumulated encounter effect, not just instantaneous geometry.
+
+Current held-out numbers:
+
+- low crossing instantaneous improvement is only about `0.02`.
+- high crossing instantaneous improvement is only about `0.10`.
+- low crossing impulse-only improvement is about `0.54`.
+- high crossing impulse-only improvement is about `0.44`.
+- low crossing full cumulative improvement is about `0.55`.
+- high crossing full cumulative improvement is about `0.56`.
+
+Working interpretation:
+
+The simplest surviving physical coordinate is the tidal impulse integral.
+Energy and angular momentum exchange refine the model, especially for the high crossing, but the impulse result suggests the core mechanism is accumulated tidal forcing over the encounter.
 - Validate on held-out seeds and reject the law if precision or recall collapses outside the declared flyby regime.

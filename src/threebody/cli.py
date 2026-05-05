@@ -56,6 +56,11 @@ def build_parser() -> argparse.ArgumentParser:
     flyby_sweep.add_argument("--samples", type=int, default=600, help="Number of solver sample times per case.")
     flyby_sweep.add_argument("--stride", type=int, default=20, help="Classification stride through each trajectory.")
     flyby_sweep.add_argument("--duration", type=float, default=8.0, help="Integration time per flyby case.")
+    flyby_sweep.add_argument(
+        "--heldout",
+        action="store_true",
+        help="Run separate discovery and held-out validation flyby grids for collapse fits.",
+    )
     flyby_sweep.add_argument("--rtol", type=float, default=1.0e-9, help="Adaptive integrator relative tolerance.")
     flyby_sweep.add_argument("--atol", type=float, default=1.0e-11, help="Adaptive integrator absolute tolerance.")
     flyby_sweep.add_argument(
@@ -131,7 +136,18 @@ def run_flyby_sweep_command(args: argparse.Namespace) -> int:
     sweep = HierarchicalFlybySweep(
         integrator=AdaptiveIntegrator(rtol=args.rtol, atol=args.atol),
     )
-    result = sweep.run(duration=args.duration, samples=args.samples, stride=args.stride)
+    if args.heldout:
+        result = sweep.run_discovery_validation(duration=args.duration, samples=args.samples, stride=args.stride)
+        summary = result.as_dict()
+        case_count = result.discovery.as_dict()["case_count"] + result.validation.as_dict()["case_count"]
+        transitioning_count = (
+            result.discovery.as_dict()["transitioning_case_count"] + result.validation.as_dict()["transitioning_case_count"]
+        )
+    else:
+        result = sweep.run(duration=args.duration, samples=args.samples, stride=args.stride)
+        summary = result.as_dict()
+        case_count = len(result.rows)
+        transitioning_count = result.as_dict()["transitioning_case_count"]
     output = args.output or _default_output_path("flyby-sweep")
     output.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -144,13 +160,14 @@ def run_flyby_sweep_command(args: argparse.Namespace) -> int:
                 "stride": args.stride,
                 "rtol": args.rtol,
                 "atol": args.atol,
+                "heldout": args.heldout,
             },
         },
-        "summary": result.as_dict(),
+        "summary": summary,
     }
     output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"wrote {output}")
-    print(f"cases={len(result.rows)} transitioning={result.as_dict()['transitioning_case_count']}")
+    print(f"cases={case_count} transitioning={transitioning_count}")
     return 0
 
 
