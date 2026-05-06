@@ -53,6 +53,19 @@ threebody flyby-sweep --heldout --duration 8 --samples 600 --stride 20
 This fits collapse exponents on the discovery grid and reports `collapse_validations` on a shifted validation grid.
 The `best_validation_models` field selects the best held-out model separately for low and high crossings.
 Models with `passes_validation = true` currently require validation improvement above `0.25`.
+Best-model selection uses `complexity_penalized_validation_score = validation_improvement - 0.03 * feature_count` so that a larger feature set must earn its extra complexity on held-out data.
+The `worst_validation_residuals` field lists the held-out cases with the largest log prediction error per model, which is the first place to look for missing physics.
+If residuals cluster in a parameter region, that region should become the next benchmark family.
+
+To test whether the model is phase-blind, add inner-binary phase variation:
+
+```powershell
+threebody flyby-sweep --heldout --phase-sweep --duration 8 --samples 600 --stride 20
+```
+
+This adds discovery phases `0` and `pi/2`, then validates against held-out phases `pi/4` and `3pi/4`.
+The phase-conditioned collapse variants include `phase_alignment`, `phase_quadrature`, and `nonlinear_tidal_exposure`.
+If these reduce held-out residuals in strong, slow flybys, the missing coordinate is not only accumulated impulse; it is the phase-resolved scattering map of the inner binary during the encounter.
 
 To check whether a boundary is a resolution artifact:
 

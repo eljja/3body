@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import UTC, datetime
+from math import pi
 from pathlib import Path
 from typing import Sequence
 
@@ -60,6 +61,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--heldout",
         action="store_true",
         help="Run separate discovery and held-out validation flyby grids for collapse fits.",
+    )
+    flyby_sweep.add_argument(
+        "--phase-sweep",
+        action="store_true",
+        help="Vary inner-binary phase to test phase-conditioned and resonance-sensitive collapse models.",
     )
     flyby_sweep.add_argument("--rtol", type=float, default=1.0e-9, help="Adaptive integrator relative tolerance.")
     flyby_sweep.add_argument("--atol", type=float, default=1.0e-11, help="Adaptive integrator absolute tolerance.")
@@ -148,14 +154,23 @@ def run_flyby_sweep_command(args: argparse.Namespace) -> int:
         integrator=AdaptiveIntegrator(rtol=args.rtol, atol=args.atol),
     )
     if args.heldout:
-        result = sweep.run_discovery_validation(duration=args.duration, samples=args.samples, stride=args.stride)
+        discovery_phases = (0.0, 0.5 * pi) if args.phase_sweep else (0.0,)
+        validation_phases = (0.25 * pi, 0.75 * pi) if args.phase_sweep else (0.0,)
+        result = sweep.run_discovery_validation(
+            discovery_binary_phases=discovery_phases,
+            validation_binary_phases=validation_phases,
+            duration=args.duration,
+            samples=args.samples,
+            stride=args.stride,
+        )
         summary = result.as_dict()
         case_count = result.discovery.as_dict()["case_count"] + result.validation.as_dict()["case_count"]
         transitioning_count = (
             result.discovery.as_dict()["transitioning_case_count"] + result.validation.as_dict()["transitioning_case_count"]
         )
     else:
-        result = sweep.run(duration=args.duration, samples=args.samples, stride=args.stride)
+        phases = (0.0, 0.5 * pi, pi, 1.5 * pi) if args.phase_sweep else (0.0,)
+        result = sweep.run(binary_phases=phases, duration=args.duration, samples=args.samples, stride=args.stride)
         summary = result.as_dict()
         case_count = len(result.rows)
         transitioning_count = result.as_dict()["transitioning_case_count"]
@@ -172,6 +187,7 @@ def run_flyby_sweep_command(args: argparse.Namespace) -> int:
                 "rtol": args.rtol,
                 "atol": args.atol,
                 "heldout": args.heldout,
+                "phase_sweep": args.phase_sweep,
             },
         },
         "summary": summary,

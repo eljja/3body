@@ -143,6 +143,7 @@ class OrbitLibrary:
     def general_hierarchical_flyby(
         self,
         binary_separation: float = 0.2,
+        binary_phase: float = 0.0,
         intruder_mass: float = 0.2,
         intruder_position: tuple[float, float] = (0.0, -2.0),
         intruder_velocity: tuple[float, float] = (0.8, 1.2),
@@ -170,6 +171,8 @@ class OrbitLibrary:
             ],
             dtype=float,
         )
+        positions[:2] = _rotate_vectors(positions[:2], binary_phase)
+        velocities[:2] = _rotate_vectors(velocities[:2], binary_phase)
         positions, velocities = _recenter(system, positions, velocities)
         initial_state = system.flatten_state(positions, velocities)
         t_eval = np.linspace(0.0, duration, samples)
@@ -182,6 +185,7 @@ class OrbitLibrary:
             description="Tight binary perturbed by a third-body flyby, designed to create chart transitions.",
             metadata={
                 "binary_separation": binary_separation,
+                "binary_phase": binary_phase,
                 "intruder_mass": intruder_mass,
                 "intruder_position": intruder_position,
                 "intruder_velocity": intruder_velocity,
@@ -194,4 +198,11 @@ def _recenter(system: GeneralThreeBodySystem, positions: np.ndarray, velocities:
     center = np.average(positions, axis=0, weights=masses)
     center_velocity = np.average(velocities, axis=0, weights=masses)
     return positions - center, velocities - center_velocity
+
+
+def _rotate_vectors(vectors: np.ndarray, angle: float) -> np.ndarray:
+    cosine = math.cos(angle)
+    sine = math.sin(angle)
+    rotation = np.array([[cosine, -sine], [sine, cosine]], dtype=float)
+    return vectors @ rotation.T
 

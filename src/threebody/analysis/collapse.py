@@ -55,10 +55,17 @@ class BoundaryCollapseValidation:
     def passes_validation(self) -> bool:
         return self.validation_improvement is not None and self.validation_improvement > 0.25
 
+    @property
+    def complexity_penalized_validation_score(self) -> float | None:
+        if self.validation_improvement is None:
+            return None
+        return float(self.validation_improvement - 0.03 * len(self.feature_names))
+
     def rows(self) -> dict[str, float | int | str | bool | None]:
         return {
             "target": self.target_name,
             "features": ",".join(self.feature_names),
+            "feature_count": len(self.feature_names),
             "training_support": self.training_support,
             "validation_support": self.validation_support,
             "training_raw_cv": self.training_raw_cv,
@@ -67,6 +74,7 @@ class BoundaryCollapseValidation:
             "validation_raw_cv": self.validation_raw_cv,
             "validation_collapsed_cv": self.validation_collapsed_cv,
             "validation_improvement": self.validation_improvement,
+            "complexity_penalized_validation_score": self.complexity_penalized_validation_score,
             "passes_validation": self.passes_validation,
         }
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import product
+from math import pi
 
 import numpy as np
 
@@ -23,6 +24,7 @@ class FlybySweepCase:
     intruder_mass: float
     impact_parameter: float
     intruder_speed_y: float
+    binary_phase: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +35,9 @@ class FlybySweepRow:
     relative_inner_energy_exchange: float
     relative_angular_momentum_exchange: float
     tidal_impulse: float
+    phase_alignment: float
+    phase_quadrature: float
+    nonlinear_tidal_exposure: float
     transition_count: int
     low_crossing: float | None
     high_crossing: float | None
@@ -46,11 +51,15 @@ class FlybySweepRow:
             "intruder_mass": self.case.intruder_mass,
             "impact_parameter": self.case.impact_parameter,
             "intruder_speed_y": self.case.intruder_speed_y,
+            "binary_phase": self.case.binary_phase,
             "incoming_speed": self.incoming_speed,
             "encounter_adiabaticity": self.encounter_adiabaticity,
             "relative_inner_energy_exchange": self.relative_inner_energy_exchange,
             "relative_angular_momentum_exchange": self.relative_angular_momentum_exchange,
             "tidal_impulse": self.tidal_impulse,
+            "phase_alignment": self.phase_alignment,
+            "phase_quadrature": self.phase_quadrature,
+            "nonlinear_tidal_exposure": self.nonlinear_tidal_exposure,
             "transition_count": self.transition_count,
             "low_crossing": self.low_crossing,
             "high_crossing": self.high_crossing,
@@ -95,6 +104,7 @@ class FlybySweepValidationResult:
             "validation": self.validation.as_dict(),
             "collapse_validations": list(self.collapse_validations),
             "best_validation_models": best,
+            "worst_validation_residuals": _collapse_residual_rows(self.discovery.rows, self.validation.rows),
         }
 
 
@@ -111,24 +121,28 @@ class HierarchicalFlybySweep:
         intruder_masses: tuple[float, ...] = (0.1, 0.2, 0.4),
         impact_parameters: tuple[float, ...] = (0.0, 0.2),
         intruder_speed_y_values: tuple[float, ...] = (1.0, 1.2),
+        binary_phases: tuple[float, ...] = (0.0,),
         duration: float = 8.0,
         samples: int = 600,
         stride: int = 20,
         binary_separation: float = 0.2,
     ) -> FlybySweepResult:
         rows: list[FlybySweepRow] = []
-        for intruder_mass, impact_parameter, speed_y in product(
+        for intruder_mass, impact_parameter, speed_y, binary_phase in product(
             intruder_masses,
             impact_parameters,
             intruder_speed_y_values,
+            binary_phases,
         ):
-            case = FlybySweepCase(intruder_mass, impact_parameter, speed_y)
+            case = FlybySweepCase(intruder_mass, impact_parameter, speed_y, binary_phase)
             incoming_speed = float(np.hypot(0.8, speed_y))
             encounter_time = float(np.hypot(impact_parameter, 2.0) / incoming_speed)
             inner_period = orbit_period(2.0, binary_separation)
             encounter_adiabaticity = float(encounter_time / inner_period)
+            phase_alignment, phase_quadrature = _phase_features(binary_phase, encounter_adiabaticity)
             scenario = self.library.general_hierarchical_flyby(
                 binary_separation=binary_separation,
+                binary_phase=binary_phase,
                 intruder_mass=intruder_mass,
                 intruder_position=(impact_parameter, -2.0),
                 intruder_velocity=(0.8, speed_y),
@@ -144,6 +158,7 @@ class HierarchicalFlybySweep:
             reports = self.atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
             transitions = self.atlas.transitions(scenario.system, trajectory, stride=stride)
             exchange = encounter_exchange_metrics(scenario.system, trajectory, inner_pair=(0, 1))
+            nonlinear_tidal_exposure = float(exchange.tidal_impulse * encounter_adiabaticity)
             perturbation_boundaries = estimate_transition_boundaries(
                 {"flyby": reports},
                 coordinate="hierarchy_perturbation_strength",
@@ -162,6 +177,9 @@ class HierarchicalFlybySweep:
                         relative_inner_energy_exchange=exchange.relative_inner_energy_exchange,
                         relative_angular_momentum_exchange=exchange.relative_angular_momentum_exchange,
                         tidal_impulse=exchange.tidal_impulse,
+                        phase_alignment=phase_alignment,
+                        phase_quadrature=phase_quadrature,
+                        nonlinear_tidal_exposure=nonlinear_tidal_exposure,
                         transition_count=len(transitions),
                         low_crossing=perturbation_loop.low_crossing,
                         high_crossing=perturbation_loop.high_crossing,
@@ -180,6 +198,9 @@ class HierarchicalFlybySweep:
                         relative_inner_energy_exchange=exchange.relative_inner_energy_exchange,
                         relative_angular_momentum_exchange=exchange.relative_angular_momentum_exchange,
                         tidal_impulse=exchange.tidal_impulse,
+                        phase_alignment=phase_alignment,
+                        phase_quadrature=phase_quadrature,
+                        nonlinear_tidal_exposure=nonlinear_tidal_exposure,
                         transition_count=len(transitions),
                         low_crossing=None,
                         high_crossing=None,
@@ -199,6 +220,8 @@ class HierarchicalFlybySweep:
         validation_intruder_masses: tuple[float, ...] = (0.15, 0.3, 0.5),
         validation_impact_parameters: tuple[float, ...] = (0.1, 0.3),
         validation_intruder_speed_y_values: tuple[float, ...] = (1.1, 1.3),
+        discovery_binary_phases: tuple[float, ...] = (0.0,),
+        validation_binary_phases: tuple[float, ...] = (0.0,),
         duration: float = 8.0,
         samples: int = 600,
         stride: int = 20,
@@ -208,6 +231,7 @@ class HierarchicalFlybySweep:
             intruder_masses=discovery_intruder_masses,
             impact_parameters=discovery_impact_parameters,
             intruder_speed_y_values=discovery_intruder_speed_y_values,
+            binary_phases=discovery_binary_phases,
             duration=duration,
             samples=samples,
             stride=stride,
@@ -217,6 +241,7 @@ class HierarchicalFlybySweep:
             intruder_masses=validation_intruder_masses,
             impact_parameters=validation_impact_parameters,
             intruder_speed_y_values=validation_intruder_speed_y_values,
+            binary_phases=validation_binary_phases,
             duration=duration,
             samples=samples,
             stride=stride,
@@ -249,7 +274,7 @@ def _collapse_fit_rows(rows: tuple[FlybySweepRow, ...]) -> list[dict[str, float 
 
 def _collapse_fits(rows: tuple[FlybySweepRow, ...]):
     fits = []
-    for spec in _collapse_specs():
+    for spec in _collapse_specs(rows):
         target, features = _target_and_features(rows, spec)
         fit = fit_power_law_boundary_collapse(
             target,
@@ -266,11 +291,46 @@ def _collapse_validation_rows(
     validation_rows: tuple[FlybySweepRow, ...],
 ) -> list[dict[str, float | int | str | bool | None]]:
     rows = []
-    for spec, fit in zip(_collapse_specs(), _collapse_fits(discovery_rows), strict=True):
+    specs = _collapse_specs(discovery_rows)
+    for spec, fit in zip(specs, _collapse_fits(discovery_rows), strict=True):
         target, features = _target_and_features(validation_rows, spec)
         validation = validate_power_law_boundary_collapse(fit, target, features)
         rows.append(validation.rows())
     return rows
+
+
+def _collapse_residual_rows(
+    discovery_rows: tuple[FlybySweepRow, ...],
+    validation_rows: tuple[FlybySweepRow, ...],
+    max_per_model: int = 3,
+) -> list[dict[str, float | int | str]]:
+    rows = []
+    specs = _collapse_specs(discovery_rows)
+    for spec, fit in zip(specs, _collapse_fits(discovery_rows), strict=True):
+        target, features, source_rows = _target_features_and_rows(validation_rows, spec)
+        if target.size == 0 or features.size == 0:
+            continue
+        predictions = fit.predict(features)
+        for observed, predicted, source in zip(target, predictions, source_rows, strict=True):
+            ratio = float(observed / max(float(predicted), 1.0e-300))
+            rows.append(
+                {
+                    "target": str(spec["target_name"]),
+                    "intruder_mass": source.case.intruder_mass,
+                    "impact_parameter": source.case.impact_parameter,
+                    "intruder_speed_y": source.case.intruder_speed_y,
+                    "binary_phase": source.case.binary_phase,
+                    "observed": float(observed),
+                    "predicted": float(predicted),
+                    "ratio": ratio,
+                    "abs_log_error": float(abs(np.log(max(ratio, 1.0e-300)))),
+                }
+            )
+    selected = []
+    for target in sorted({row["target"] for row in rows}):
+        target_rows = [row for row in rows if row["target"] == target]
+        selected.extend(sorted(target_rows, key=lambda row: float(row["abs_log_error"]), reverse=True)[:max_per_model])
+    return selected
 
 
 def _best_validation_rows(
@@ -280,66 +340,123 @@ def _best_validation_rows(
     for row in rows:
         target = str(row["target"])
         direction = "low" if target.startswith("low_") else "high"
-        improvement = row.get("validation_improvement")
-        if improvement is None:
+        score = row.get("complexity_penalized_validation_score")
+        if score is None:
             continue
         current = best_by_direction.get(direction)
-        if current is None or float(improvement) > float(current.get("validation_improvement") or -np.inf):
+        current_score = None if current is None else current.get("complexity_penalized_validation_score")
+        if current is None or float(score) > float(current_score or -np.inf):
             best_by_direction[direction] = row
     return [best_by_direction[key] for key in sorted(best_by_direction)]
 
 
-def _collapse_specs() -> tuple[dict[str, object], ...]:
+def _collapse_specs(rows: tuple[FlybySweepRow, ...] | None = None) -> tuple[dict[str, object], ...]:
     specs = []
+    include_phase = _has_phase_diversity(rows)
     for prefix, crossing_attr, hierarchy_attr in (
         ("low_crossing", "low_crossing", "low_hierarchy_ratio"),
         ("high_crossing", "high_crossing", "high_hierarchy_ratio"),
     ):
-        specs.extend(
-            [
-                {
-                    "target_name": f"{prefix}_instantaneous",
-                    "crossing_attr": crossing_attr,
-                    "hierarchy_attr": hierarchy_attr,
-                    "feature_names": ("encounter_adiabaticity", "hierarchy_ratio"),
-                },
-                {
-                    "target_name": f"{prefix}_impulse",
-                    "crossing_attr": crossing_attr,
-                    "hierarchy_attr": hierarchy_attr,
-                    "feature_names": ("encounter_adiabaticity", "hierarchy_ratio", "tidal_impulse"),
-                },
-                {
-                    "target_name": f"{prefix}_exchange",
-                    "crossing_attr": crossing_attr,
-                    "hierarchy_attr": hierarchy_attr,
-                    "feature_names": (
-                        "encounter_adiabaticity",
-                        "hierarchy_ratio",
-                        "relative_inner_energy_exchange",
-                        "relative_angular_momentum_exchange",
-                    ),
-                },
-                {
-                    "target_name": f"{prefix}_cumulative",
-                    "crossing_attr": crossing_attr,
-                    "hierarchy_attr": hierarchy_attr,
-                    "feature_names": (
-                        "encounter_adiabaticity",
-                        "hierarchy_ratio",
-                        "relative_inner_energy_exchange",
-                        "relative_angular_momentum_exchange",
-                        "tidal_impulse",
-                    ),
-                },
-            ]
-        )
+        base_specs = [
+            {
+                "target_name": f"{prefix}_instantaneous",
+                "crossing_attr": crossing_attr,
+                "hierarchy_attr": hierarchy_attr,
+                "feature_names": ("encounter_adiabaticity", "hierarchy_ratio"),
+            },
+            {
+                "target_name": f"{prefix}_impulse",
+                "crossing_attr": crossing_attr,
+                "hierarchy_attr": hierarchy_attr,
+                "feature_names": ("encounter_adiabaticity", "hierarchy_ratio", "tidal_impulse"),
+            },
+            {
+                "target_name": f"{prefix}_exchange",
+                "crossing_attr": crossing_attr,
+                "hierarchy_attr": hierarchy_attr,
+                "feature_names": (
+                    "encounter_adiabaticity",
+                    "hierarchy_ratio",
+                    "relative_inner_energy_exchange",
+                    "relative_angular_momentum_exchange",
+                ),
+            },
+            {
+                "target_name": f"{prefix}_cumulative",
+                "crossing_attr": crossing_attr,
+                "hierarchy_attr": hierarchy_attr,
+                "feature_names": (
+                    "encounter_adiabaticity",
+                    "hierarchy_ratio",
+                    "relative_inner_energy_exchange",
+                    "relative_angular_momentum_exchange",
+                    "tidal_impulse",
+                ),
+            },
+            {
+                "target_name": f"{prefix}_nonlinear_cumulative",
+                "crossing_attr": crossing_attr,
+                "hierarchy_attr": hierarchy_attr,
+                "feature_names": (
+                    "encounter_adiabaticity",
+                    "hierarchy_ratio",
+                    "relative_inner_energy_exchange",
+                    "relative_angular_momentum_exchange",
+                    "tidal_impulse",
+                    "nonlinear_tidal_exposure",
+                ),
+            },
+        ]
+        if include_phase:
+            base_specs.extend(
+                [
+                    {
+                        "target_name": f"{prefix}_phase_cumulative",
+                        "crossing_attr": crossing_attr,
+                        "hierarchy_attr": hierarchy_attr,
+                        "feature_names": (
+                            "encounter_adiabaticity",
+                            "hierarchy_ratio",
+                            "relative_inner_energy_exchange",
+                            "relative_angular_momentum_exchange",
+                            "tidal_impulse",
+                            "phase_alignment",
+                            "phase_quadrature",
+                        ),
+                    },
+                    {
+                        "target_name": f"{prefix}_phase_nonlinear",
+                        "crossing_attr": crossing_attr,
+                        "hierarchy_attr": hierarchy_attr,
+                        "feature_names": (
+                            "encounter_adiabaticity",
+                            "hierarchy_ratio",
+                            "relative_inner_energy_exchange",
+                            "relative_angular_momentum_exchange",
+                            "tidal_impulse",
+                            "phase_alignment",
+                            "phase_quadrature",
+                            "nonlinear_tidal_exposure",
+                        ),
+                    },
+                ]
+            )
+        specs.extend(base_specs)
     return tuple(specs)
 
 
 def _target_and_features(rows: tuple[FlybySweepRow, ...], spec: dict[str, object]) -> tuple[np.ndarray, np.ndarray]:
+    target, features, _source_rows = _target_features_and_rows(rows, spec)
+    return target, features
+
+
+def _target_features_and_rows(
+    rows: tuple[FlybySweepRow, ...],
+    spec: dict[str, object],
+) -> tuple[np.ndarray, np.ndarray, tuple[FlybySweepRow, ...]]:
     target = []
     features = []
+    source_rows = []
     for row in rows:
         crossing = getattr(row, str(spec["crossing_attr"]))
         hierarchy_ratio = getattr(row, str(spec["hierarchy_attr"]))
@@ -348,7 +465,8 @@ def _target_and_features(rows: tuple[FlybySweepRow, ...], spec: dict[str, object
         target.append(crossing)
         vector = [_feature_value(row, hierarchy_ratio, name) for name in spec["feature_names"]]
         features.append(vector)
-    return np.asarray(target, dtype=float), np.asarray(features, dtype=float)
+        source_rows.append(row)
+    return np.asarray(target, dtype=float), np.asarray(features, dtype=float), tuple(source_rows)
 
 
 def _feature_value(row: FlybySweepRow, hierarchy_ratio: float, name: str) -> float:
@@ -362,4 +480,22 @@ def _feature_value(row: FlybySweepRow, hierarchy_ratio: float, name: str) -> flo
         return max(row.relative_angular_momentum_exchange, 1.0e-12)
     if name == "tidal_impulse":
         return max(row.tidal_impulse, 1.0e-12)
+    if name == "phase_alignment":
+        return max(row.phase_alignment, 1.0e-12)
+    if name == "phase_quadrature":
+        return max(row.phase_quadrature, 1.0e-12)
+    if name == "nonlinear_tidal_exposure":
+        return max(row.nonlinear_tidal_exposure, 1.0e-12)
     raise ValueError(f"Unknown collapse feature: {name}")
+
+
+def _phase_features(binary_phase: float, encounter_adiabaticity: float) -> tuple[float, float]:
+    encounter_phase = binary_phase + 2.0 * pi * encounter_adiabaticity
+    return 1.0 + abs(float(np.cos(encounter_phase))), 1.0 + abs(float(np.sin(encounter_phase)))
+
+
+def _has_phase_diversity(rows: tuple[FlybySweepRow, ...] | None) -> bool:
+    if rows is None:
+        return False
+    phases = np.asarray([row.case.binary_phase for row in rows], dtype=float)
+    return bool(phases.size > 1 and np.ptp(phases) > 1.0e-12)

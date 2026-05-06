@@ -107,10 +107,42 @@ Working interpretation:
 
 The simplest surviving physical coordinate is the tidal impulse integral.
 Energy and angular momentum exchange refine the model, especially for the high crossing, but the impulse result suggests the core mechanism is accumulated tidal forcing over the encounter.
+After adding a feature-count penalty to held-out selection, the current preferred low-crossing model is usually impulse-only, while the preferred high-crossing model can shift to exchange variables.
+This is a useful split: exit from hierarchy appears impulse-threshold-like, while re-entry remembers the energy/angular-momentum exchange history more strongly.
 
 Resolution check:
 
 The boundary-resolution smoke run indicates that the low crossing is stable across sample/stride settings.
 The high crossing is more sensitive, but its numerical-setting scatter is still smaller than the cross-family scatter that the cumulative model explains.
 This reduces the likelihood that the observed boundary collapse is only a sampling artifact.
-- Validate on held-out seeds and reject the law if precision or recall collapses outside the declared flyby regime.
+
+Current miss pattern:
+
+Worst held-out residuals cluster around larger intruder masses and slower incoming speeds.
+The current power-law collapse therefore still under-models strong, slow encounters.
+The next missing term is likely a nonlinear exchange or resonance coordinate, not just another instantaneous distance or speed feature.
+
+## H2: Phase-Resolved Encounter Map
+
+The existing cumulative models can still be wrong if they average over the inner binary's orbital phase.
+For weak or fast encounters this may not matter much because the perturbation acts like a small impulse.
+For strong, slow encounters, the intruder samples a finite arc of the binary orbit; the same mass, speed, impact parameter, and impulse can produce different exchange depending on the binary phase at closest approach.
+
+Implemented test variables:
+
+- `binary_phase`: initial phase of the inner circular binary.
+- `phase_alignment`: positive orientation feature derived from the binary phase advanced over the encounter time.
+- `phase_quadrature`: complementary phase feature, also positive for log-power fitting.
+- `nonlinear_tidal_exposure`: `tidal_impulse * encounter_adiabaticity`, a first nonlinear proxy for slow strong encounters.
+
+Falsifiable criterion:
+
+If `--phase-sweep --heldout` reduces the worst residuals concentrated at large intruder mass and low incoming speed, then the boundary law must be stated as a phase-conditioned scattering map, not as a scalar impulse law.
+If it does not, the next missing mechanism is more likely manifold topology or near-collision regularized dynamics.
+
+First smoke result:
+
+In the current small phase-heldout run, phase-conditioned terms reduce training scatter strongly but do not beat the simpler impulse model on held-out selection.
+For low crossing they overfit badly; for high crossing they remain useful but weaker than impulse-only after complexity penalty.
+The worst residuals concentrate near validation phase `3*pi/4`, so phase is real structure, but the current positive power-law phase encoding is too crude.
+The next phase model should be a scattering or return map rather than another multiplicative feature in the same power law.
