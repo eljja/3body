@@ -46,6 +46,10 @@ class FlybySweepRow:
     binary_phase_sin_positive: float
     outer_energy_delta: float
     outer_angular_momentum_delta: float
+    outgoing_semimajor_axis: float
+    outgoing_eccentricity: float
+    outgoing_periapsis_distance: float
+    outgoing_escape_speed_at_infinity: float
     deflection_angle: float
     transition_count: int
     low_crossing: float | None
@@ -76,6 +80,10 @@ class FlybySweepRow:
             "binary_phase_sin_positive": self.binary_phase_sin_positive,
             "outer_energy_delta": self.outer_energy_delta,
             "outer_angular_momentum_delta": self.outer_angular_momentum_delta,
+            "outgoing_semimajor_axis": self.outgoing_semimajor_axis,
+            "outgoing_eccentricity": self.outgoing_eccentricity,
+            "outgoing_periapsis_distance": self.outgoing_periapsis_distance,
+            "outgoing_escape_speed_at_infinity": self.outgoing_escape_speed_at_infinity,
             "deflection_angle": self.deflection_angle,
             "transition_count": self.transition_count,
             "low_crossing": self.low_crossing,
@@ -206,6 +214,10 @@ class HierarchicalFlybySweep:
                         binary_phase_sin_positive=scattering.binary_phase_sin_positive,
                         outer_energy_delta=scattering.outer_energy_delta,
                         outer_angular_momentum_delta=scattering.outer_angular_momentum_delta,
+                        outgoing_semimajor_axis=scattering.outgoing_semimajor_axis,
+                        outgoing_eccentricity=scattering.outgoing_eccentricity,
+                        outgoing_periapsis_distance=scattering.outgoing_periapsis_distance,
+                        outgoing_escape_speed_at_infinity=scattering.outgoing_escape_speed_at_infinity,
                         deflection_angle=scattering.deflection_angle,
                         transition_count=len(transitions),
                         low_crossing=perturbation_loop.low_crossing,
@@ -235,6 +247,10 @@ class HierarchicalFlybySweep:
                         binary_phase_sin_positive=scattering.binary_phase_sin_positive,
                         outer_energy_delta=scattering.outer_energy_delta,
                         outer_angular_momentum_delta=scattering.outer_angular_momentum_delta,
+                        outgoing_semimajor_axis=scattering.outgoing_semimajor_axis,
+                        outgoing_eccentricity=scattering.outgoing_eccentricity,
+                        outgoing_periapsis_distance=scattering.outgoing_periapsis_distance,
+                        outgoing_escape_speed_at_infinity=scattering.outgoing_escape_speed_at_infinity,
                         deflection_angle=scattering.deflection_angle,
                         transition_count=len(transitions),
                         low_crossing=None,

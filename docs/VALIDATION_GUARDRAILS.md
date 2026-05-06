@@ -32,9 +32,9 @@ Forbidden claims:
 
 ## Current Gaps
 
-- Periapsis phase is now measured from the trajectory, and the first `scattering_map` collapse includes periapsis distance and deflection angle. It is still a power-law diagnostic, not a full outgoing-element scattering map.
+- Periapsis phase is now measured from the trajectory, and the first `scattering_map` collapse includes periapsis distance and deflection angle. The scattering diagnostic now also reports outgoing semimajor axis, eccentricity, periapsis distance, and escape speed at infinity.
 - AIC, BIC, leave-one-out, and bootstrap/OOB diagnostics exist for flyby collapse fits, but the sample count is still small.
-- A true regularized collision integrator is missing.
-- Lagrange gateway transport needs a neck-specific classifier and invariant-manifold benchmark.
-- Shape-space close encounter support is currently a chart label and error-bound statement, not a McGehee-style regularized flow.
+- A true regularized collision integrator is missing, but a McGehee-style scale/shape collision diagnostic now separates hyperradius, radial velocity, shape area, anisotropy, and collision depth.
+- Lagrange gateway transport now has a linearized L1/L2/L3 transit estimate based on neck openness and stable/unstable eigendirection projection. It is not yet a full invariant-manifold computation.
+- Shape-space close encounter support is currently a diagnostic blow-up coordinate, not a fully regularized flow.
 - Escape scattering is detected as a regime, but outgoing asymptotic Kepler-element convergence is not yet enforced.

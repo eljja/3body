@@ -4,7 +4,14 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..analysis import AnalysisAtlas, ChartClassifier, chart_validity_bound, local_linearization
+from ..analysis import (
+    AnalysisAtlas,
+    ChartClassifier,
+    chart_validity_bound,
+    gateway_transit_estimate,
+    local_linearization,
+    mcgehee_collision_diagnostic,
+)
 from ..diagnostics import InvariantMonitor, StabilityAnalyzer
 from ..solvers import AdaptiveIntegrator, StructureAwareIntegrator
 from ..systems import GeneralThreeBodySystem
@@ -167,15 +174,18 @@ class RegimeProbeResult:
     confidence: float
     validity_statement: str
     diagnostic: float | None
+    extra: dict[str, float | str | bool] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, float | str | None]:
-        return {
+        row = {
             "name": self.name,
             "primary_chart": self.primary_chart,
             "confidence": self.confidence,
             "validity_statement": self.validity_statement,
             "diagnostic": self.diagnostic,
         }
+        row.update(self.extra)
+        return row
 
 
 @dataclass(slots=True)
@@ -210,6 +220,13 @@ class RegimeProbeSuite:
         for name, system, state in probes:
             report = atlas.analyze_state(system, state)
             bound = chart_validity_bound(report)
+            extra: dict[str, float | str | bool] = {}
+            if hasattr(system, "mass_ratio") and "neck" in name:
+                gateway = gateway_transit_estimate(system, state)
+                extra.update({f"gateway_{key}": value for key, value in gateway.as_dict().items()})
+            elif getattr(system, "body_count", None) == 3:
+                collision = mcgehee_collision_diagnostic(system, state)
+                extra.update({f"collision_{key}": value for key, value in collision.as_dict().items()})
             rows.append(
                 RegimeProbeResult(
                     name=name,
@@ -217,6 +234,7 @@ class RegimeProbeSuite:
                     confidence=report.confidence,
                     validity_statement=bound.statement,
                     diagnostic=bound.observed_value,
+                    extra=extra,
                 )
             )
         return tuple(rows)

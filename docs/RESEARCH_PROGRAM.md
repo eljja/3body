@@ -35,6 +35,9 @@ No pair dominates, so the analysis should focus on symmetry, shape space, virial
 
 Applies near collision or near-collision.
 Use regularized coordinates before drawing conclusions from raw numerical trajectories.
+The current implementation exposes a McGehee-style diagnostic, not a full regularized flow:
+it separates hyperradius, radial velocity, normalized triangle area, anisotropy, and collision depth.
+Any law in this chart remains provisional until a regularized stepper or equivalent blow-up dynamics is implemented.
 
 ### Restricted Lagrange
 
@@ -45,6 +48,9 @@ Use local normal forms, zero-velocity geometry, Floquet analysis, and invariant 
 
 Applies near L1/L2/L3 neck regions.
 Use transport channels and manifold-guided transition analysis.
+The current implementation adds a linearized `gateway_transit_estimate` around the nearest collinear point.
+It checks neck openness through Jacobi margin and projects the state onto stable/unstable eigendirections.
+This is a first transit indicator, not yet a full invariant-manifold computation.
 
 ### Periodic-Orbit Neighborhood
 
@@ -60,6 +66,8 @@ Use Poincare sections, return maps, Lyapunov diagnostics, symbolic dynamics, and
 
 Applies when scattering or escape dominates.
 Use asymptotic Kepler elements, energy partition, and scattering maps.
+The current scattering map now records outgoing semimajor axis, eccentricity, periapsis distance, and escape speed at infinity.
+The next requirement is convergence of those outgoing elements over longer integrations.
 
 ## Proposed New Method
 

@@ -2,10 +2,12 @@ from .atlas import AnalysisAtlas
 from .boundaries import TransitionBoundaryEstimate, estimate_transition_boundaries, transition_boundary_rows
 from .charts import ChartClassifier
 from .collapse import BoundaryCollapseFit, BoundaryCollapseValidation, fit_power_law_boundary_collapse, validate_power_law_boundary_collapse
+from .collision import McGeheeCollisionDiagnostic, mcgehee_collision_diagnostic
 from .coordinates import GeneralThreeBodyFeatures, RestrictedThreeBodyFeatures
 from .ensembles import PerturbationEnsemble, PerturbationMember
 from .events import TransitionEventEvidence, transition_event_evidence, transition_event_rows
 from .error_bounds import ChartValidityBound, chart_validity_bound
+from .gateway import GatewayTransitEstimate, gateway_transit_estimate
 from .exchange import EncounterExchangeMetrics, encounter_exchange_metrics
 from .hierarchy import HierarchicalElements, hierarchical_elements
 from .hysteresis import TransitionHysteresisLoop, detect_hysteresis_loops, hysteresis_loop_rows
@@ -39,9 +41,11 @@ __all__ = [
     "CandidateTransitionLaw",
     "EncounterExchangeMetrics",
     "FeatureConditionedTransitionModel",
+    "GatewayTransitEstimate",
     "GeneralThreeBodyFeatures",
     "HierarchicalElements",
     "LocalLinearization",
+    "McGeheeCollisionDiagnostic",
     "PerturbationEnsemble",
     "PerturbationMember",
     "PeriapsisScatteringMap",
@@ -72,6 +76,8 @@ __all__ = [
     "hierarchical_elements",
     "hysteresis_loop_rows",
     "local_linearization",
+    "gateway_transit_estimate",
+    "mcgehee_collision_diagnostic",
     "periapsis_scattering_map",
     "shape_space_coordinates",
     "transition_boundary_rows",

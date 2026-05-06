@@ -163,4 +163,5 @@ Current smoke observations:
 - Adaptive DOP853 currently shows smaller short-run energy drift than the fixed-step structure-aware Verlet smoke run, while Verlet remains the relevant symplectic baseline for long-run drift studies.
 - No true regularized close-encounter integrator exists yet. Therefore close-encounter laws must not be promoted beyond provisional chart claims.
 - L4/L5 geometry and the figure-eight period-return benchmark pass the current smoke tolerances.
-- The current Lagrange-neck probe is still classified as `restricted_lagrange`, not `restricted_gateway`; the gateway classifier needs a stronger neck-specific test before claiming L1/L2 transport analysis.
+- The current Lagrange-neck probe can now be evaluated with a linearized `gateway_transit_estimate`, but this remains weaker than a full invariant-manifold computation.
+- Close/triple collision states now produce a McGehee-style scale/shape diagnostic, but the project still lacks a regularized integrator.

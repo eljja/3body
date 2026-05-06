@@ -26,6 +26,10 @@ class PeriapsisScatteringMap:
     incoming_outer_angular_momentum: float
     outgoing_outer_angular_momentum: float
     outer_angular_momentum_delta: float
+    outgoing_semimajor_axis: float
+    outgoing_eccentricity: float
+    outgoing_periapsis_distance: float
+    outgoing_escape_speed_at_infinity: float
     deflection_angle: float
 
     def as_dict(self) -> dict[str, float | int]:
@@ -42,6 +46,10 @@ class PeriapsisScatteringMap:
             "incoming_outer_angular_momentum": self.incoming_outer_angular_momentum,
             "outgoing_outer_angular_momentum": self.outgoing_outer_angular_momentum,
             "outer_angular_momentum_delta": self.outer_angular_momentum_delta,
+            "outgoing_semimajor_axis": self.outgoing_semimajor_axis,
+            "outgoing_eccentricity": self.outgoing_eccentricity,
+            "outgoing_periapsis_distance": self.outgoing_periapsis_distance,
+            "outgoing_escape_speed_at_infinity": self.outgoing_escape_speed_at_infinity,
             "deflection_angle": self.deflection_angle,
         }
 
@@ -88,6 +96,7 @@ def periapsis_scattering_map(
     phase = float(binary_phases[periapsis_index])
     incoming_velocity = np.asarray(outer_velocities[0], dtype=float)
     outgoing_velocity = np.asarray(outer_velocities[-1], dtype=float)
+    outgoing_elements = _relative_orbital_elements(system, trajectory.y[-1], inner_pair, outer)
     deflection_angle = _angle_between(incoming_velocity, outgoing_velocity)
     return PeriapsisScatteringMap(
         inner_pair=inner_pair,
@@ -104,6 +113,10 @@ def periapsis_scattering_map(
         incoming_outer_angular_momentum=float(outer_angular[0]),
         outgoing_outer_angular_momentum=float(outer_angular[-1]),
         outer_angular_momentum_delta=float(outer_angular[-1] - outer_angular[0]),
+        outgoing_semimajor_axis=outgoing_elements["semimajor_axis"],
+        outgoing_eccentricity=outgoing_elements["eccentricity"],
+        outgoing_periapsis_distance=outgoing_elements["periapsis_distance"],
+        outgoing_escape_speed_at_infinity=outgoing_elements["escape_speed_at_infinity"],
         deflection_angle=deflection_angle,
     )
 
@@ -115,3 +128,38 @@ def _angle_between(first: np.ndarray, second: np.ndarray) -> float:
         return 0.0
     cosine = float(np.dot(first, second) / (first_norm * second_norm))
     return float(np.arccos(np.clip(cosine, -1.0, 1.0)))
+
+
+def _relative_orbital_elements(
+    system: object,
+    state: np.ndarray,
+    inner_pair: tuple[int, int],
+    outer: int,
+) -> dict[str, float]:
+    positions, velocities = system.split_state(state)
+    masses = np.asarray(system.masses, dtype=float)
+    i, j = inner_pair
+    pair_mass = masses[i] + masses[j]
+    pair_center = (masses[i] * positions[i] + masses[j] * positions[j]) / pair_mass
+    pair_velocity = (masses[i] * velocities[i] + masses[j] * velocities[j]) / pair_mass
+    relative_position = positions[outer] - pair_center
+    relative_velocity = velocities[outer] - pair_velocity
+    radius = float(np.linalg.norm(relative_position))
+    speed_sq = float(np.dot(relative_velocity, relative_velocity))
+    mu = system.gravitational_constant * (pair_mass + masses[outer])
+    specific_energy = 0.5 * speed_sq - mu / max(radius, 1.0e-12)
+    angular = cross_3d(relative_position, relative_velocity)
+    eccentricity_vector = np.cross(np.array([relative_velocity[0], relative_velocity[1], 0.0]), angular) / mu
+    eccentricity_vector -= np.array([relative_position[0], relative_position[1], 0.0]) / max(radius, 1.0e-12)
+    eccentricity = float(np.linalg.norm(eccentricity_vector))
+    semimajor_axis = float(-mu / (2.0 * specific_energy)) if abs(specific_energy) > 1.0e-12 else np.inf
+    periapsis_distance = float(semimajor_axis * (1.0 - eccentricity)) if np.isfinite(semimajor_axis) else np.inf
+    if periapsis_distance < 0.0 and eccentricity > 1.0:
+        periapsis_distance = float(abs(semimajor_axis) * (eccentricity - 1.0))
+    escape_speed = float(np.sqrt(max(2.0 * specific_energy, 0.0)))
+    return {
+        "semimajor_axis": semimajor_axis,
+        "eccentricity": eccentricity,
+        "periapsis_distance": periapsis_distance,
+        "escape_speed_at_infinity": escape_speed,
+    }

@@ -47,3 +47,9 @@ The current implementation measures `binary_phase_at_periapsis` from the traject
 That is necessary but not sufficient.
 A real scattering map must predict outgoing energy, angular momentum, deflection angle, and chart transition probability jointly, not just reuse phase as another multiplicative power-law feature.
 The first smoke result is encouraging only for low-crossing boundary collapse; high-crossing selection still prefers a simpler impulse model after complexity penalty.
+
+Current atlas additions:
+
+- Close/triple collision: `mcgehee_collision_diagnostic` separates hyperradius, radial velocity, normalized shape area, anisotropy, and collision depth.
+- Escape/flyby scattering: `periapsis_scattering_map` now reports outgoing semimajor axis, eccentricity, periapsis distance, and escape speed at infinity.
+- Lagrange gateway: `gateway_transit_estimate` tests whether the local neck is open and projects the state onto stable/unstable eigendirections around the nearest collinear point.

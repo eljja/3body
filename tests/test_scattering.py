@@ -21,4 +21,6 @@ def test_periapsis_scattering_map_uses_trajectory_closest_approach() -> None:
     assert 0 <= scattering.periapsis_index < len(trajectory.t)
     assert scattering.periapsis_distance > 0.0
     assert 0.0 <= scattering.binary_phase_at_periapsis <= 2.0 * np.pi
+    assert scattering.outgoing_eccentricity >= 0.0
+    assert scattering.outgoing_periapsis_distance > 0.0
     assert scattering.deflection_angle >= 0.0
