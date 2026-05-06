@@ -133,6 +133,8 @@ Implemented test variables:
 - `binary_phase`: initial phase of the inner circular binary.
 - `phase_alignment`: positive orientation feature derived from the binary phase advanced over the encounter time.
 - `phase_quadrature`: complementary phase feature, also positive for log-power fitting.
+- `binary_phase_at_periapsis`: phase measured from the actual trajectory at the outer body's closest approach to the inner binary center of mass.
+- `deflection_angle`: incoming-to-outgoing scattering angle of the outer body relative to the binary center of mass.
 - `nonlinear_tidal_exposure`: `tidal_impulse * encounter_adiabaticity`, a first nonlinear proxy for slow strong encounters.
 
 Falsifiable criterion:
@@ -142,7 +144,23 @@ If it does not, the next missing mechanism is more likely manifold topology or n
 
 First smoke result:
 
-In the current small phase-heldout run, phase-conditioned terms reduce training scatter strongly but do not beat the simpler impulse model on held-out selection.
-For low crossing they overfit badly; for high crossing they remain useful but weaker than impulse-only after complexity penalty.
-The worst residuals concentrate near validation phase `3*pi/4`, so phase is real structure, but the current positive power-law phase encoding is too crude.
-The next phase model should be a scattering or return map rather than another multiplicative feature in the same power law.
+Initial-phase proxy terms reduce training scatter but do not reliably beat simpler impulse/exchange models on held-out selection.
+After replacing the proxy with trajectory-measured periapsis phase and deflection angle, the `low_crossing_scattering_map` smoke run passes held-out validation and narrowly wins the low-crossing complexity-penalized score.
+The high crossing still prefers the simpler impulse model in the current phase-heldout smoke run.
+This suggests a split: hierarchy exit may need an actual scattering-map coordinate, while hierarchy re-entry is still dominated by accumulated impulse/exchange memory.
+
+This is not yet a final law.
+The scattering-map model has seven features and only a few dozen smoke samples, so it must survive larger bootstrap/OOB and leave-one-out diagnostics before being promoted.
+
+## Guardrail Checks
+
+The current code now exposes `threebody research-checks`.
+This is not a proof suite; it is a falsification harness.
+
+Current smoke observations:
+
+- Classifier transitions survive small stride and threshold perturbations, but strict hierarchy settings can change transition counts. This means classifier-induced artifacts remain possible.
+- Adaptive DOP853 currently shows smaller short-run energy drift than the fixed-step structure-aware Verlet smoke run, while Verlet remains the relevant symplectic baseline for long-run drift studies.
+- No true regularized close-encounter integrator exists yet. Therefore close-encounter laws must not be promoted beyond provisional chart claims.
+- L4/L5 geometry and the figure-eight period-return benchmark pass the current smoke tolerances.
+- The current Lagrange-neck probe is still classified as `restricted_lagrange`, not `restricted_gateway`; the gateway classifier needs a stronger neck-specific test before claiming L1/L2 transport analysis.

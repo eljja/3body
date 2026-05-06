@@ -8,7 +8,16 @@ from pathlib import Path
 from typing import Sequence
 
 from .analysis import ResearchPipeline
-from .experiments import BoundaryResolutionStudy, HierarchicalFlybySweep, OrbitLibrary
+from .experiments import (
+    BoundaryResolutionStudy,
+    ClassifierArtifactStudy,
+    FigureEightStabilityProbe,
+    HierarchicalFlybySweep,
+    IntegratorComparisonStudy,
+    KnownBenchmarkSuite,
+    OrbitLibrary,
+    RegimeProbeSuite,
+)
 from .solvers import AdaptiveIntegrator
 from .types import Scenario
 
@@ -87,6 +96,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-boundary-resolution.json.",
     )
     resolution.set_defaults(func=run_boundary_resolution_command)
+    checks = subparsers.add_parser("research-checks", help="Run artifact, benchmark, integrator, and regime sanity checks.")
+    checks.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-research-checks.json.",
+    )
+    checks.set_defaults(func=run_research_checks_command)
     return parser
 
 
@@ -218,6 +235,33 @@ def run_boundary_resolution_command(args: argparse.Namespace) -> int:
     output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"wrote {output}")
     print(f"cases={len(result.rows)}")
+    return 0
+
+
+def run_research_checks_command(args: argparse.Namespace) -> int:
+    artifact = ClassifierArtifactStudy().run()
+    integrators = IntegratorComparisonStudy().run()
+    benchmarks = KnownBenchmarkSuite().run()
+    regimes = RegimeProbeSuite().run()
+    figure_eight = FigureEightStabilityProbe().run()
+    output = args.output or _default_output_path("research-checks")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "metadata": {
+            "created_at": datetime.now(UTC).isoformat(),
+            "kind": "research-checks",
+        },
+        "summary": {
+            "classifier_artifacts": [row.as_dict() for row in artifact],
+            "integrator_comparison": integrators.as_dict(),
+            "known_benchmarks": [row.as_dict() for row in benchmarks],
+            "regime_probes": [row.as_dict() for row in regimes],
+            "figure_eight_stability": figure_eight.as_dict(),
+        },
+    }
+    output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"wrote {output}")
+    print(f"artifact_cases={len(artifact)} benchmarks={len(benchmarks)} regimes={len(regimes)}")
     return 0
 
 

@@ -16,6 +16,9 @@ class BoundaryCollapseFit:
     raw_cv: float | None
     collapsed_cv: float | None
     improvement: float | None
+    log_residual_sum_squares: float | None
+    aic: float | None
+    bic: float | None
     support: int
 
     def predict(self, features: np.ndarray) -> np.ndarray:
@@ -32,6 +35,9 @@ class BoundaryCollapseFit:
             "raw_cv": self.raw_cv,
             "collapsed_cv": self.collapsed_cv,
             "improvement": self.improvement,
+            "log_residual_sum_squares": self.log_residual_sum_squares,
+            "aic": self.aic,
+            "bic": self.bic,
         }
         for name, coefficient in zip(self.feature_names, self.coefficients, strict=True):
             row[f"exponent_{name}"] = coefficient
@@ -96,6 +102,9 @@ def fit_power_law_boundary_collapse(
             raw_cv=None,
             collapsed_cv=None,
             improvement=None,
+            log_residual_sum_squares=None,
+            aic=None,
+            bic=None,
             support=0,
         )
     features = np.atleast_2d(features)
@@ -111,6 +120,9 @@ def fit_power_law_boundary_collapse(
             raw_cv=_coefficient_of_variation(target),
             collapsed_cv=None,
             improvement=None,
+            log_residual_sum_squares=None,
+            aic=None,
+            bic=None,
             support=int(target.size),
         )
 
@@ -120,6 +132,11 @@ def fit_power_law_boundary_collapse(
     exponents = tuple(float(value) for value in coefficients[1:])
     predicted = np.exp(design @ coefficients)
     collapsed = target / predicted
+    log_residuals = np.log(target) - np.log(np.maximum(predicted, 1.0e-300))
+    rss = float(np.sum(log_residuals**2))
+    parameter_count = len(feature_names) + 1
+    aic = _information_criterion(rss, target.size, parameter_count, kind="aic")
+    bic = _information_criterion(rss, target.size, parameter_count, kind="bic")
     raw_cv = _coefficient_of_variation(target)
     collapsed_cv = _coefficient_of_variation(collapsed)
     improvement = None if raw_cv in (None, 0.0) or collapsed_cv is None else float(1.0 - collapsed_cv / raw_cv)
@@ -131,6 +148,9 @@ def fit_power_law_boundary_collapse(
         raw_cv=raw_cv,
         collapsed_cv=collapsed_cv,
         improvement=improvement,
+        log_residual_sum_squares=rss,
+        aic=aic,
+        bic=bic,
         support=int(target.size),
     )
 
@@ -189,3 +209,14 @@ def _coefficient_of_variation(values: np.ndarray) -> float | None:
     if abs(mean) < 1.0e-12:
         return None
     return float(np.std(values) / abs(mean))
+
+
+def _information_criterion(rss: float, sample_count: int, parameter_count: int, kind: str) -> float | None:
+    if sample_count <= 0:
+        return None
+    likelihood_term = sample_count * np.log(max(rss, 1.0e-300) / sample_count)
+    if kind == "aic":
+        return float(likelihood_term + 2.0 * parameter_count)
+    if kind == "bic":
+        return float(likelihood_term + parameter_count * np.log(sample_count))
+    raise ValueError(f"Unknown information criterion: {kind}")

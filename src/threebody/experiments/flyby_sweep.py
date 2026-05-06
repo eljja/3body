@@ -12,6 +12,7 @@ from ..analysis import (
     encounter_exchange_metrics,
     estimate_transition_boundaries,
     fit_power_law_boundary_collapse,
+    periapsis_scattering_map,
     validate_power_law_boundary_collapse,
 )
 from ..solvers import AdaptiveIntegrator
@@ -38,6 +39,14 @@ class FlybySweepRow:
     phase_alignment: float
     phase_quadrature: float
     nonlinear_tidal_exposure: float
+    periapsis_time: float
+    periapsis_distance: float
+    binary_phase_at_periapsis: float
+    binary_phase_cos_positive: float
+    binary_phase_sin_positive: float
+    outer_energy_delta: float
+    outer_angular_momentum_delta: float
+    deflection_angle: float
     transition_count: int
     low_crossing: float | None
     high_crossing: float | None
@@ -60,6 +69,14 @@ class FlybySweepRow:
             "phase_alignment": self.phase_alignment,
             "phase_quadrature": self.phase_quadrature,
             "nonlinear_tidal_exposure": self.nonlinear_tidal_exposure,
+            "periapsis_time": self.periapsis_time,
+            "periapsis_distance": self.periapsis_distance,
+            "binary_phase_at_periapsis": self.binary_phase_at_periapsis,
+            "binary_phase_cos_positive": self.binary_phase_cos_positive,
+            "binary_phase_sin_positive": self.binary_phase_sin_positive,
+            "outer_energy_delta": self.outer_energy_delta,
+            "outer_angular_momentum_delta": self.outer_angular_momentum_delta,
+            "deflection_angle": self.deflection_angle,
             "transition_count": self.transition_count,
             "low_crossing": self.low_crossing,
             "high_crossing": self.high_crossing,
@@ -88,6 +105,7 @@ class FlybySweepResult:
             "high_crossing_mean": _mean_or_none(high_crossings),
             "high_crossing_cv": _coefficient_of_variation_or_none(high_crossings),
             "collapse_fits": _collapse_fit_rows(self.rows),
+            "model_selection": _model_selection_rows(self.rows),
         }
 
 
@@ -158,6 +176,7 @@ class HierarchicalFlybySweep:
             reports = self.atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
             transitions = self.atlas.transitions(scenario.system, trajectory, stride=stride)
             exchange = encounter_exchange_metrics(scenario.system, trajectory, inner_pair=(0, 1))
+            scattering = periapsis_scattering_map(scenario.system, trajectory, inner_pair=(0, 1))
             nonlinear_tidal_exposure = float(exchange.tidal_impulse * encounter_adiabaticity)
             perturbation_boundaries = estimate_transition_boundaries(
                 {"flyby": reports},
@@ -180,6 +199,14 @@ class HierarchicalFlybySweep:
                         phase_alignment=phase_alignment,
                         phase_quadrature=phase_quadrature,
                         nonlinear_tidal_exposure=nonlinear_tidal_exposure,
+                        periapsis_time=scattering.periapsis_time,
+                        periapsis_distance=scattering.periapsis_distance,
+                        binary_phase_at_periapsis=scattering.binary_phase_at_periapsis,
+                        binary_phase_cos_positive=scattering.binary_phase_cos_positive,
+                        binary_phase_sin_positive=scattering.binary_phase_sin_positive,
+                        outer_energy_delta=scattering.outer_energy_delta,
+                        outer_angular_momentum_delta=scattering.outer_angular_momentum_delta,
+                        deflection_angle=scattering.deflection_angle,
                         transition_count=len(transitions),
                         low_crossing=perturbation_loop.low_crossing,
                         high_crossing=perturbation_loop.high_crossing,
@@ -201,6 +228,14 @@ class HierarchicalFlybySweep:
                         phase_alignment=phase_alignment,
                         phase_quadrature=phase_quadrature,
                         nonlinear_tidal_exposure=nonlinear_tidal_exposure,
+                        periapsis_time=scattering.periapsis_time,
+                        periapsis_distance=scattering.periapsis_distance,
+                        binary_phase_at_periapsis=scattering.binary_phase_at_periapsis,
+                        binary_phase_cos_positive=scattering.binary_phase_cos_positive,
+                        binary_phase_sin_positive=scattering.binary_phase_sin_positive,
+                        outer_energy_delta=scattering.outer_energy_delta,
+                        outer_angular_momentum_delta=scattering.outer_angular_momentum_delta,
+                        deflection_angle=scattering.deflection_angle,
                         transition_count=len(transitions),
                         low_crossing=None,
                         high_crossing=None,
@@ -270,6 +305,89 @@ def _coefficient_of_variation_or_none(values: list[float]) -> float | None:
 
 def _collapse_fit_rows(rows: tuple[FlybySweepRow, ...]) -> list[dict[str, float | int | str | None]]:
     return [fit.rows() for fit in _collapse_fits(rows)]
+
+
+def _model_selection_rows(
+    rows: tuple[FlybySweepRow, ...],
+    bootstrap_replicates: int = 32,
+) -> list[dict[str, float | int | str | None]]:
+    diagnostics = []
+    for spec in _collapse_specs(rows):
+        target, features = _target_and_features(rows, spec)
+        fit = fit_power_law_boundary_collapse(
+            target,
+            features,
+            feature_names=spec["feature_names"],
+            target_name=spec["target_name"],
+        )
+        diagnostics.append(
+            {
+                "target": str(spec["target_name"]),
+                "feature_count": len(spec["feature_names"]),
+                "support": fit.support,
+                "aic": fit.aic,
+                "bic": fit.bic,
+                "loo_log_rmse": _leave_one_out_log_rmse(target, features, spec),
+                "bootstrap_oob_log_rmse_mean": _bootstrap_oob_log_rmse(target, features, spec, bootstrap_replicates),
+            }
+        )
+    return diagnostics
+
+
+def _leave_one_out_log_rmse(target: np.ndarray, features: np.ndarray, spec: dict[str, object]) -> float | None:
+    target = np.asarray(target, dtype=float)
+    features = np.atleast_2d(np.asarray(features, dtype=float))
+    if target.size < len(spec["feature_names"]) + 3:
+        return None
+    residuals = []
+    for holdout in range(target.size):
+        train_mask = np.ones(target.size, dtype=bool)
+        train_mask[holdout] = False
+        fit = fit_power_law_boundary_collapse(
+            target[train_mask],
+            features[train_mask],
+            feature_names=spec["feature_names"],
+            target_name=str(spec["target_name"]),
+        )
+        if fit.support < len(spec["feature_names"]) + 1:
+            continue
+        prediction = float(fit.predict(features[holdout])[0])
+        residuals.append(np.log(target[holdout]) - np.log(max(prediction, 1.0e-300)))
+    if not residuals:
+        return None
+    return float(np.sqrt(np.mean(np.asarray(residuals, dtype=float) ** 2)))
+
+
+def _bootstrap_oob_log_rmse(
+    target: np.ndarray,
+    features: np.ndarray,
+    spec: dict[str, object],
+    replicates: int,
+) -> float | None:
+    target = np.asarray(target, dtype=float)
+    features = np.atleast_2d(np.asarray(features, dtype=float))
+    if target.size < len(spec["feature_names"]) + 3:
+        return None
+    rng = np.random.default_rng(20260507)
+    rmses = []
+    for _replicate in range(replicates):
+        sample = rng.integers(0, target.size, size=target.size)
+        oob_mask = np.ones(target.size, dtype=bool)
+        oob_mask[np.unique(sample)] = False
+        if not np.any(oob_mask):
+            continue
+        fit = fit_power_law_boundary_collapse(
+            target[sample],
+            features[sample],
+            feature_names=spec["feature_names"],
+            target_name=str(spec["target_name"]),
+        )
+        if fit.support < len(spec["feature_names"]) + 1:
+            continue
+        predictions = fit.predict(features[oob_mask])
+        residuals = np.log(target[oob_mask]) - np.log(np.maximum(predictions, 1.0e-300))
+        rmses.append(float(np.sqrt(np.mean(residuals**2))))
+    return None if not rmses else float(np.mean(rmses))
 
 
 def _collapse_fits(rows: tuple[FlybySweepRow, ...]):
@@ -420,8 +538,8 @@ def _collapse_specs(rows: tuple[FlybySweepRow, ...] | None = None) -> tuple[dict
                             "relative_inner_energy_exchange",
                             "relative_angular_momentum_exchange",
                             "tidal_impulse",
-                            "phase_alignment",
-                            "phase_quadrature",
+                            "binary_phase_cos_positive",
+                            "binary_phase_sin_positive",
                         ),
                     },
                     {
@@ -434,9 +552,23 @@ def _collapse_specs(rows: tuple[FlybySweepRow, ...] | None = None) -> tuple[dict
                             "relative_inner_energy_exchange",
                             "relative_angular_momentum_exchange",
                             "tidal_impulse",
-                            "phase_alignment",
-                            "phase_quadrature",
+                            "binary_phase_cos_positive",
+                            "binary_phase_sin_positive",
                             "nonlinear_tidal_exposure",
+                        ),
+                    },
+                    {
+                        "target_name": f"{prefix}_scattering_map",
+                        "crossing_attr": crossing_attr,
+                        "hierarchy_attr": hierarchy_attr,
+                        "feature_names": (
+                            "encounter_adiabaticity",
+                            "hierarchy_ratio",
+                            "tidal_impulse",
+                            "binary_phase_cos_positive",
+                            "binary_phase_sin_positive",
+                            "periapsis_distance",
+                            "deflection_angle",
                         ),
                     },
                 ]
@@ -486,6 +618,18 @@ def _feature_value(row: FlybySweepRow, hierarchy_ratio: float, name: str) -> flo
         return max(row.phase_quadrature, 1.0e-12)
     if name == "nonlinear_tidal_exposure":
         return max(row.nonlinear_tidal_exposure, 1.0e-12)
+    if name == "periapsis_distance":
+        return max(row.periapsis_distance, 1.0e-12)
+    if name == "binary_phase_cos_positive":
+        return max(row.binary_phase_cos_positive, 1.0e-12)
+    if name == "binary_phase_sin_positive":
+        return max(row.binary_phase_sin_positive, 1.0e-12)
+    if name == "outer_energy_delta":
+        return max(abs(row.outer_energy_delta), 1.0e-12)
+    if name == "outer_angular_momentum_delta":
+        return max(abs(row.outer_angular_momentum_delta), 1.0e-12)
+    if name == "deflection_angle":
+        return max(row.deflection_angle, 1.0e-12)
     raise ValueError(f"Unknown collapse feature: {name}")
 
 

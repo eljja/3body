@@ -5,10 +5,12 @@ from .collapse import BoundaryCollapseFit, BoundaryCollapseValidation, fit_power
 from .coordinates import GeneralThreeBodyFeatures, RestrictedThreeBodyFeatures
 from .ensembles import PerturbationEnsemble, PerturbationMember
 from .events import TransitionEventEvidence, transition_event_evidence, transition_event_rows
+from .error_bounds import ChartValidityBound, chart_validity_bound
 from .exchange import EncounterExchangeMetrics, encounter_exchange_metrics
 from .hierarchy import HierarchicalElements, hierarchical_elements
 from .hysteresis import TransitionHysteresisLoop, detect_hysteresis_loops, hysteresis_loop_rows
 from .rule_miner import CandidateTransitionLaw, TransitionRuleMiner
+from .scattering import PeriapsisScatteringMap, periapsis_scattering_map
 from .pipeline import ResearchPipeline, ResearchRunResult, ResearchValidationResult
 from .shape import ShapeSpaceCoordinates, shape_space_coordinates
 from .survey import TransitionSurvey, TransitionSurveyResult
@@ -32,6 +34,7 @@ __all__ = [
     "ChartClassifier",
     "ChartScore",
     "ChartTransition",
+    "ChartValidityBound",
     "ChartType",
     "CandidateTransitionLaw",
     "EncounterExchangeMetrics",
@@ -41,6 +44,7 @@ __all__ = [
     "LocalLinearization",
     "PerturbationEnsemble",
     "PerturbationMember",
+    "PeriapsisScatteringMap",
     "ResearchPipeline",
     "ResearchRunResult",
     "ResearchValidationResult",
@@ -59,6 +63,7 @@ __all__ = [
     "ShapeSpaceCoordinates",
     "feature_vector_for_report",
     "finite_difference_jacobian",
+    "chart_validity_bound",
     "estimate_transition_boundaries",
     "fit_power_law_boundary_collapse",
     "validate_power_law_boundary_collapse",
@@ -67,6 +72,7 @@ __all__ = [
     "hierarchical_elements",
     "hysteresis_loop_rows",
     "local_linearization",
+    "periapsis_scattering_map",
     "shape_space_coordinates",
     "transition_boundary_rows",
     "transition_event_evidence",

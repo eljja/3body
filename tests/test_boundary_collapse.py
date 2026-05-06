@@ -22,6 +22,9 @@ def test_power_law_boundary_collapse_reduces_cv_for_scaled_boundary() -> None:
     assert fit.collapsed_cv is not None
     assert fit.raw_cv is not None
     assert fit.collapsed_cv < fit.raw_cv
+    assert fit.log_residual_sum_squares is not None
+    assert fit.aic is not None
+    assert fit.bic is not None
 
 
 def test_power_law_boundary_collapse_validates_on_heldout_data() -> None:

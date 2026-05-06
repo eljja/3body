@@ -42,3 +42,8 @@ boundary ~= F(tidal_impulse, exchange, encounter_adiabaticity, hierarchy_ratio, 
 ```
 
 If they fail, the project should pivot to manifold routing and regularized close-encounter coordinates for the same residual cases.
+
+The current implementation measures `binary_phase_at_periapsis` from the trajectory rather than relying only on initial phase.
+That is necessary but not sufficient.
+A real scattering map must predict outgoing energy, angular momentum, deflection angle, and chart transition probability jointly, not just reuse phase as another multiplicative power-law feature.
+The first smoke result is encouraging only for low-crossing boundary collapse; high-crossing selection still prefers a simpler impulse model after complexity penalty.

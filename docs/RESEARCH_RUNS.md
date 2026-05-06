@@ -75,6 +75,16 @@ threebody boundary-resolution --duration 8
 
 This reruns the same benchmark across sample counts and classification strides, then reports crossing CV across those numerical settings.
 
+To run the broader research guardrails:
+
+```powershell
+threebody research-checks
+```
+
+This writes classifier-artifact sensitivity rows, adaptive-vs-structure-aware integrator comparison, known benchmark checks, regime probes, and a figure-eight stability probe.
+The integrator comparison deliberately reports `regularized_available = false` until a real collision-regularized stepper exists.
+Any close-encounter compact model is provisional while that flag is false.
+
 To split the run into discovery and validation ensembles:
 
 ```powershell
