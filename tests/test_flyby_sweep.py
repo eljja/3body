@@ -23,6 +23,7 @@ def test_hierarchical_flyby_sweep_returns_boundary_rows() -> None:
     assert result.rows[0].encounter_adiabaticity > 0.0
     assert result.rows[0].tidal_impulse > 0.0
     assert result.rows[0].transition_count > 0
+    assert result.rows[0].chart_word
 
 
 def test_hierarchical_flyby_sweep_tracks_phase_features() -> None:

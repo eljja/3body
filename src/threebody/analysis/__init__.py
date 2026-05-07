@@ -28,6 +28,14 @@ from .transition_graph import TransitionGraph
 from .types import AnalysisReport, ChartScore, ChartTransition, ChartType
 from .validation import TransitionLawValidation, TransitionLawValidator
 from .variational import LocalLinearization, finite_difference_jacobian, local_linearization
+from .word_algebra import (
+    ChartWord,
+    ChartWordSignature,
+    chart_word_from_reports,
+    chart_word_signature,
+    word_distance,
+    word_signature_rows,
+)
 
 __all__ = [
     "AnalysisAtlas",
@@ -37,6 +45,8 @@ __all__ = [
     "ChartClassifier",
     "ChartScore",
     "ChartTransition",
+    "ChartWord",
+    "ChartWordSignature",
     "ChartValidityBound",
     "ChartType",
     "CandidateTransitionLaw",
@@ -70,6 +80,8 @@ __all__ = [
     "feature_vector_for_report",
     "finite_difference_jacobian",
     "chart_validity_bound",
+    "chart_word_from_reports",
+    "chart_word_signature",
     "estimate_transition_boundaries",
     "fit_power_law_boundary_collapse",
     "validate_power_law_boundary_collapse",
@@ -88,4 +100,6 @@ __all__ = [
     "transition_event_evidence",
     "transition_event_rows",
     "transition_samples_from_reports",
+    "word_distance",
+    "word_signature_rows",
 ]

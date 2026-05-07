@@ -70,6 +70,27 @@ Open proof obligations:
 - Separate low-boundary exit behavior from high-boundary re-entry memory.
 - Test whether the selected model changes under longer integrations, smaller tolerances, and independent implementation.
 
+## Candidate 4: Chart-Word Grammar Conjecture
+
+Claim:
+
+When scalar boundary collapse fails, the re-entry structure of a three-body trajectory may still be described by stable words over the chart alphabet and their transition grammar.
+
+Why this is a different mathematical object:
+
+The object is not a scalar threshold or a fitted physical feature.
+It is a compressed word over an alphabet of dynamical charts.
+The current diagnostics include transition entropy, reversal defect, primitive period, and grammar rank.
+
+Open proof obligations:
+
+- Show held-out word stability across flyby grids.
+- Rule out the trivial explanation that the classifier alphabet is too coarse and every flyby compresses to the same word.
+- Require held-out word diversity, not only nearest-neighbor word similarity.
+- Define admissible grammar transformations for noisy chart classification.
+- Connect chart words to a genuine return map or symbolic dynamics construction.
+- Prove that a grammar invariant predicts re-entry better than scalar high-crossing thresholds.
+
 ## Reproducibility
 
 Run:

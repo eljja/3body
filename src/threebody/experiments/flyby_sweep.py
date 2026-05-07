@@ -14,6 +14,8 @@ from ..analysis import (
     fit_power_law_boundary_collapse,
     periapsis_scattering_map,
     validate_power_law_boundary_collapse,
+    chart_word_from_reports,
+    chart_word_signature,
 )
 from ..solvers import AdaptiveIntegrator
 from ..utils import orbit_period
@@ -52,6 +54,11 @@ class FlybySweepRow:
     outgoing_escape_speed_at_infinity: float
     deflection_angle: float
     transition_count: int
+    chart_word: str
+    word_transition_entropy: float
+    word_reversal_defect: float
+    word_primitive_period: int
+    word_grammar_rank: int
     low_crossing: float | None
     high_crossing: float | None
     low_hierarchy_ratio: float | None
@@ -59,7 +66,7 @@ class FlybySweepRow:
     hysteresis_width: float | None
     support: int
 
-    def as_dict(self) -> dict[str, float | int | None]:
+    def as_dict(self) -> dict[str, float | int | str | None]:
         return {
             "intruder_mass": self.case.intruder_mass,
             "impact_parameter": self.case.impact_parameter,
@@ -86,6 +93,11 @@ class FlybySweepRow:
             "outgoing_escape_speed_at_infinity": self.outgoing_escape_speed_at_infinity,
             "deflection_angle": self.deflection_angle,
             "transition_count": self.transition_count,
+            "chart_word": self.chart_word,
+            "word_transition_entropy": self.word_transition_entropy,
+            "word_reversal_defect": self.word_reversal_defect,
+            "word_primitive_period": self.word_primitive_period,
+            "word_grammar_rank": self.word_grammar_rank,
             "low_crossing": self.low_crossing,
             "high_crossing": self.high_crossing,
             "low_hierarchy_ratio": self.low_hierarchy_ratio,
@@ -185,6 +197,7 @@ class HierarchicalFlybySweep:
             transitions = self.atlas.transitions(scenario.system, trajectory, stride=stride)
             exchange = encounter_exchange_metrics(scenario.system, trajectory, inner_pair=(0, 1))
             scattering = periapsis_scattering_map(scenario.system, trajectory, inner_pair=(0, 1))
+            word_signature = chart_word_signature(chart_word_from_reports(reports))
             nonlinear_tidal_exposure = float(exchange.tidal_impulse * encounter_adiabaticity)
             perturbation_boundaries = estimate_transition_boundaries(
                 {"flyby": reports},
@@ -220,6 +233,11 @@ class HierarchicalFlybySweep:
                         outgoing_escape_speed_at_infinity=scattering.outgoing_escape_speed_at_infinity,
                         deflection_angle=scattering.deflection_angle,
                         transition_count=len(transitions),
+                        chart_word=word_signature.word.as_string(),
+                        word_transition_entropy=word_signature.transition_entropy,
+                        word_reversal_defect=word_signature.reversal_defect,
+                        word_primitive_period=word_signature.primitive_period,
+                        word_grammar_rank=word_signature.grammar_rank,
                         low_crossing=perturbation_loop.low_crossing,
                         high_crossing=perturbation_loop.high_crossing,
                         low_hierarchy_ratio=None if hierarchy_loop is None else hierarchy_loop.low_crossing,
@@ -253,6 +271,11 @@ class HierarchicalFlybySweep:
                         outgoing_escape_speed_at_infinity=scattering.outgoing_escape_speed_at_infinity,
                         deflection_angle=scattering.deflection_angle,
                         transition_count=len(transitions),
+                        chart_word=word_signature.word.as_string(),
+                        word_transition_entropy=word_signature.transition_entropy,
+                        word_reversal_defect=word_signature.reversal_defect,
+                        word_primitive_period=word_signature.primitive_period,
+                        word_grammar_rank=word_signature.grammar_rank,
                         low_crossing=None,
                         high_crossing=None,
                         low_hierarchy_ratio=None,

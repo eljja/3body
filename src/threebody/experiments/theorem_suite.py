@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..analysis import word_distance
 from .flyby_sweep import HierarchicalFlybySweep
 from .research_checks import ClassifierArtifactStudy, IntegratorComparisonStudy, KnownBenchmarkSuite, RegimeProbeSuite
 
@@ -141,6 +142,12 @@ def _paper_benchmarks(
     low_selection_score = (
         None if low_scattering_selection is None else float(low_scattering_selection["complexity_penalized_validation_score"])
     )
+    discovery_words = _word_rows_by_name(flyby_summary["discovery"])
+    validation_words = _word_rows_by_name(flyby_summary["validation"])
+    word_stability = _word_stability_score(discovery_words, validation_words)
+    combined_word_rows = tuple(discovery_words.values()) + tuple(validation_words.values())
+    distinct_word_count = _distinct_word_count(combined_word_rows)
+    validation_distinct_word_count = _distinct_word_count(tuple(validation_words.values()))
     high_best = next((row for row in best_models if str(row["target"]).startswith("high_")), None)
     hysteresis_best = next((row for row in best_models if str(row["target"]).startswith("hysteresis_")), None)
     low_best_score = None if low_best is None else float(low_best["complexity_penalized_validation_score"])
@@ -225,6 +232,30 @@ def _paper_benchmarks(
             threshold=0.25,
             interpretation=f"Best hysteresis-width model in theorem suite: {hysteresis_best_target}.",
         ),
+        PaperBenchmarkResult(
+            name="transition_word_stability",
+            passed=word_stability is not None and word_stability >= 0.5,
+            metric="mean_normalized_word_similarity",
+            observed=word_stability,
+            threshold=0.5,
+            interpretation="New-math candidate: chart words should remain grammar-stable across held-out flyby grids.",
+        ),
+        PaperBenchmarkResult(
+            name="transition_word_nontriviality",
+            passed=distinct_word_count >= 2,
+            metric="distinct_chart_words",
+            observed=float(distinct_word_count),
+            threshold=2.0,
+            interpretation="Chart-word stability is not meaningful if the whole sweep collapses to one trivial word.",
+        ),
+        PaperBenchmarkResult(
+            name="transition_word_validation_diversity",
+            passed=validation_distinct_word_count >= 2,
+            metric="heldout_distinct_chart_words",
+            observed=float(validation_distinct_word_count),
+            threshold=2.0,
+            interpretation="Held-out chart words must retain diversity before claiming a robust grammar law.",
+        ),
     )
 
 
@@ -235,6 +266,9 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     low_best_passed = benchmark_by_name["best_low_crossing_model_validation"].passed
     high_best_passed = benchmark_by_name["best_high_crossing_model_validation"].passed
     hysteresis_best_passed = benchmark_by_name["best_hysteresis_width_model_validation"].passed
+    word_stability_passed = benchmark_by_name["transition_word_stability"].passed
+    word_nontriviality_passed = benchmark_by_name["transition_word_nontriviality"].passed
+    word_validation_diversity_passed = benchmark_by_name["transition_word_validation_diversity"].passed
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
@@ -347,4 +381,89 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
             ),
         ),
+        TheoremCandidate(
+            name="Chart-Word Grammar Conjecture",
+            claim=(
+                "When scalar boundary collapse fails, the re-entry structure of a three-body trajectory may still be "
+                "described by stable words over the chart alphabet and their transition grammar."
+            ),
+            scope="Current implementation tests compressed chart words over the hierarchical flyby theorem-suite grids.",
+            novelty_target="Move from scalar thresholds to an algebra of chart words, reversal defects, primitive periods, and grammar rank.",
+            proven=False,
+            obligations=(
+                ProofObligation(
+                    "heldout_word_stability",
+                    "partial" if word_stability_passed and word_nontriviality_passed else "failing",
+                    benchmark_by_name["transition_word_stability"].interpretation,
+                    None
+                    if word_stability_passed and word_nontriviality_passed
+                    else "Chart words are not stable or are trivial across the current held-out grids.",
+                ),
+                ProofObligation(
+                    "coarse_alphabet_artifact_check",
+                    "partial" if word_validation_diversity_passed else "failing",
+                    benchmark_by_name["transition_word_validation_diversity"].interpretation,
+                    None
+                    if word_validation_diversity_passed
+                    else "Current held-out flyby words collapse to too few symbols; refine the alphabet before promoting this.",
+                ),
+                ProofObligation(
+                    "grammar_invariant_bound",
+                    "open",
+                    "No analytic invariant or symbolic-dynamics bound has been derived for chart words.",
+                    "Define admissible grammar transformations and prove stability in a restricted regime.",
+                ),
+                ProofObligation(
+                    "return_map_connection",
+                    "open",
+                    "The current word algebra is not yet tied to a Poincare/return map.",
+                    "Construct a return section and prove that word transitions correspond to return-map regions.",
+                ),
+            ),
+        ),
     )
+
+
+def _word_rows_by_name(summary: object) -> dict[str, dict[str, object]]:
+    return {
+        f"{row['intruder_mass']}:{row['impact_parameter']}:{row['intruder_speed_y']}:{row['binary_phase']}": row
+        for row in summary.get("rows", [])
+        if "chart_word" in row
+    }
+
+
+def _word_stability_score(
+    discovery_words: dict[str, dict[str, object]],
+    validation_words: dict[str, dict[str, object]],
+) -> float | None:
+    if not discovery_words or not validation_words:
+        return None
+    discovery_strings = [str(row["chart_word"]) for row in discovery_words.values()]
+    validation_strings = [str(row["chart_word"]) for row in validation_words.values()]
+    scores = []
+    for validation in validation_strings:
+        validation_symbols = tuple(part.strip() for part in validation.split("->") if part.strip())
+        best = 0.0
+        for discovery in discovery_strings:
+            discovery_symbols = tuple(part.strip() for part in discovery.split("->") if part.strip())
+            distance = _string_word_distance(discovery_symbols, validation_symbols)
+            denominator = max(len(discovery_symbols), len(validation_symbols), 1)
+            best = max(best, 1.0 - distance / denominator)
+        scores.append(best)
+    return float(sum(scores) / len(scores))
+
+
+def _distinct_word_count(rows: tuple[dict[str, object], ...]) -> int:
+    return len({str(row["chart_word"]) for row in rows if "chart_word" in row})
+
+
+def _string_word_distance(first: tuple[str, ...], second: tuple[str, ...]) -> int:
+    class _Word:
+        def __init__(self, symbols: tuple[str, ...]) -> None:
+            self.symbols = symbols
+
+        @property
+        def length(self) -> int:
+            return len(self.symbols)
+
+    return word_distance(_Word(first), _Word(second))

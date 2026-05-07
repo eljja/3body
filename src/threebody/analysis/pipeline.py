@@ -27,6 +27,7 @@ class ResearchRunResult:
             "transition_events": self.survey.transition_event_rows(),
             "transition_boundaries": self.survey.transition_boundary_rows(),
             "hysteresis_loops": self.survey.hysteresis_loop_rows(),
+            "word_signatures": self.survey.word_signature_rows(),
             "candidate_laws": ResearchPipeline.law_rows(self.candidate_laws),
         }
 

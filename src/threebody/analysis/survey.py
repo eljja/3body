@@ -10,6 +10,7 @@ from .transition_graph import TransitionGraph
 from .transition_model import FeatureConditionedTransitionModel, transition_samples_from_reports
 from .types import AnalysisReport
 from .events import transition_event_evidence, transition_event_rows
+from .word_algebra import word_signature_rows
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +36,9 @@ class TransitionSurveyResult:
     def hysteresis_loop_rows(self, coordinate: str = "hierarchy_perturbation_strength") -> list[dict[str, float | int | str | bool]]:
         estimates = estimate_transition_boundaries(self.reports_by_name, coordinate=coordinate)
         return hysteresis_loop_rows(detect_hysteresis_loops(estimates))
+
+    def word_signature_rows(self) -> list[dict[str, float | int | str | bool]]:
+        return word_signature_rows(self.reports_by_name)
 
 
 @dataclass(slots=True)
