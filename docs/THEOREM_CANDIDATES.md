@@ -63,6 +63,8 @@ That means the more defensible current target is not "phase/scattering wins", bu
 Open proof obligations:
 
 - Current theorem-suite status: low boundary is partial with `low_crossing_impulse`; high boundary is still failing under the current threshold.
+- The suite now also tests `hysteresis_width` as a memory/re-entry target, but that target also fails in the current theorem harness.
+- This suggests high/re-entry is not a scalar boundary-collapse problem yet; it likely needs a transition-word or return-map model.
 - Prove or numerically dominate instantaneous-only models over larger held-out grids.
 - Derive a perturbative bound connecting tidal impulse and inner-binary action variation.
 - Separate low-boundary exit behavior from high-boundary re-entry memory.

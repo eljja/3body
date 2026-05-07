@@ -495,18 +495,28 @@ def _collapse_residual_rows(
 def _best_validation_rows(
     rows: tuple[dict[str, float | int | str | bool | None], ...],
 ) -> list[dict[str, float | int | str | bool | None]]:
-    best_by_direction: dict[str, dict[str, float | int | str | bool | None]] = {}
+    best_by_family: dict[str, dict[str, float | int | str | bool | None]] = {}
     for row in rows:
         target = str(row["target"])
-        direction = "low" if target.startswith("low_") else "high"
+        family = _target_family(target)
         score = row.get("complexity_penalized_validation_score")
         if score is None:
             continue
-        current = best_by_direction.get(direction)
+        current = best_by_family.get(family)
         current_score = None if current is None else current.get("complexity_penalized_validation_score")
         if current is None or float(score) > float(current_score or -np.inf):
-            best_by_direction[direction] = row
-    return [best_by_direction[key] for key in sorted(best_by_direction)]
+            best_by_family[family] = row
+    return [best_by_family[key] for key in sorted(best_by_family)]
+
+
+def _target_family(target: str) -> str:
+    if target.startswith("low_"):
+        return "low"
+    if target.startswith("high_"):
+        return "high"
+    if target.startswith("hysteresis_"):
+        return "hysteresis"
+    return target.split("_", maxsplit=1)[0]
 
 
 def _collapse_specs(rows: tuple[FlybySweepRow, ...] | None = None) -> tuple[dict[str, object], ...]:
@@ -515,6 +525,7 @@ def _collapse_specs(rows: tuple[FlybySweepRow, ...] | None = None) -> tuple[dict
     for prefix, crossing_attr, hierarchy_attr in (
         ("low_crossing", "low_crossing", "low_hierarchy_ratio"),
         ("high_crossing", "high_crossing", "high_hierarchy_ratio"),
+        ("hysteresis_width", "hysteresis_width", "high_hierarchy_ratio"),
     ):
         base_specs = [
             {

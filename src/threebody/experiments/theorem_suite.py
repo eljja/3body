@@ -142,10 +142,15 @@ def _paper_benchmarks(
         None if low_scattering_selection is None else float(low_scattering_selection["complexity_penalized_validation_score"])
     )
     high_best = next((row for row in best_models if str(row["target"]).startswith("high_")), None)
+    hysteresis_best = next((row for row in best_models if str(row["target"]).startswith("hysteresis_")), None)
     low_best_score = None if low_best is None else float(low_best["complexity_penalized_validation_score"])
     high_best_score = None if high_best is None else float(high_best["complexity_penalized_validation_score"])
+    hysteresis_best_score = (
+        None if hysteresis_best is None else float(hysteresis_best["complexity_penalized_validation_score"])
+    )
     low_best_target = "none" if low_best is None else str(low_best["target"])
     high_best_target = "none" if high_best is None else str(high_best["target"])
+    hysteresis_best_target = "none" if hysteresis_best is None else str(hysteresis_best["target"])
     return (
         PaperBenchmarkResult(
             name="known_reference_benchmarks",
@@ -212,6 +217,14 @@ def _paper_benchmarks(
             threshold=0.25,
             interpretation=f"Best high-crossing model in theorem suite: {high_best_target}.",
         ),
+        PaperBenchmarkResult(
+            name="best_hysteresis_width_model_validation",
+            passed=hysteresis_best_score is not None and hysteresis_best_score > 0.25,
+            metric="complexity_penalized_validation_score",
+            observed=hysteresis_best_score,
+            threshold=0.25,
+            interpretation=f"Best hysteresis-width model in theorem suite: {hysteresis_best_target}.",
+        ),
     )
 
 
@@ -221,6 +234,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     scattering_selection_passed = benchmark_by_name["low_crossing_scattering_map_selection"].passed
     low_best_passed = benchmark_by_name["best_low_crossing_model_validation"].passed
     high_best_passed = benchmark_by_name["best_high_crossing_model_validation"].passed
+    hysteresis_best_passed = benchmark_by_name["best_hysteresis_width_model_validation"].passed
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
@@ -312,6 +326,12 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                     "partial" if high_best_passed else "failing",
                     benchmark_by_name["best_high_crossing_model_validation"].interpretation,
                     None if high_best_passed else "No high-boundary model survives theorem-suite validation.",
+                ),
+                ProofObligation(
+                    "hysteresis_width_model_validation",
+                    "partial" if hysteresis_best_passed else "failing",
+                    benchmark_by_name["best_hysteresis_width_model_validation"].interpretation,
+                    None if hysteresis_best_passed else "Width/memory model does not yet survive theorem-suite validation.",
                 ),
                 ProofObligation(
                     "instantaneous_threshold_rejection",
