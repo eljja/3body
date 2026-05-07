@@ -11,6 +11,7 @@ from ..analysis import (
     gateway_transit_estimate,
     local_linearization,
     mcgehee_collision_diagnostic,
+    reduced_three_body_state,
 )
 from ..diagnostics import InvariantMonitor, StabilityAnalyzer
 from ..solvers import AdaptiveIntegrator, StructureAwareIntegrator
@@ -225,7 +226,15 @@ class RegimeProbeSuite:
                 gateway = gateway_transit_estimate(system, state)
                 extra.update({f"gateway_{key}": value for key, value in gateway.as_dict().items()})
             elif getattr(system, "body_count", None) == 3:
+                reduced = reduced_three_body_state(system, state)
                 collision = mcgehee_collision_diagnostic(system, state)
+                extra.update(
+                    {
+                        "reduced_hyperradius": reduced.hyperradius,
+                        "reduced_shape_area": reduced.shape_area,
+                        "reduced_regime_hint": reduced.reduced_regime_hint,
+                    }
+                )
                 extra.update({f"collision_{key}": value for key, value in collision.as_dict().items()})
             rows.append(
                 RegimeProbeResult(

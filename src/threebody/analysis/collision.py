@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .coordinates import PAIR_INDICES
+from .reduced_state import reduced_three_body_state
 from .shape import shape_space_coordinates
 
 
@@ -45,6 +46,7 @@ def mcgehee_collision_diagnostic(
     """Separate scale from shape near binary or triple collision candidates."""
 
     positions, velocities = system.split_state(state)
+    reduced = reduced_three_body_state(system, state)
     masses = np.asarray(system.masses, dtype=float)
     center = np.average(positions, axis=0, weights=masses)
     center_velocity = np.average(velocities, axis=0, weights=masses)
@@ -66,11 +68,11 @@ def mcgehee_collision_diagnostic(
         collision_type = "regular_shape"
 
     return McGeheeCollisionDiagnostic(
-        hyperradius=float(shape.hyperradius),
+        hyperradius=reduced.hyperradius,
         radial_velocity=radial_velocity,
         normalized_radial_velocity=normalized_radial_velocity,
-        shape_area=shape.normalized_area,
-        shape_anisotropy=shape.anisotropy,
+        shape_area=reduced.shape_area,
+        shape_anisotropy=reduced.shape_anisotropy,
         minimum_pair_distance=minimum_pair_distance,
         collision_depth=collision_depth,
         collision_type=collision_type,

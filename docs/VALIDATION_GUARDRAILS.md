@@ -32,6 +32,7 @@ Forbidden claims:
 
 ## Current Gaps
 
+- `ReducedThreeBodyState` now centralizes shape-scale-invariant coordinates, but the main classifier still partly uses older feature objects. Migration should be gradual and tested against existing chart labels.
 - Periapsis phase is now measured from the trajectory, and the first `scattering_map` collapse includes periapsis distance and deflection angle. The scattering diagnostic now also reports outgoing semimajor axis, eccentricity, periapsis distance, and escape speed at infinity.
 - AIC, BIC, leave-one-out, and bootstrap/OOB diagnostics exist for flyby collapse fits, but the sample count is still small.
 - A true regularized collision integrator is missing, but a McGehee-style scale/shape collision diagnostic now separates hyperradius, radial velocity, shape area, anisotropy, and collision depth.

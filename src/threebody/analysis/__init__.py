@@ -14,6 +14,7 @@ from .hysteresis import TransitionHysteresisLoop, detect_hysteresis_loops, hyste
 from .rule_miner import CandidateTransitionLaw, TransitionRuleMiner
 from .scattering import PeriapsisScatteringMap, periapsis_scattering_map
 from .pipeline import ResearchPipeline, ResearchRunResult, ResearchValidationResult
+from .reduced_state import ReducedThreeBodyState, reduced_state_series, reduced_three_body_state
 from .shape import ShapeSpaceCoordinates, shape_space_coordinates
 from .survey import TransitionSurvey, TransitionSurveyResult
 from .transition_model import (
@@ -52,6 +53,7 @@ __all__ = [
     "ResearchPipeline",
     "ResearchRunResult",
     "ResearchValidationResult",
+    "ReducedThreeBodyState",
     "RestrictedThreeBodyFeatures",
     "TransitionPrediction",
     "TransitionEventEvidence",
@@ -79,6 +81,8 @@ __all__ = [
     "gateway_transit_estimate",
     "mcgehee_collision_diagnostic",
     "periapsis_scattering_map",
+    "reduced_state_series",
+    "reduced_three_body_state",
     "shape_space_coordinates",
     "transition_boundary_rows",
     "transition_event_evidence",

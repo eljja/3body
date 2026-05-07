@@ -19,6 +19,11 @@ An analysis atlas consists of:
 - transition rules between charts,
 - and error bounds or empirical validity tests.
 
+The shared state object is now `ReducedThreeBodyState`.
+It removes the center-of-mass perspective and exposes the quantities that every chart should agree on:
+energy, angular momentum, virial ratio, hyperradius, radial velocity, normalized shape area, anisotropy, nearest-pair distance, hierarchy ratio, perturbation strength, collision depth, escape depth, and a provisional regime hint.
+This is the bridge from raw trajectory plotting to a real shape-scale atlas.
+
 ## Initial Charts
 
 ### Two-Body Hierarchy
@@ -97,6 +102,9 @@ In the hierarchical flyby benchmark, the first mined law moves from a generic vi
 
 The general three-body feature vector now includes scale-separated shape-space coordinates: normalized triangle area, hyperradius, and side-length anisotropy.
 This matters because democratic motion, close approaches, hierarchy formation, and escape are not only energy events; they are also changes in triangle geometry.
+
+`ReducedThreeBodyState` is the next consolidation step.
+Future classifiers and compact models should depend on this reduced state first, then attach chart-specific refinements such as Kepler elements, McGehee collision diagnostics, Lagrange gateway projections, or scattering outgoing elements.
 
 `TransitionSurvey` is the batch loop for this program.
 It runs the atlas over multiple trajectories and returns chart reports, an empirical transition graph, and a feature-conditioned transition model.
