@@ -80,7 +80,14 @@ Why this is a different mathematical object:
 
 The object is not a scalar threshold or a fitted physical feature.
 It is a compressed word over an alphabet of dynamical charts.
-The current diagnostics include transition entropy, reversal defect, primitive period, and grammar rank.
+The current diagnostics include transition entropy, reversal defect, primitive period, grammar rank, refined physical bins, and an extremum-based return-word proxy.
+
+Current proof status for this candidate:
+
+- Coarse chart words are stable but too low-diversity to trust.
+- Refined physical chart words now pass the current held-out diversity check.
+- Extremum-based return words now pass the current partial stability and diversity checks.
+- This is still not a theorem because no grammar invariant bound has been proved.
 
 Open proof obligations:
 
@@ -88,7 +95,7 @@ Open proof obligations:
 - Rule out the trivial explanation that the classifier alphabet is too coarse and every flyby compresses to the same word.
 - Require held-out word diversity, not only nearest-neighbor word similarity.
 - Define admissible grammar transformations for noisy chart classification.
-- Connect chart words to a genuine return map or symbolic dynamics construction.
+- Upgrade the current extremum-based return-word proxy into a genuine Poincare/return-map construction.
 - Prove that a grammar invariant predicts re-entry better than scalar high-crossing thresholds.
 
 ## Reproducibility

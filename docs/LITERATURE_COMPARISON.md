@@ -40,6 +40,7 @@ the surviving explanatory class is accumulated impulse/exchange over the encount
 The next nonstandard candidate is a chart-word grammar.
 Rather than fitting another scalar boundary, trajectories are compressed into words over the atlas chart alphabet.
 This is adjacent to symbolic dynamics, but the current proposal is atlas-specific: the alphabet is not a fixed partition of configuration space, but a set of local explanatory regimes with validity controls.
+The refined version adds physical bins inside each chart and an extremum-based return-word proxy, which is a bridge toward return maps rather than a completed symbolic-dynamics theorem.
 
 ## What Would Count As A Real Breakthrough
 

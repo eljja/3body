@@ -24,6 +24,9 @@ def test_hierarchical_flyby_sweep_returns_boundary_rows() -> None:
     assert result.rows[0].tidal_impulse > 0.0
     assert result.rows[0].transition_count > 0
     assert result.rows[0].chart_word
+    assert result.rows[0].refined_chart_word
+    assert result.rows[0].return_chart_word
+    assert result.rows[0].refined_word_grammar_rank >= result.rows[0].word_grammar_rank
 
 
 def test_hierarchical_flyby_sweep_tracks_phase_features() -> None:

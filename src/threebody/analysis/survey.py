@@ -10,7 +10,7 @@ from .transition_graph import TransitionGraph
 from .transition_model import FeatureConditionedTransitionModel, transition_samples_from_reports
 from .types import AnalysisReport
 from .events import transition_event_evidence, transition_event_rows
-from .word_algebra import word_signature_rows
+from .word_algebra import refined_word_signature_rows, return_word_signature_rows, word_signature_rows
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +39,15 @@ class TransitionSurveyResult:
 
     def word_signature_rows(self) -> list[dict[str, float | int | str | bool]]:
         return word_signature_rows(self.reports_by_name)
+
+    def refined_word_signature_rows(self) -> list[dict[str, float | int | str | bool]]:
+        return refined_word_signature_rows(self.reports_by_name)
+
+    def return_word_signature_rows(
+        self,
+        coordinate: str = "hierarchy_ratio",
+    ) -> list[dict[str, float | int | str | bool]]:
+        return return_word_signature_rows(self.reports_by_name, coordinate=coordinate)
 
 
 @dataclass(slots=True)

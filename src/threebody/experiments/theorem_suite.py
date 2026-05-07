@@ -148,6 +148,30 @@ def _paper_benchmarks(
     combined_word_rows = tuple(discovery_words.values()) + tuple(validation_words.values())
     distinct_word_count = _distinct_word_count(combined_word_rows)
     validation_distinct_word_count = _distinct_word_count(tuple(validation_words.values()))
+    refined_discovery_words = _word_rows_by_name(flyby_summary["discovery"], field="refined_chart_word")
+    refined_validation_words = _word_rows_by_name(flyby_summary["validation"], field="refined_chart_word")
+    refined_word_stability = _word_stability_score(
+        refined_discovery_words,
+        refined_validation_words,
+        field="refined_chart_word",
+    )
+    refined_combined_word_rows = tuple(refined_discovery_words.values()) + tuple(refined_validation_words.values())
+    refined_distinct_word_count = _distinct_word_count(refined_combined_word_rows, field="refined_chart_word")
+    refined_validation_distinct_word_count = _distinct_word_count(
+        tuple(refined_validation_words.values()),
+        field="refined_chart_word",
+    )
+    return_discovery_words = _word_rows_by_name(flyby_summary["discovery"], field="return_chart_word")
+    return_validation_words = _word_rows_by_name(flyby_summary["validation"], field="return_chart_word")
+    return_word_stability = _word_stability_score(
+        return_discovery_words,
+        return_validation_words,
+        field="return_chart_word",
+    )
+    return_validation_distinct_word_count = _distinct_word_count(
+        tuple(return_validation_words.values()),
+        field="return_chart_word",
+    )
     high_best = next((row for row in best_models if str(row["target"]).startswith("high_")), None)
     hysteresis_best = next((row for row in best_models if str(row["target"]).startswith("hysteresis_")), None)
     low_best_score = None if low_best is None else float(low_best["complexity_penalized_validation_score"])
@@ -256,6 +280,46 @@ def _paper_benchmarks(
             threshold=2.0,
             interpretation="Held-out chart words must retain diversity before claiming a robust grammar law.",
         ),
+        PaperBenchmarkResult(
+            name="refined_transition_word_stability",
+            passed=refined_word_stability is not None and refined_word_stability >= 0.5,
+            metric="mean_normalized_refined_word_similarity",
+            observed=refined_word_stability,
+            threshold=0.5,
+            interpretation="Refined physical chart words should remain grammar-stable across held-out flyby grids.",
+        ),
+        PaperBenchmarkResult(
+            name="refined_transition_word_nontriviality",
+            passed=refined_distinct_word_count >= 6,
+            metric="distinct_refined_chart_words",
+            observed=float(refined_distinct_word_count),
+            threshold=6.0,
+            interpretation="The refined chart alphabet must separate multiple physical word classes.",
+        ),
+        PaperBenchmarkResult(
+            name="refined_transition_word_validation_diversity",
+            passed=refined_validation_distinct_word_count >= 6,
+            metric="heldout_distinct_refined_chart_words",
+            observed=float(refined_validation_distinct_word_count),
+            threshold=6.0,
+            interpretation="Held-out refined chart words must remain diverse after physical binning.",
+        ),
+        PaperBenchmarkResult(
+            name="return_word_stability",
+            passed=return_word_stability is not None and return_word_stability >= 0.35,
+            metric="mean_normalized_return_word_similarity",
+            observed=return_word_stability,
+            threshold=0.35,
+            interpretation="Extremum-based return words should retain partial stability across held-out flyby grids.",
+        ),
+        PaperBenchmarkResult(
+            name="return_word_validation_diversity",
+            passed=return_validation_distinct_word_count >= 4,
+            metric="heldout_distinct_return_words",
+            observed=float(return_validation_distinct_word_count),
+            threshold=4.0,
+            interpretation="The return-word proxy must produce multiple held-out symbolic return classes.",
+        ),
     )
 
 
@@ -266,9 +330,11 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     low_best_passed = benchmark_by_name["best_low_crossing_model_validation"].passed
     high_best_passed = benchmark_by_name["best_high_crossing_model_validation"].passed
     hysteresis_best_passed = benchmark_by_name["best_hysteresis_width_model_validation"].passed
-    word_stability_passed = benchmark_by_name["transition_word_stability"].passed
-    word_nontriviality_passed = benchmark_by_name["transition_word_nontriviality"].passed
-    word_validation_diversity_passed = benchmark_by_name["transition_word_validation_diversity"].passed
+    refined_word_stability_passed = benchmark_by_name["refined_transition_word_stability"].passed
+    refined_word_nontriviality_passed = benchmark_by_name["refined_transition_word_nontriviality"].passed
+    refined_word_validation_diversity_passed = benchmark_by_name["refined_transition_word_validation_diversity"].passed
+    return_word_passed = benchmark_by_name["return_word_stability"].passed
+    return_word_diversity_passed = benchmark_by_name["return_word_validation_diversity"].passed
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
@@ -387,24 +453,27 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 "When scalar boundary collapse fails, the re-entry structure of a three-body trajectory may still be "
                 "described by stable words over the chart alphabet and their transition grammar."
             ),
-            scope="Current implementation tests compressed chart words over the hierarchical flyby theorem-suite grids.",
+            scope=(
+                "Current implementation tests coarse words, refined physical words, and extremum-based return words "
+                "over the hierarchical flyby theorem-suite grids."
+            ),
             novelty_target="Move from scalar thresholds to an algebra of chart words, reversal defects, primitive periods, and grammar rank.",
             proven=False,
             obligations=(
                 ProofObligation(
                     "heldout_word_stability",
-                    "partial" if word_stability_passed and word_nontriviality_passed else "failing",
-                    benchmark_by_name["transition_word_stability"].interpretation,
+                    "partial" if refined_word_stability_passed and refined_word_nontriviality_passed else "failing",
+                    benchmark_by_name["refined_transition_word_stability"].interpretation,
                     None
-                    if word_stability_passed and word_nontriviality_passed
+                    if refined_word_stability_passed and refined_word_nontriviality_passed
                     else "Chart words are not stable or are trivial across the current held-out grids.",
                 ),
                 ProofObligation(
                     "coarse_alphabet_artifact_check",
-                    "partial" if word_validation_diversity_passed else "failing",
-                    benchmark_by_name["transition_word_validation_diversity"].interpretation,
+                    "partial" if refined_word_validation_diversity_passed else "failing",
+                    benchmark_by_name["refined_transition_word_validation_diversity"].interpretation,
                     None
-                    if word_validation_diversity_passed
+                    if refined_word_validation_diversity_passed
                     else "Current held-out flyby words collapse to too few symbols; refine the alphabet before promoting this.",
                 ),
                 ProofObligation(
@@ -415,31 +484,35 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
                 ProofObligation(
                     "return_map_connection",
-                    "open",
-                    "The current word algebra is not yet tied to a Poincare/return map.",
-                    "Construct a return section and prove that word transitions correspond to return-map regions.",
+                    "partial" if return_word_passed and return_word_diversity_passed else "failing",
+                    benchmark_by_name["return_word_stability"].interpretation,
+                    None
+                    if return_word_passed and return_word_diversity_passed
+                    else "The current return-word proxy is not stable or diverse enough.",
                 ),
             ),
         ),
     )
 
 
-def _word_rows_by_name(summary: object) -> dict[str, dict[str, object]]:
+def _word_rows_by_name(summary: object, *, field: str = "chart_word") -> dict[str, dict[str, object]]:
     return {
         f"{row['intruder_mass']}:{row['impact_parameter']}:{row['intruder_speed_y']}:{row['binary_phase']}": row
         for row in summary.get("rows", [])
-        if "chart_word" in row
+        if field in row
     }
 
 
 def _word_stability_score(
     discovery_words: dict[str, dict[str, object]],
     validation_words: dict[str, dict[str, object]],
+    *,
+    field: str = "chart_word",
 ) -> float | None:
     if not discovery_words or not validation_words:
         return None
-    discovery_strings = [str(row["chart_word"]) for row in discovery_words.values()]
-    validation_strings = [str(row["chart_word"]) for row in validation_words.values()]
+    discovery_strings = [str(row[field]) for row in discovery_words.values()]
+    validation_strings = [str(row[field]) for row in validation_words.values()]
     scores = []
     for validation in validation_strings:
         validation_symbols = tuple(part.strip() for part in validation.split("->") if part.strip())
@@ -453,8 +526,8 @@ def _word_stability_score(
     return float(sum(scores) / len(scores))
 
 
-def _distinct_word_count(rows: tuple[dict[str, object], ...]) -> int:
-    return len({str(row["chart_word"]) for row in rows if "chart_word" in row})
+def _distinct_word_count(rows: tuple[dict[str, object], ...], *, field: str = "chart_word") -> int:
+    return len({str(row[field]) for row in rows if field in row})
 
 
 def _string_word_distance(first: tuple[str, ...], second: tuple[str, ...]) -> int:

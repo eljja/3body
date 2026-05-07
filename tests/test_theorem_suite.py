@@ -18,3 +18,7 @@ def test_theorem_suite_reports_candidates_and_benchmarks() -> None:
     assert any(benchmark["name"] == "transition_word_stability" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "transition_word_nontriviality" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "transition_word_validation_diversity" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "refined_transition_word_stability" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "refined_transition_word_validation_diversity" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "return_word_stability" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "return_word_validation_diversity" for benchmark in summary["benchmarks"])

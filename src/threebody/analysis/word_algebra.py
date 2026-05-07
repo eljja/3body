@@ -11,7 +11,7 @@ from .types import AnalysisReport, ChartType
 class ChartWord:
     """Compressed word over the chart alphabet."""
 
-    symbols: tuple[ChartType, ...]
+    symbols: tuple[object, ...]
 
     @property
     def length(self) -> int:
@@ -23,7 +23,7 @@ class ChartWord:
     def reversal(self) -> ChartWord:
         return ChartWord(tuple(reversed(self.symbols)))
 
-    def transition_pairs(self) -> tuple[tuple[ChartType, ChartType], ...]:
+    def transition_pairs(self) -> tuple[tuple[object, object], ...]:
         return tuple(zip(self.symbols, self.symbols[1:], strict=False))
 
 
@@ -49,8 +49,8 @@ class ChartWordSignature:
 
 
 def chart_word_from_reports(reports: tuple[AnalysisReport, ...] | list[AnalysisReport]) -> ChartWord:
-    symbols: list[ChartType] = []
-    previous: ChartType | None = None
+    symbols: list[object] = []
+    previous: object | None = None
     for report in reports:
         chart = report.primary_chart
         if chart == previous:
@@ -58,6 +58,96 @@ def chart_word_from_reports(reports: tuple[AnalysisReport, ...] | list[AnalysisR
         symbols.append(chart)
         previous = chart
     return ChartWord(tuple(symbols))
+
+
+def refined_chart_word_from_reports(reports: tuple[AnalysisReport, ...] | list[AnalysisReport]) -> ChartWord:
+    """Compressed word over chart labels enriched with coarse physical bins."""
+
+    symbols: list[object] = []
+    previous: object | None = None
+    for report in reports:
+        symbol = refined_chart_symbol(report)
+        if symbol == previous:
+            continue
+        symbols.append(symbol)
+        previous = symbol
+    return ChartWord(tuple(symbols))
+
+
+def return_map_word_from_reports(
+    reports: tuple[AnalysisReport, ...] | list[AnalysisReport],
+    *,
+    coordinate: str = "hierarchy_ratio",
+) -> ChartWord:
+    """Symbolic proxy for a return map built from extrema of a diagnostic coordinate."""
+
+    if len(reports) < 3:
+        return refined_chart_word_from_reports(reports)
+    values = np.asarray([_feature_value(report, coordinate) for report in reports], dtype=float)
+    symbols: list[object] = []
+    for index in range(1, len(reports) - 1):
+        previous, current, following = values[index - 1], values[index], values[index + 1]
+        if not np.isfinite(current):
+            continue
+        if current >= previous and current > following:
+            event = "max"
+        elif current <= previous and current < following:
+            event = "min"
+        else:
+            continue
+        symbol = return_map_symbol(reports[index], coordinate=coordinate, event=event)
+        if symbols and symbols[-1] == symbol:
+            continue
+        symbols.append(symbol)
+    if not symbols:
+        return refined_chart_word_from_reports(reports)
+    return ChartWord(tuple(symbols))
+
+
+def return_map_symbol(report: AnalysisReport, *, coordinate: str, event: str) -> str:
+    value = _feature_value(report, coordinate)
+    if coordinate == "hierarchy_perturbation_strength":
+        bucket = _log_strength_bin(value)
+    else:
+        bucket = _linear_bin(value, width=2.0, maximum=9)
+    return f"return:{coordinate}:{event}:B{bucket}:{refined_chart_symbol(report)}"
+
+
+def refined_chart_symbol(report: AnalysisReport) -> str:
+    chart = report.primary_chart
+    features = report.features
+    if chart == ChartType.TWO_BODY_HIERARCHY:
+        pair = "".join(str(index) for index in getattr(features, "nearest_pair", ()))
+        hierarchy = _linear_bin(getattr(features, "hierarchy_ratio", 0.0), width=2.0, maximum=9)
+        perturbation = _log_strength_bin(getattr(features, "hierarchy_perturbation_strength", np.inf))
+        inner_energy = "B" if getattr(features, "nearest_pair_specific_energy", 1.0) < 0.0 else "U"
+        return f"{chart.value}:pair{pair}:H{hierarchy}:P{perturbation}:{inner_energy}"
+    if chart == ChartType.PERIODIC_ORBIT_NEIGHBORHOOD:
+        virial = _linear_bin(abs(getattr(features, "virial_ratio", 0.0) - 1.0), width=0.2, maximum=9)
+        area = _linear_bin(getattr(features, "normalized_area", 0.0), width=0.2, maximum=5)
+        outer_energy = "E+" if getattr(features, "outer_specific_energy", -1.0) > 0.0 else "E-"
+        return f"{chart.value}:V{virial}:A{area}:{outer_energy}"
+    if chart == ChartType.CHAOTIC_TRANSPORT:
+        area = _linear_bin(getattr(features, "normalized_area", 0.0), width=0.2, maximum=5)
+        anisotropy = _linear_bin(getattr(features, "shape_anisotropy", 0.0), width=0.33, maximum=9)
+        return f"{chart.value}:A{area}:S{anisotropy}"
+    if chart == ChartType.DEMOCRATIC_THREE_BODY:
+        area = _linear_bin(getattr(features, "normalized_area", 0.0), width=0.2, maximum=5)
+        anisotropy = _linear_bin(getattr(features, "shape_anisotropy", 0.0), width=0.33, maximum=9)
+        return f"{chart.value}:A{area}:S{anisotropy}"
+    if chart == ChartType.CLOSE_ENCOUNTER:
+        pair = "".join(str(index) for index in getattr(features, "nearest_pair", ()))
+        distance = _log_distance_bin(getattr(features, "nearest_distance", np.inf))
+        return f"{chart.value}:pair{pair}:D{distance}"
+    if chart == ChartType.ESCAPE_TRANSPORT:
+        escape = _linear_bin(getattr(features, "escape_index", 0.0), width=1.0, maximum=9)
+        outer_energy = "E+" if getattr(features, "outer_specific_energy", -1.0) > 0.0 else "E-"
+        return f"{chart.value}:X{escape}:{outer_energy}"
+    if chart in {ChartType.RESTRICTED_LAGRANGE, ChartType.RESTRICTED_GATEWAY}:
+        lagrange = getattr(features, "nearest_lagrange", "?")
+        margin = _signed_linear_bin(getattr(features, "gateway_margin", 0.0), width=0.05, maximum=9)
+        return f"{chart.value}:{lagrange}:M{margin}"
+    return chart.value
 
 
 def chart_word_signature(word: ChartWord) -> ChartWordSignature:
@@ -85,6 +175,33 @@ def word_signature_rows(
         signature = chart_word_signature(chart_word_from_reports(reports))
         row = signature.as_dict()
         row["scenario"] = name
+        rows.append(row)
+    return rows
+
+
+def refined_word_signature_rows(
+    reports_by_name: dict[str, tuple[AnalysisReport, ...]],
+) -> list[dict[str, float | int | str | bool]]:
+    rows = []
+    for name, reports in reports_by_name.items():
+        signature = chart_word_signature(refined_chart_word_from_reports(reports))
+        row = signature.as_dict()
+        row["scenario"] = name
+        rows.append(row)
+    return rows
+
+
+def return_word_signature_rows(
+    reports_by_name: dict[str, tuple[AnalysisReport, ...]],
+    *,
+    coordinate: str = "hierarchy_ratio",
+) -> list[dict[str, float | int | str | bool]]:
+    rows = []
+    for name, reports in reports_by_name.items():
+        signature = chart_word_signature(return_map_word_from_reports(reports, coordinate=coordinate))
+        row = signature.as_dict()
+        row["scenario"] = name
+        row["coordinate"] = coordinate
         rows.append(row)
     return rows
 
@@ -124,7 +241,7 @@ def _reversal_defect(word: ChartWord) -> float:
     return float(word_distance(word, word.reversal()) / word.length)
 
 
-def _primitive_period(symbols: tuple[ChartType, ...]) -> int:
+def _primitive_period(symbols: tuple[object, ...]) -> int:
     if not symbols:
         return 0
     for period in range(1, len(symbols) + 1):
@@ -133,3 +250,36 @@ def _primitive_period(symbols: tuple[ChartType, ...]) -> int:
         if tiled == symbols:
             return period
     return len(symbols)
+
+
+def _linear_bin(value: float, *, width: float, maximum: int) -> int:
+    if not np.isfinite(value):
+        return maximum
+    return int(np.clip(np.floor(max(value, 0.0) / width), 0, maximum))
+
+
+def _signed_linear_bin(value: float, *, width: float, maximum: int) -> str:
+    if not np.isfinite(value):
+        return "?"
+    sign = "p" if value >= 0.0 else "m"
+    return f"{sign}{int(np.clip(np.floor(abs(value) / width), 0, maximum))}"
+
+
+def _log_strength_bin(value: float) -> int:
+    if not np.isfinite(value) or value <= 0.0:
+        return 0
+    return int(np.clip(np.floor(-np.log10(max(value, 1.0e-12))), 0, 9))
+
+
+def _log_distance_bin(value: float) -> int:
+    if not np.isfinite(value) or value <= 0.0:
+        return 9
+    return int(np.clip(np.floor(-np.log10(max(value, 1.0e-12))), 0, 9))
+
+
+def _feature_value(report: AnalysisReport, coordinate: str) -> float:
+    value = getattr(report.features, coordinate, np.nan)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float("nan")

@@ -16,6 +16,8 @@ from ..analysis import (
     validate_power_law_boundary_collapse,
     chart_word_from_reports,
     chart_word_signature,
+    refined_chart_word_from_reports,
+    return_map_word_from_reports,
 )
 from ..solvers import AdaptiveIntegrator
 from ..utils import orbit_period
@@ -55,10 +57,20 @@ class FlybySweepRow:
     deflection_angle: float
     transition_count: int
     chart_word: str
+    refined_chart_word: str
+    return_chart_word: str
     word_transition_entropy: float
     word_reversal_defect: float
     word_primitive_period: int
     word_grammar_rank: int
+    refined_word_transition_entropy: float
+    refined_word_reversal_defect: float
+    refined_word_primitive_period: int
+    refined_word_grammar_rank: int
+    return_word_transition_entropy: float
+    return_word_reversal_defect: float
+    return_word_primitive_period: int
+    return_word_grammar_rank: int
     low_crossing: float | None
     high_crossing: float | None
     low_hierarchy_ratio: float | None
@@ -94,10 +106,20 @@ class FlybySweepRow:
             "deflection_angle": self.deflection_angle,
             "transition_count": self.transition_count,
             "chart_word": self.chart_word,
+            "refined_chart_word": self.refined_chart_word,
+            "return_chart_word": self.return_chart_word,
             "word_transition_entropy": self.word_transition_entropy,
             "word_reversal_defect": self.word_reversal_defect,
             "word_primitive_period": self.word_primitive_period,
             "word_grammar_rank": self.word_grammar_rank,
+            "refined_word_transition_entropy": self.refined_word_transition_entropy,
+            "refined_word_reversal_defect": self.refined_word_reversal_defect,
+            "refined_word_primitive_period": self.refined_word_primitive_period,
+            "refined_word_grammar_rank": self.refined_word_grammar_rank,
+            "return_word_transition_entropy": self.return_word_transition_entropy,
+            "return_word_reversal_defect": self.return_word_reversal_defect,
+            "return_word_primitive_period": self.return_word_primitive_period,
+            "return_word_grammar_rank": self.return_word_grammar_rank,
             "low_crossing": self.low_crossing,
             "high_crossing": self.high_crossing,
             "low_hierarchy_ratio": self.low_hierarchy_ratio,
@@ -198,6 +220,8 @@ class HierarchicalFlybySweep:
             exchange = encounter_exchange_metrics(scenario.system, trajectory, inner_pair=(0, 1))
             scattering = periapsis_scattering_map(scenario.system, trajectory, inner_pair=(0, 1))
             word_signature = chart_word_signature(chart_word_from_reports(reports))
+            refined_word_signature = chart_word_signature(refined_chart_word_from_reports(reports))
+            return_word_signature = chart_word_signature(return_map_word_from_reports(reports))
             nonlinear_tidal_exposure = float(exchange.tidal_impulse * encounter_adiabaticity)
             perturbation_boundaries = estimate_transition_boundaries(
                 {"flyby": reports},
@@ -234,10 +258,20 @@ class HierarchicalFlybySweep:
                         deflection_angle=scattering.deflection_angle,
                         transition_count=len(transitions),
                         chart_word=word_signature.word.as_string(),
+                        refined_chart_word=refined_word_signature.word.as_string(),
+                        return_chart_word=return_word_signature.word.as_string(),
                         word_transition_entropy=word_signature.transition_entropy,
                         word_reversal_defect=word_signature.reversal_defect,
                         word_primitive_period=word_signature.primitive_period,
                         word_grammar_rank=word_signature.grammar_rank,
+                        refined_word_transition_entropy=refined_word_signature.transition_entropy,
+                        refined_word_reversal_defect=refined_word_signature.reversal_defect,
+                        refined_word_primitive_period=refined_word_signature.primitive_period,
+                        refined_word_grammar_rank=refined_word_signature.grammar_rank,
+                        return_word_transition_entropy=return_word_signature.transition_entropy,
+                        return_word_reversal_defect=return_word_signature.reversal_defect,
+                        return_word_primitive_period=return_word_signature.primitive_period,
+                        return_word_grammar_rank=return_word_signature.grammar_rank,
                         low_crossing=perturbation_loop.low_crossing,
                         high_crossing=perturbation_loop.high_crossing,
                         low_hierarchy_ratio=None if hierarchy_loop is None else hierarchy_loop.low_crossing,
@@ -272,10 +306,20 @@ class HierarchicalFlybySweep:
                         deflection_angle=scattering.deflection_angle,
                         transition_count=len(transitions),
                         chart_word=word_signature.word.as_string(),
+                        refined_chart_word=refined_word_signature.word.as_string(),
+                        return_chart_word=return_word_signature.word.as_string(),
                         word_transition_entropy=word_signature.transition_entropy,
                         word_reversal_defect=word_signature.reversal_defect,
                         word_primitive_period=word_signature.primitive_period,
                         word_grammar_rank=word_signature.grammar_rank,
+                        refined_word_transition_entropy=refined_word_signature.transition_entropy,
+                        refined_word_reversal_defect=refined_word_signature.reversal_defect,
+                        refined_word_primitive_period=refined_word_signature.primitive_period,
+                        refined_word_grammar_rank=refined_word_signature.grammar_rank,
+                        return_word_transition_entropy=return_word_signature.transition_entropy,
+                        return_word_reversal_defect=return_word_signature.reversal_defect,
+                        return_word_primitive_period=return_word_signature.primitive_period,
+                        return_word_grammar_rank=return_word_signature.grammar_rank,
                         low_crossing=None,
                         high_crossing=None,
                         low_hierarchy_ratio=None,
