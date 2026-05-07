@@ -114,7 +114,23 @@ def _paper_benchmarks(
         if "reduced_regime_hint" in row.extra
     }
     best_models = flyby_summary["best_validation_models"]
-    low_scattering = next(
+    low_best = next((row for row in best_models if str(row["target"]).startswith("low_")), None)
+    low_best_is_scattering = low_best is not None and "scattering_map" in str(low_best["target"])
+    low_scattering_validation = next(
+        (
+            row
+            for row in flyby_summary["collapse_validations"]
+            if str(row["target"]) == "low_crossing_scattering_map"
+        ),
+        None,
+    )
+    low_scattering_score = (
+        None
+        if low_scattering_validation is None
+        else float(low_scattering_validation["complexity_penalized_validation_score"])
+    )
+    low_scattering_selection_score = 1.0 if low_best_is_scattering else 0.0
+    low_scattering_selection = next(
         (
             row
             for row in best_models
@@ -122,7 +138,14 @@ def _paper_benchmarks(
         ),
         None,
     )
-    low_score = None if low_scattering is None else float(low_scattering["complexity_penalized_validation_score"])
+    low_selection_score = (
+        None if low_scattering_selection is None else float(low_scattering_selection["complexity_penalized_validation_score"])
+    )
+    high_best = next((row for row in best_models if str(row["target"]).startswith("high_")), None)
+    low_best_score = None if low_best is None else float(low_best["complexity_penalized_validation_score"])
+    high_best_score = None if high_best is None else float(high_best["complexity_penalized_validation_score"])
+    low_best_target = "none" if low_best is None else str(low_best["target"])
+    high_best_target = "none" if high_best is None else str(high_best["target"])
     return (
         PaperBenchmarkResult(
             name="known_reference_benchmarks",
@@ -158,19 +181,46 @@ def _paper_benchmarks(
             interpretation="The atlas must exercise non-flyby regimes before making broad claims.",
         ),
         PaperBenchmarkResult(
-            name="low_crossing_scattering_map_validation",
-            passed=low_score is not None and low_score > 0.25,
+            name="low_crossing_scattering_map_score",
+            passed=low_scattering_score is not None and low_scattering_score > 0.25,
             metric="complexity_penalized_validation_score",
-            observed=low_score,
+            observed=low_scattering_score,
             threshold=0.25,
-            interpretation="The only current breakthrough candidate: trajectory-measured scattering coordinates improve low hierarchy-exit prediction.",
+            interpretation="The scattering-map model must retain positive held-out score before it can be considered physically relevant.",
+        ),
+        PaperBenchmarkResult(
+            name="low_crossing_scattering_map_selection",
+            passed=low_best_is_scattering,
+            metric="selection_indicator",
+            observed=low_scattering_selection_score if low_selection_score is None else low_selection_score,
+            threshold=1.0,
+            interpretation="The stronger breakthrough requirement: scattering-map must beat simpler competing low-crossing models.",
+        ),
+        PaperBenchmarkResult(
+            name="best_low_crossing_model_validation",
+            passed=low_best_score is not None and low_best_score > 0.25,
+            metric="complexity_penalized_validation_score",
+            observed=low_best_score,
+            threshold=0.25,
+            interpretation=f"Best low-crossing model in theorem suite: {low_best_target}.",
+        ),
+        PaperBenchmarkResult(
+            name="best_high_crossing_model_validation",
+            passed=high_best_score is not None and high_best_score > 0.25,
+            metric="complexity_penalized_validation_score",
+            observed=high_best_score,
+            threshold=0.25,
+            interpretation=f"Best high-crossing model in theorem suite: {high_best_target}.",
         ),
     )
 
 
 def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[TheoremCandidate, ...]:
     benchmark_by_name = {benchmark.name: benchmark for benchmark in benchmarks}
-    scattering_passed = benchmark_by_name["low_crossing_scattering_map_validation"].passed
+    scattering_score_passed = benchmark_by_name["low_crossing_scattering_map_score"].passed
+    scattering_selection_passed = benchmark_by_name["low_crossing_scattering_map_selection"].passed
+    low_best_passed = benchmark_by_name["best_low_crossing_model_validation"].passed
+    high_best_passed = benchmark_by_name["best_high_crossing_model_validation"].passed
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
@@ -217,9 +267,15 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
             obligations=(
                 ProofObligation(
                     "heldout_scattering_validation",
-                    "partial" if scattering_passed else "failing",
-                    "The smoke theorem suite requires positive complexity-penalized held-out score for low_crossing_scattering_map.",
-                    None if scattering_passed else "Current scattering map does not survive held-out validation.",
+                    "partial" if scattering_score_passed else "failing",
+                    "The theorem suite requires positive complexity-penalized held-out score for low_crossing_scattering_map.",
+                    None if scattering_score_passed else "Current scattering map does not survive held-out validation.",
+                ),
+                ProofObligation(
+                    "competitive_model_selection",
+                    "partial" if scattering_selection_passed else "failing",
+                    "The theorem suite also requires the scattering-map model to beat simpler low-crossing competitors.",
+                    None if scattering_selection_passed else "Scattering coordinates may be useful but are not yet the selected explanation.",
                 ),
                 ProofObligation(
                     "large_sweep_bootstrap",
@@ -232,6 +288,42 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                     "open",
                     "No perturbation-theoretic error bound links tidal impulse and scattering coordinates yet.",
                     "Derive a local bound in a restricted mass/impact/energy regime.",
+                ),
+            ),
+        ),
+        TheoremCandidate(
+            name="Impulse-Exchange Hierarchy Boundary Conjecture",
+            claim=(
+                "For the declared hierarchical flyby family, hierarchy exit and re-entry boundaries are better treated as "
+                "accumulated encounter effects than as instantaneous geometric thresholds."
+            ),
+            scope="Declared hierarchical flyby grid with held-out masses, impact parameters, speeds, and binary phases.",
+            novelty_target="Promote the robust negative result against instantaneous thresholds into a positive impulse/exchange boundary law.",
+            proven=False,
+            obligations=(
+                ProofObligation(
+                    "low_boundary_best_model_validation",
+                    "partial" if low_best_passed else "failing",
+                    benchmark_by_name["best_low_crossing_model_validation"].interpretation,
+                    None if low_best_passed else "No low-boundary model survives theorem-suite validation.",
+                ),
+                ProofObligation(
+                    "high_boundary_best_model_validation",
+                    "partial" if high_best_passed else "failing",
+                    benchmark_by_name["best_high_crossing_model_validation"].interpretation,
+                    None if high_best_passed else "No high-boundary model survives theorem-suite validation.",
+                ),
+                ProofObligation(
+                    "instantaneous_threshold_rejection",
+                    "open",
+                    "The theorem suite should explicitly compare against instantaneous-only thresholds over wider grids.",
+                    "Add a formal likelihood-ratio or bootstrap dominance test against instantaneous models.",
+                ),
+                ProofObligation(
+                    "analytic_impulse_bound",
+                    "open",
+                    "No analytic perturbation bound has been derived for the observed impulse/exchange scaling.",
+                    "Derive a restricted-regime bound from tidal forcing and inner-binary action variation.",
                 ),
             ),
         ),

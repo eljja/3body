@@ -93,6 +93,8 @@ threebody theorem-suite
 
 This emits theorem candidates, proof obligations, and paper benchmark rows.
 No row in this suite should be interpreted as a proof; it is a reproducibility and overclaim-prevention artifact.
+For the scattering conjecture, the suite reports both `low_crossing_scattering_map_score` and `low_crossing_scattering_map_selection`.
+A positive score without selection means the feature family may contain signal, but it has not beaten simpler competing explanations.
 
 To split the run into discovery and validation ensembles:
 

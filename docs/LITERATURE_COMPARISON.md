@@ -30,6 +30,12 @@ can improve low hierarchy-exit boundary prediction over instantaneous geometry.
 
 This is a conjecture, not a theorem.
 The current `theorem-suite` fails to reproduce this candidate under the stricter paper harness, so it is not yet a breakthrough claim.
+The more robust current target is therefore weaker but cleaner:
+
+```text
+instantaneous hierarchy thresholds are insufficient;
+the surviving explanatory class is accumulated impulse/exchange over the encounter.
+```
 
 ## What Would Count As A Real Breakthrough
 

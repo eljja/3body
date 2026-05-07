@@ -343,11 +343,36 @@ def _model_selection_rows(
                 "support": fit.support,
                 "aic": fit.aic,
                 "bic": fit.bic,
+                "log_feature_condition_number": _log_feature_condition_number(features),
+                "max_abs_log_feature_correlation": _max_abs_log_feature_correlation(features),
                 "loo_log_rmse": _leave_one_out_log_rmse(target, features, spec),
                 "bootstrap_oob_log_rmse_mean": _bootstrap_oob_log_rmse(target, features, spec, bootstrap_replicates),
             }
         )
     return diagnostics
+
+
+def _log_feature_condition_number(features: np.ndarray) -> float | None:
+    features = np.atleast_2d(np.asarray(features, dtype=float))
+    if features.size == 0 or features.shape[0] < 2:
+        return None
+    log_features = np.log(np.maximum(features, 1.0e-300))
+    centered = log_features - np.mean(log_features, axis=0)
+    if np.allclose(centered, 0.0):
+        return None
+    return float(np.linalg.cond(centered))
+
+
+def _max_abs_log_feature_correlation(features: np.ndarray) -> float | None:
+    features = np.atleast_2d(np.asarray(features, dtype=float))
+    if features.size == 0 or features.shape[1] < 2 or features.shape[0] < 3:
+        return None
+    log_features = np.log(np.maximum(features, 1.0e-300))
+    correlation = np.corrcoef(log_features, rowvar=False)
+    if not np.all(np.isfinite(correlation)):
+        return None
+    mask = ~np.eye(correlation.shape[0], dtype=bool)
+    return float(np.max(np.abs(correlation[mask])))
 
 
 def _leave_one_out_log_rmse(target: np.ndarray, features: np.ndarray, spec: dict[str, object]) -> float | None:
