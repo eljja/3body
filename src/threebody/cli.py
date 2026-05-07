@@ -17,6 +17,7 @@ from .experiments import (
     KnownBenchmarkSuite,
     OrbitLibrary,
     RegimeProbeSuite,
+    TheoremSuite,
 )
 from .solvers import AdaptiveIntegrator
 from .types import Scenario
@@ -104,6 +105,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-research-checks.json.",
     )
     checks.set_defaults(func=run_research_checks_command)
+    theorem = subparsers.add_parser("theorem-suite", help="Run theorem-candidate proof obligations and paper benchmarks.")
+    theorem.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-theorem-suite.json.",
+    )
+    theorem.set_defaults(func=run_theorem_suite_command)
     return parser
 
 
@@ -262,6 +271,23 @@ def run_research_checks_command(args: argparse.Namespace) -> int:
     output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"wrote {output}")
     print(f"artifact_cases={len(artifact)} benchmarks={len(benchmarks)} regimes={len(regimes)}")
+    return 0
+
+
+def run_theorem_suite_command(args: argparse.Namespace) -> int:
+    result = TheoremSuite().run()
+    output = args.output or _default_output_path("theorem-suite")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "metadata": {
+            "created_at": datetime.now(UTC).isoformat(),
+            "kind": "theorem-suite",
+        },
+        "summary": result.as_dict(),
+    }
+    output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"wrote {output}")
+    print(f"theorem_candidates={len(result.theorem_candidates)} benchmarks={len(result.benchmarks)}")
     return 0
 
 

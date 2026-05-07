@@ -15,6 +15,7 @@ from .research_checks import (
 )
 from .resolution_study import BoundaryResolutionResult, BoundaryResolutionRow, BoundaryResolutionStudy
 from .scanner import InitialConditionScanner
+from .theorem_suite import PaperBenchmarkResult, ProofObligation, TheoremCandidate, TheoremSuite, TheoremSuiteResult
 
 __all__ = [
     "CompactModelFitter",
@@ -38,4 +39,9 @@ __all__ = [
     "RegimeProbeResult",
     "RegimeProbeSuite",
     "InitialConditionScanner",
+    "PaperBenchmarkResult",
+    "ProofObligation",
+    "TheoremCandidate",
+    "TheoremSuite",
+    "TheoremSuiteResult",
 ]

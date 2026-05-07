@@ -1,0 +1,59 @@
+# Theorem Candidates
+
+These are not proven theorems.
+They are the current smallest claims that could become publishable if their proof obligations are completed.
+
+## Candidate 1: Reduced Shape-Scattering Atlas Conjecture
+
+Claim:
+
+For planar Newtonian three-body trajectories away from unresolved collision singularities, a finite atlas built from reduced shape-scale coordinates, hierarchy charts, collision diagnostics, Lagrange gateway linearization, and scattering maps can assign each sampled state a local explanatory regime with explicit validity controls.
+
+Why this might be new:
+
+The project is not trying to add one more special orbit.
+It tries to unify local analytic regimes into a reproducible, falsifiable atlas centered on `ReducedThreeBodyState`.
+
+Current proof status:
+
+- `ReducedThreeBodyState` exists.
+- Hierarchy, collision, gateway, escape, and scattering diagnostics exist.
+- Held-out and artifact guardrails exist.
+- No theorem-level covering proof exists.
+
+Open proof obligations:
+
+- Prove that the reduced coordinates separate the declared chart regimes under explicit inequalities.
+- Prove local error bounds for each chart.
+- Replace collision diagnostics with actual regularized flow.
+- Replace gateway linearization with invariant-manifold transit certificates.
+
+## Candidate 2: Hierarchy Exit Scattering Coordinate Conjecture
+
+Claim:
+
+For the declared hierarchical flyby family, low hierarchy-exit boundary collapse is improved by trajectory-measured periapsis phase, periapsis distance, and deflection angle compared with instantaneous geometry alone.
+
+Current evidence:
+
+- `flyby-sweep --heldout --phase-sweep` selected `low_crossing_scattering_map` in one smoke benchmark.
+- `theorem-suite` did not reproduce that selection under its stricter paper harness, so the conjecture is currently not stable enough to promote.
+- The model uses held-out masses, impact parameters, speeds, and binary phases.
+- The model still has too many features for a theorem-level claim.
+
+Open proof obligations:
+
+- Run larger sweeps and publish bootstrap/OOB confidence intervals.
+- Identify why scattering-map selection changes with sample count and validation grid.
+- Derive perturbative bounds linking tidal impulse and measured scattering coordinates.
+- Test against independent implementations and stricter integrator comparisons.
+
+## Reproducibility
+
+Run:
+
+```powershell
+threebody theorem-suite
+```
+
+The suite reports which obligations are partial, failing, or open.

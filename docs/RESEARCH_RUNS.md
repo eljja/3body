@@ -85,6 +85,15 @@ This writes classifier-artifact sensitivity rows, adaptive-vs-structure-aware in
 The integrator comparison deliberately reports `regularized_available = false` until a real collision-regularized stepper exists.
 Any close-encounter compact model is provisional while that flag is false.
 
+To run the paper-level theorem candidate harness:
+
+```powershell
+threebody theorem-suite
+```
+
+This emits theorem candidates, proof obligations, and paper benchmark rows.
+No row in this suite should be interpreted as a proof; it is a reproducibility and overclaim-prevention artifact.
+
 To split the run into discovery and validation ensembles:
 
 ```powershell
