@@ -232,8 +232,30 @@ def _paper_benchmarks(
         for row in (high_grammar, hysteresis_grammar)
         if row is not None and row.get("validation_support") is not None
     ]
+    grammar_certified_accuracies = [
+        float(row["certified_validation_accuracy"])
+        for row in (high_grammar, hysteresis_grammar)
+        if row is not None and row.get("certified_validation_accuracy") is not None
+    ]
+    grammar_certified_fractions = [
+        float(row["certified_validation_fraction"])
+        for row in (high_grammar, hysteresis_grammar)
+        if row is not None and row.get("certified_validation_fraction") is not None
+    ]
+    grammar_mean_margins = [
+        float(row["mean_decision_margin"])
+        for row in (high_grammar, hysteresis_grammar)
+        if row is not None and row.get("mean_decision_margin") is not None
+    ]
     min_grammar_training_gain = None if not grammar_training_gains else float(min(grammar_training_gains))
     min_grammar_validation_support = None if not grammar_validation_supports else float(min(grammar_validation_supports))
+    min_grammar_certified_accuracy = (
+        None if not grammar_certified_accuracies else float(min(grammar_certified_accuracies))
+    )
+    min_grammar_certified_fraction = (
+        None if not grammar_certified_fractions else float(min(grammar_certified_fractions))
+    )
+    min_grammar_mean_margin = None if not grammar_mean_margins else float(min(grammar_mean_margins))
     return (
         PaperBenchmarkResult(
             name="known_reference_benchmarks",
@@ -420,6 +442,30 @@ def _paper_benchmarks(
             threshold=0.05,
             interpretation="Branch-law scores should not collapse to zero under classifier-threshold and stride perturbations.",
         ),
+        PaperBenchmarkResult(
+            name="grammar_branch_certified_accuracy",
+            passed=min_grammar_certified_accuracy is not None and min_grammar_certified_accuracy >= 0.95,
+            metric="minimum_margin_certified_validation_accuracy",
+            observed=min_grammar_certified_accuracy,
+            threshold=0.95,
+            interpretation="Predictions with positive nearest-neighbor branch margin should be nearly error-free.",
+        ),
+        PaperBenchmarkResult(
+            name="grammar_branch_certified_fraction",
+            passed=min_grammar_certified_fraction is not None and min_grammar_certified_fraction >= 0.5,
+            metric="minimum_positive_margin_fraction",
+            observed=min_grammar_certified_fraction,
+            threshold=0.5,
+            interpretation="A branch law is weak if only a tiny fraction of held-out cases have positive decision margin.",
+        ),
+        PaperBenchmarkResult(
+            name="grammar_branch_mean_margin",
+            passed=min_grammar_mean_margin is not None and min_grammar_mean_margin > 0.05,
+            metric="minimum_mean_decision_margin",
+            observed=min_grammar_mean_margin,
+            threshold=0.05,
+            interpretation="Held-out branch decisions should have positive margin, not only tie-breaking accuracy.",
+        ),
     )
 
 
@@ -439,6 +485,9 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     hysteresis_grammar_passed = benchmark_by_name["hysteresis_width_grammar_outcome_validation"].passed
     grammar_training_signal_passed = benchmark_by_name["grammar_branch_training_signal"].passed
     grammar_artifact_passed = benchmark_by_name["grammar_branch_artifact_pass_rate"].passed
+    grammar_margin_passed = benchmark_by_name["grammar_branch_certified_accuracy"].passed and benchmark_by_name[
+        "grammar_branch_mean_margin"
+    ].passed
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
@@ -596,21 +645,29 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
                 ProofObligation(
                     "reentry_branch_prediction",
-                    "partial" if high_grammar_passed and grammar_training_signal_passed and grammar_artifact_passed else "failing",
+                    "partial"
+                    if high_grammar_passed and grammar_training_signal_passed and grammar_artifact_passed and grammar_margin_passed
+                    else "failing",
                     benchmark_by_name["high_crossing_grammar_outcome_validation"].interpretation,
                     None
-                    if high_grammar_passed and grammar_training_signal_passed and grammar_artifact_passed
-                    else "High re-entry branch lacks held-out validation, discovery training signal, or artifact robustness.",
+                    if high_grammar_passed and grammar_training_signal_passed and grammar_artifact_passed and grammar_margin_passed
+                    else "High re-entry branch lacks held-out validation, discovery training signal, artifact robustness, or decision margin.",
                 ),
                 ProofObligation(
                     "hysteresis_branch_prediction",
                     "partial"
-                    if hysteresis_grammar_passed and grammar_training_signal_passed and grammar_artifact_passed
+                    if hysteresis_grammar_passed
+                    and grammar_training_signal_passed
+                    and grammar_artifact_passed
+                    and grammar_margin_passed
                     else "failing",
                     benchmark_by_name["hysteresis_width_grammar_outcome_validation"].interpretation,
                     None
-                    if hysteresis_grammar_passed and grammar_training_signal_passed and grammar_artifact_passed
-                    else "Hysteresis branch lacks held-out validation, discovery training signal, or artifact robustness.",
+                    if hysteresis_grammar_passed
+                    and grammar_training_signal_passed
+                    and grammar_artifact_passed
+                    and grammar_margin_passed
+                    else "Hysteresis branch lacks held-out validation, discovery training signal, artifact robustness, or decision margin.",
                 ),
             ),
         ),

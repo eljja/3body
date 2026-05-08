@@ -632,6 +632,9 @@ def _validate_grammar_outcome(
             "baseline_training_accuracy": None,
             "training_accuracy_gain": None,
             "validation_accuracy": None,
+            "certified_validation_accuracy": None,
+            "certified_validation_fraction": None,
+            "mean_decision_margin": None,
             "baseline_validation_accuracy": None,
             "validation_accuracy_gain": None,
             "complexity_penalized_validation_score": None,
@@ -662,11 +665,33 @@ def _validate_grammar_outcome(
         ],
         dtype=int,
     )
+    validation_margins = np.asarray(
+        [
+            _grammar_decision_margin(
+                discovery,
+                training_labels,
+                row,
+                int(label),
+                word_field=word_field,
+                feature_names=feature_names,
+            )
+            for row, label in zip(validation, validation_labels, strict=True)
+        ],
+        dtype=float,
+    )
     baseline_label = int(np.argmax(np.bincount(training_labels, minlength=quantile_count)))
     baseline_training_accuracy = float(np.mean(baseline_label == training_labels))
     training_accuracy = float(np.mean(training_predictions == training_labels))
     training_gain = float(training_accuracy - baseline_training_accuracy)
     validation_accuracy = float(np.mean(validation_predictions == validation_labels))
+    certified_mask = validation_margins > 0.0
+    certified_accuracy = (
+        None
+        if not np.any(certified_mask)
+        else float(np.mean(validation_predictions[certified_mask] == validation_labels[certified_mask]))
+    )
+    certified_fraction = float(np.mean(certified_mask))
+    mean_decision_margin = float(np.mean(validation_margins))
     baseline_validation_accuracy = float(np.mean(baseline_label == validation_labels))
     validation_gain = float(validation_accuracy - baseline_validation_accuracy)
     score = float(validation_gain - 0.02 * (len(feature_names) + 1))
@@ -682,6 +707,9 @@ def _validate_grammar_outcome(
         "baseline_training_accuracy": baseline_training_accuracy,
         "training_accuracy_gain": training_gain,
         "validation_accuracy": validation_accuracy,
+        "certified_validation_accuracy": certified_accuracy,
+        "certified_validation_fraction": certified_fraction,
+        "mean_decision_margin": mean_decision_margin,
         "baseline_validation_accuracy": baseline_validation_accuracy,
         "validation_accuracy_gain": validation_gain,
         "complexity_penalized_validation_score": score,
@@ -724,6 +752,57 @@ def _predict_grammar_label(
             best_distance = distance
             best_label = int(training_labels[index])
     return best_label
+
+
+def _grammar_decision_margin(
+    training_rows: tuple[FlybySweepRow, ...],
+    training_labels: np.ndarray,
+    row: FlybySweepRow,
+    true_label: int,
+    *,
+    word_field: str,
+    feature_names: tuple[str, ...],
+) -> float:
+    distances = _grammar_neighbor_distances(
+        training_rows,
+        training_labels,
+        row,
+        word_field=word_field,
+        feature_names=feature_names,
+    )
+    same = [distance for distance, label in distances if int(label) == true_label]
+    other = [distance for distance, label in distances if int(label) != true_label]
+    if not same or not other:
+        return 0.0
+    return float(min(other) - min(same))
+
+
+def _grammar_neighbor_distances(
+    training_rows: tuple[FlybySweepRow, ...],
+    training_labels: np.ndarray,
+    row: FlybySweepRow,
+    *,
+    word_field: str,
+    feature_names: tuple[str, ...],
+) -> list[tuple[float, int]]:
+    feature_matrix = _grammar_feature_matrix(training_rows, feature_names)
+    feature_vector = _grammar_feature_matrix((row,), feature_names)[0]
+    if feature_names:
+        center = np.mean(feature_matrix, axis=0)
+        scale = np.std(feature_matrix, axis=0) + 1.0e-9
+        feature_matrix = (feature_matrix - center) / scale
+        feature_vector = (feature_vector - center) / scale
+    row_word = _word_symbols(str(getattr(row, word_field)))
+    distances = []
+    for index, candidate in enumerate(training_rows):
+        candidate_word = _word_symbols(str(getattr(candidate, word_field)))
+        word_component = _normalized_word_distance(candidate_word, row_word)
+        feature_component = 0.0
+        if feature_names:
+            feature_component = float(np.linalg.norm(feature_matrix[index] - feature_vector))
+            feature_component = float(feature_component / np.sqrt(len(feature_names)))
+        distances.append((word_component + 0.5 * feature_component, int(training_labels[index])))
+    return distances
 
 
 def _grammar_feature_matrix(rows: tuple[FlybySweepRow, ...], feature_names: tuple[str, ...]) -> np.ndarray:

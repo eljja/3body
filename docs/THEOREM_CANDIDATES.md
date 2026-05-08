@@ -90,6 +90,7 @@ Current proof status for this candidate:
 - High re-entry and hysteresis are now tested as predeclared grammar branch classification problems, not scalar boundary-collapse problems.
 - The high re-entry branch currently uses refined chart words plus periapsis distance and tidal impulse; hysteresis uses refined chart words plus encounter adiabaticity.
 - Branch robustness is now tested against classifier-threshold and stride perturbations.
+- Branch predictions now report a nearest-neighbor decision margin; positive-margin predictions are tracked separately as certified branch decisions.
 - This is still not a theorem because no grammar invariant bound has been proved.
 
 Open proof obligations:
@@ -101,6 +102,7 @@ Open proof obligations:
 - Upgrade the current extremum-based return-word proxy into a genuine Poincare/return-map construction.
 - Prove that a grammar invariant predicts re-entry better than scalar high-crossing thresholds.
 - Replace the current binary branch classifier with a multi-branch return-map partition and prove its error bound.
+- Prove a lower bound on branch margin under allowed classifier and trajectory perturbations.
 
 ## Reproducibility
 

@@ -28,3 +28,5 @@ def test_theorem_suite_reports_candidates_and_benchmarks() -> None:
     assert any(benchmark["name"] == "grammar_branch_validation_support" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "grammar_branch_artifact_pass_rate" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "grammar_branch_artifact_min_score" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "grammar_branch_certified_accuracy" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "grammar_branch_mean_margin" for benchmark in summary["benchmarks"])
