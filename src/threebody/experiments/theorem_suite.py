@@ -115,6 +115,7 @@ def _paper_benchmarks(
         if "reduced_regime_hint" in row.extra
     }
     best_models = flyby_summary["best_validation_models"]
+    grammar_outcomes = flyby_summary["grammar_outcome_validations"]
     low_best = next((row for row in best_models if str(row["target"]).startswith("low_")), None)
     low_best_is_scattering = low_best is not None and "scattering_map" in str(low_best["target"])
     low_scattering_validation = next(
@@ -182,6 +183,20 @@ def _paper_benchmarks(
     low_best_target = "none" if low_best is None else str(low_best["target"])
     high_best_target = "none" if high_best is None else str(high_best["target"])
     hysteresis_best_target = "none" if hysteresis_best is None else str(hysteresis_best["target"])
+    high_grammar = next(
+        (row for row in grammar_outcomes if str(row["target"]) == "high_crossing_grammar_phase_branch"),
+        None,
+    )
+    hysteresis_grammar = next(
+        (row for row in grammar_outcomes if str(row["target"]) == "hysteresis_width_grammar_phase_branch"),
+        None,
+    )
+    high_grammar_score = (
+        None if high_grammar is None else float(high_grammar["complexity_penalized_validation_score"])
+    )
+    hysteresis_grammar_score = (
+        None if hysteresis_grammar is None else float(hysteresis_grammar["complexity_penalized_validation_score"])
+    )
     return (
         PaperBenchmarkResult(
             name="known_reference_benchmarks",
@@ -320,6 +335,22 @@ def _paper_benchmarks(
             threshold=4.0,
             interpretation="The return-word proxy must produce multiple held-out symbolic return classes.",
         ),
+        PaperBenchmarkResult(
+            name="high_crossing_grammar_outcome_validation",
+            passed=high_grammar_score is not None and high_grammar_score > 0.2,
+            metric="complexity_penalized_accuracy_gain",
+            observed=high_grammar_score,
+            threshold=0.2,
+            interpretation="High re-entry should be predictable as a grammar/phase branch even when scalar boundary collapse fails.",
+        ),
+        PaperBenchmarkResult(
+            name="hysteresis_width_grammar_outcome_validation",
+            passed=hysteresis_grammar_score is not None and hysteresis_grammar_score > 0.2,
+            metric="complexity_penalized_accuracy_gain",
+            observed=hysteresis_grammar_score,
+            threshold=0.2,
+            interpretation="Hysteresis width should be predictable as a grammar/phase branch rather than a scalar threshold.",
+        ),
     )
 
 
@@ -335,6 +366,8 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     refined_word_validation_diversity_passed = benchmark_by_name["refined_transition_word_validation_diversity"].passed
     return_word_passed = benchmark_by_name["return_word_stability"].passed
     return_word_diversity_passed = benchmark_by_name["return_word_validation_diversity"].passed
+    high_grammar_passed = benchmark_by_name["high_crossing_grammar_outcome_validation"].passed
+    hysteresis_grammar_passed = benchmark_by_name["hysteresis_width_grammar_outcome_validation"].passed
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
@@ -489,6 +522,20 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                     None
                     if return_word_passed and return_word_diversity_passed
                     else "The current return-word proxy is not stable or diverse enough.",
+                ),
+                ProofObligation(
+                    "reentry_branch_prediction",
+                    "partial" if high_grammar_passed else "failing",
+                    benchmark_by_name["high_crossing_grammar_outcome_validation"].interpretation,
+                    None if high_grammar_passed else "High re-entry branch is not yet predictable from grammar/phase features.",
+                ),
+                ProofObligation(
+                    "hysteresis_branch_prediction",
+                    "partial" if hysteresis_grammar_passed else "failing",
+                    benchmark_by_name["hysteresis_width_grammar_outcome_validation"].interpretation,
+                    None
+                    if hysteresis_grammar_passed
+                    else "Hysteresis branch is not yet predictable from grammar/phase features.",
                 ),
             ),
         ),

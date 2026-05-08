@@ -87,6 +87,7 @@ Current proof status for this candidate:
 - Coarse chart words are stable but too low-diversity to trust.
 - Refined physical chart words now pass the current held-out diversity check.
 - Extremum-based return words now pass the current partial stability and diversity checks.
+- High re-entry and hysteresis are now tested as grammar/phase branch classification problems, not scalar boundary-collapse problems.
 - This is still not a theorem because no grammar invariant bound has been proved.
 
 Open proof obligations:
@@ -97,6 +98,7 @@ Open proof obligations:
 - Define admissible grammar transformations for noisy chart classification.
 - Upgrade the current extremum-based return-word proxy into a genuine Poincare/return-map construction.
 - Prove that a grammar invariant predicts re-entry better than scalar high-crossing thresholds.
+- Replace the current binary branch classifier with a multi-branch return-map partition and prove its error bound.
 
 ## Reproducibility
 

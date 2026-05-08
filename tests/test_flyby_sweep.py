@@ -69,6 +69,7 @@ def test_hierarchical_flyby_sweep_runs_heldout_validation() -> None:
     assert summary["discovery"]["case_count"] == 2
     assert summary["validation"]["case_count"] == 1
     assert summary["collapse_validations"]
+    assert summary["grammar_outcome_validations"]
     assert "best_validation_models" in summary
     assert "worst_validation_residuals" in summary
     assert any(row["target"].endswith("phase_nonlinear") for row in summary["collapse_validations"])

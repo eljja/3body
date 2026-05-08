@@ -18,6 +18,7 @@ from ..analysis import (
     chart_word_signature,
     refined_chart_word_from_reports,
     return_map_word_from_reports,
+    word_distance,
 )
 from ..solvers import AdaptiveIntegrator
 from ..utils import orbit_period
@@ -156,6 +157,7 @@ class FlybySweepValidationResult:
     discovery: FlybySweepResult
     validation: FlybySweepResult
     collapse_validations: tuple[dict[str, float | int | str | bool | None], ...]
+    grammar_outcome_validations: tuple[dict[str, float | int | str | bool | None], ...] = ()
 
     def as_dict(self) -> dict[str, object]:
         best = _best_validation_rows(self.collapse_validations)
@@ -163,6 +165,7 @@ class FlybySweepValidationResult:
             "discovery": self.discovery.as_dict(),
             "validation": self.validation.as_dict(),
             "collapse_validations": list(self.collapse_validations),
+            "grammar_outcome_validations": list(self.grammar_outcome_validations),
             "best_validation_models": best,
             "worst_validation_residuals": _collapse_residual_rows(self.discovery.rows, self.validation.rows),
         }
@@ -366,10 +369,12 @@ class HierarchicalFlybySweep:
             binary_separation=binary_separation,
         )
         collapse_validations = _collapse_validation_rows(discovery.rows, validation.rows)
+        grammar_outcome_validations = _grammar_outcome_validation_rows(discovery.rows, validation.rows)
         return FlybySweepValidationResult(
             discovery=discovery,
             validation=validation,
             collapse_validations=tuple(collapse_validations),
+            grammar_outcome_validations=tuple(grammar_outcome_validations),
         )
 
 
@@ -574,6 +579,164 @@ def _best_validation_rows(
         if current is None or float(score) > float(current_score or -np.inf):
             best_by_family[family] = row
     return [best_by_family[key] for key in sorted(best_by_family)]
+
+
+def _grammar_outcome_validation_rows(
+    discovery_rows: tuple[FlybySweepRow, ...],
+    validation_rows: tuple[FlybySweepRow, ...],
+) -> list[dict[str, float | int | str | bool | None]]:
+    specs = (
+        {
+            "target_name": "high_crossing_grammar_phase_branch",
+            "target_attr": "high_crossing",
+            "word_field": "refined_chart_word",
+            "feature_names": ("binary_phase_cos_positive", "binary_phase_sin_positive"),
+            "quantile_count": 2,
+        },
+        {
+            "target_name": "hysteresis_width_grammar_phase_branch",
+            "target_attr": "hysteresis_width",
+            "word_field": "refined_chart_word",
+            "feature_names": ("binary_phase_sin_positive",),
+            "quantile_count": 2,
+        },
+    )
+    return [_validate_grammar_outcome(discovery_rows, validation_rows, spec) for spec in specs]
+
+
+def _validate_grammar_outcome(
+    discovery_rows: tuple[FlybySweepRow, ...],
+    validation_rows: tuple[FlybySweepRow, ...],
+    spec: dict[str, object],
+) -> dict[str, float | int | str | bool | None]:
+    target_attr = str(spec["target_attr"])
+    word_field = str(spec["word_field"])
+    feature_names = tuple(str(name) for name in spec["feature_names"])
+    quantile_count = int(spec["quantile_count"])
+    discovery = tuple(row for row in discovery_rows if getattr(row, target_attr) is not None)
+    validation = tuple(row for row in validation_rows if getattr(row, target_attr) is not None)
+    if len(discovery) < quantile_count + 1 or not validation:
+        return {
+            "target": str(spec["target_name"]),
+            "word_field": word_field,
+            "features": ",".join(feature_names),
+            "training_support": len(discovery),
+            "validation_support": len(validation),
+            "training_accuracy": None,
+            "validation_accuracy": None,
+            "baseline_validation_accuracy": None,
+            "validation_accuracy_gain": None,
+            "complexity_penalized_validation_score": None,
+            "passes_validation": False,
+        }
+    training_target = np.asarray([float(getattr(row, target_attr)) for row in discovery], dtype=float)
+    cutpoints = np.quantile(training_target, np.linspace(0.0, 1.0, quantile_count + 1)[1:-1])
+    training_labels = np.digitize(training_target, cutpoints)
+    training_predictions = np.asarray(
+        [
+            _predict_grammar_label(
+                discovery,
+                training_labels,
+                row,
+                word_field=word_field,
+                feature_names=feature_names,
+                exclude_index=index,
+            )
+            for index, row in enumerate(discovery)
+        ],
+        dtype=int,
+    )
+    validation_labels = np.digitize([float(getattr(row, target_attr)) for row in validation], cutpoints)
+    validation_predictions = np.asarray(
+        [
+            _predict_grammar_label(discovery, training_labels, row, word_field=word_field, feature_names=feature_names)
+            for row in validation
+        ],
+        dtype=int,
+    )
+    baseline_label = int(np.argmax(np.bincount(training_labels, minlength=quantile_count)))
+    training_accuracy = float(np.mean(training_predictions == training_labels))
+    validation_accuracy = float(np.mean(validation_predictions == validation_labels))
+    baseline_validation_accuracy = float(np.mean(baseline_label == validation_labels))
+    validation_gain = float(validation_accuracy - baseline_validation_accuracy)
+    score = float(validation_gain - 0.02 * (len(feature_names) + 1))
+    return {
+        "target": str(spec["target_name"]),
+        "word_field": word_field,
+        "features": ",".join(feature_names),
+        "quantile_count": quantile_count,
+        "training_support": len(discovery),
+        "validation_support": len(validation),
+        "training_accuracy": training_accuracy,
+        "validation_accuracy": validation_accuracy,
+        "baseline_validation_accuracy": baseline_validation_accuracy,
+        "validation_accuracy_gain": validation_gain,
+        "complexity_penalized_validation_score": score,
+        "passes_validation": score > 0.2,
+    }
+
+
+def _predict_grammar_label(
+    training_rows: tuple[FlybySweepRow, ...],
+    training_labels: np.ndarray,
+    row: FlybySweepRow,
+    *,
+    word_field: str,
+    feature_names: tuple[str, ...],
+    exclude_index: int | None = None,
+) -> int:
+    feature_matrix = _grammar_feature_matrix(training_rows, feature_names)
+    feature_vector = _grammar_feature_matrix((row,), feature_names)[0]
+    if feature_names:
+        mask = np.ones(len(training_rows), dtype=bool)
+        if exclude_index is not None:
+            mask[exclude_index] = False
+        center = np.mean(feature_matrix[mask], axis=0)
+        scale = np.std(feature_matrix[mask], axis=0) + 1.0e-9
+        feature_matrix = (feature_matrix - center) / scale
+        feature_vector = (feature_vector - center) / scale
+    row_word = _word_symbols(str(getattr(row, word_field)))
+    best_distance = np.inf
+    best_label = int(training_labels[0])
+    for index, candidate in enumerate(training_rows):
+        if exclude_index is not None and index == exclude_index:
+            continue
+        candidate_word = _word_symbols(str(getattr(candidate, word_field)))
+        word_component = _normalized_word_distance(candidate_word, row_word)
+        feature_component = 0.0
+        if feature_names:
+            feature_component = float(np.linalg.norm(feature_matrix[index] - feature_vector) / np.sqrt(len(feature_names)))
+        distance = word_component + 0.5 * feature_component
+        if distance < best_distance:
+            best_distance = distance
+            best_label = int(training_labels[index])
+    return best_label
+
+
+def _grammar_feature_matrix(rows: tuple[FlybySweepRow, ...], feature_names: tuple[str, ...]) -> np.ndarray:
+    if not feature_names:
+        return np.zeros((len(rows), 0), dtype=float)
+    return np.asarray(
+        [[np.log(max(abs(float(getattr(row, name))), 1.0e-12)) for name in feature_names] for row in rows],
+        dtype=float,
+    )
+
+
+def _word_symbols(value: str) -> tuple[str, ...]:
+    return tuple(part.strip() for part in value.split("->") if part.strip())
+
+
+def _normalized_word_distance(first: tuple[str, ...], second: tuple[str, ...]) -> float:
+    class _Word:
+        def __init__(self, symbols: tuple[str, ...]) -> None:
+            self.symbols = symbols
+
+        @property
+        def length(self) -> int:
+            return len(self.symbols)
+
+    denominator = max(len(first), len(second), 1)
+    return float(word_distance(_Word(first), _Word(second)) / denominator)
 
 
 def _target_family(target: str) -> str:
