@@ -97,6 +97,8 @@ class GrammarBranchArtifactRow:
     hysteresis_certified_fraction: float | None
     high_mean_margin: float | None
     hysteresis_mean_margin: float | None
+    high_negative_control_gap: float | None
+    hysteresis_negative_control_gap: float | None
     high_passed: bool
     hysteresis_passed: bool
 
@@ -132,6 +134,15 @@ class GrammarBranchArtifactRow:
         values = [value for value in (self.high_mean_margin, self.hysteresis_mean_margin) if value is not None]
         return None if not values else float(min(values))
 
+    @property
+    def minimum_negative_control_gap(self) -> float | None:
+        values = [
+            value
+            for value in (self.high_negative_control_gap, self.hysteresis_negative_control_gap)
+            if value is not None
+        ]
+        return None if not values else float(min(values))
+
     def as_dict(self) -> dict[str, float | int | str | bool | None]:
         return {
             "label": self.label,
@@ -149,6 +160,9 @@ class GrammarBranchArtifactRow:
             "high_mean_margin": self.high_mean_margin,
             "hysteresis_mean_margin": self.hysteresis_mean_margin,
             "minimum_mean_margin": self.minimum_mean_margin,
+            "high_negative_control_gap": self.high_negative_control_gap,
+            "hysteresis_negative_control_gap": self.hysteresis_negative_control_gap,
+            "minimum_negative_control_gap": self.minimum_negative_control_gap,
             "high_passed": self.high_passed,
             "hysteresis_passed": self.hysteresis_passed,
             "passed": self.passed,
@@ -197,6 +211,10 @@ class GrammarBranchArtifactStudy:
                     hysteresis_certified_fraction=_optional_float(hysteresis.get("certified_validation_fraction")),
                     high_mean_margin=_optional_float(high.get("mean_decision_margin")),
                     hysteresis_mean_margin=_optional_float(hysteresis.get("mean_decision_margin")),
+                    high_negative_control_gap=_optional_float(high.get("grammar_negative_control_score_gap")),
+                    hysteresis_negative_control_gap=_optional_float(
+                        hysteresis.get("grammar_negative_control_score_gap")
+                    ),
                     high_passed=bool(high.get("passes_validation", False)),
                     hysteresis_passed=bool(hysteresis.get("passes_validation", False)),
                 )

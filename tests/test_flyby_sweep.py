@@ -73,3 +73,4 @@ def test_hierarchical_flyby_sweep_runs_heldout_validation() -> None:
     assert "best_validation_models" in summary
     assert "worst_validation_residuals" in summary
     assert any(row["target"].endswith("phase_nonlinear") for row in summary["collapse_validations"])
+    assert all("grammar_negative_control_score_gap" in row for row in summary["grammar_outcome_validations"])

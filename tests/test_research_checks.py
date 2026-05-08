@@ -24,6 +24,7 @@ def test_grammar_branch_artifact_study_varies_classifier_settings() -> None:
     assert {row.label for row in rows} >= {"baseline", "strict_hierarchy", "loose_hierarchy"}
     assert all(row.minimum_score is None or isinstance(row.minimum_score, float) for row in rows)
     assert all(row.minimum_certified_fraction is None or row.minimum_certified_fraction >= 0.0 for row in rows)
+    assert all(row.minimum_negative_control_gap is None or isinstance(row.minimum_negative_control_gap, float) for row in rows)
 
 
 def test_integrator_comparison_reports_regularization_gap() -> None:

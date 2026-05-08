@@ -92,6 +92,8 @@ Current proof status for this candidate:
 - Branch robustness is now tested against classifier-threshold and stride perturbations.
 - Branch predictions now report a nearest-neighbor decision margin; positive-margin predictions are tracked separately as certified branch decisions.
 - Branch margin certificates are now also tested under classifier-threshold and stride perturbations.
+- Branch validation now includes feature-only and permuted-word negative controls. A grammar branch is not promotable unless it beats both controls on the same held-out split.
+- Current negative-control result splits the claim: hysteresis behaves like a grammar-memory branch, while high re-entry is not yet a grammar result because feature-only scattering variables can beat the grammar model.
 - This is still not a theorem because no grammar invariant bound has been proved.
 
 Open proof obligations:
@@ -102,6 +104,7 @@ Open proof obligations:
 - Define admissible grammar transformations for noisy chart classification.
 - Upgrade the current extremum-based return-word proxy into a genuine Poincare/return-map construction.
 - Prove that a grammar invariant predicts re-entry better than scalar high-crossing thresholds.
+- Prove that grammar information contributes beyond smooth scattering/adiabaticity features and beyond permuted symbolic labels.
 - Replace the current binary branch classifier with a multi-branch return-map partition and prove its error bound.
 - Prove a lower bound on branch margin under allowed classifier and trajectory perturbations.
 

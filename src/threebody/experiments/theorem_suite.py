@@ -143,6 +143,19 @@ def _paper_benchmarks(
     grammar_artifact_mean_margins = [
         row.minimum_mean_margin for row in grammar_artifact_rows if row.minimum_mean_margin is not None
     ]
+    grammar_artifact_negative_control_gaps = [
+        row.minimum_negative_control_gap
+        for row in grammar_artifact_rows
+        if row.minimum_negative_control_gap is not None
+    ]
+    grammar_artifact_high_negative_control_gaps = [
+        row.high_negative_control_gap for row in grammar_artifact_rows if row.high_negative_control_gap is not None
+    ]
+    grammar_artifact_hysteresis_negative_control_gaps = [
+        row.hysteresis_negative_control_gap
+        for row in grammar_artifact_rows
+        if row.hysteresis_negative_control_gap is not None
+    ]
     grammar_artifact_pass_rate = sum(1 for row in grammar_artifact_rows if row.passed) / len(grammar_artifact_rows)
     minimum_grammar_artifact_score = None if not grammar_artifact_scores else float(min(grammar_artifact_scores))
     minimum_grammar_artifact_certified_accuracy = (
@@ -153,6 +166,19 @@ def _paper_benchmarks(
     )
     minimum_grammar_artifact_mean_margin = (
         None if not grammar_artifact_mean_margins else float(min(grammar_artifact_mean_margins))
+    )
+    minimum_grammar_artifact_negative_control_gap = (
+        None if not grammar_artifact_negative_control_gaps else float(min(grammar_artifact_negative_control_gaps))
+    )
+    minimum_grammar_artifact_high_negative_control_gap = (
+        None
+        if not grammar_artifact_high_negative_control_gaps
+        else float(min(grammar_artifact_high_negative_control_gaps))
+    )
+    minimum_grammar_artifact_hysteresis_negative_control_gap = (
+        None
+        if not grammar_artifact_hysteresis_negative_control_gaps
+        else float(min(grammar_artifact_hysteresis_negative_control_gaps))
     )
     known_pass_rate = sum(1 for row in known_benchmarks if row.passed) / len(known_benchmarks)
     regime_names = {row.name for row in regimes}
@@ -244,6 +270,12 @@ def _paper_benchmarks(
     hysteresis_grammar_score = (
         None if hysteresis_grammar is None else float(hysteresis_grammar["complexity_penalized_validation_score"])
     )
+    high_grammar_negative_control_gap = (
+        None if high_grammar is None else float(high_grammar["grammar_negative_control_score_gap"])
+    )
+    hysteresis_grammar_negative_control_gap = (
+        None if hysteresis_grammar is None else float(hysteresis_grammar["grammar_negative_control_score_gap"])
+    )
     grammar_training_gains = [
         float(row["training_accuracy_gain"])
         for row in (high_grammar, hysteresis_grammar)
@@ -269,6 +301,11 @@ def _paper_benchmarks(
         for row in (high_grammar, hysteresis_grammar)
         if row is not None and row.get("mean_decision_margin") is not None
     ]
+    grammar_negative_control_gaps = [
+        float(row["grammar_negative_control_score_gap"])
+        for row in (high_grammar, hysteresis_grammar)
+        if row is not None and row.get("grammar_negative_control_score_gap") is not None
+    ]
     min_grammar_training_gain = None if not grammar_training_gains else float(min(grammar_training_gains))
     min_grammar_validation_support = None if not grammar_validation_supports else float(min(grammar_validation_supports))
     min_grammar_certified_accuracy = (
@@ -278,6 +315,9 @@ def _paper_benchmarks(
         None if not grammar_certified_fractions else float(min(grammar_certified_fractions))
     )
     min_grammar_mean_margin = None if not grammar_mean_margins else float(min(grammar_mean_margins))
+    min_grammar_negative_control_gap = (
+        None if not grammar_negative_control_gaps else float(min(grammar_negative_control_gaps))
+    )
     return (
         PaperBenchmarkResult(
             name="known_reference_benchmarks",
@@ -491,6 +531,33 @@ def _paper_benchmarks(
             interpretation="Classifier and stride perturbations should preserve a positive branch decision margin.",
         ),
         PaperBenchmarkResult(
+            name="grammar_branch_artifact_negative_control_gap",
+            passed=minimum_grammar_artifact_negative_control_gap is not None
+            and minimum_grammar_artifact_negative_control_gap > 0.0,
+            metric="minimum_score_gap_over_feature_only_or_permuted_word_controls",
+            observed=minimum_grammar_artifact_negative_control_gap,
+            threshold=0.0,
+            interpretation="Branch grammar should beat feature-only and permuted-word controls under perturbation.",
+        ),
+        PaperBenchmarkResult(
+            name="high_crossing_grammar_artifact_negative_control_gap",
+            passed=minimum_grammar_artifact_high_negative_control_gap is not None
+            and minimum_grammar_artifact_high_negative_control_gap > 0.0,
+            metric="minimum_high_score_gap_over_negative_controls",
+            observed=minimum_grammar_artifact_high_negative_control_gap,
+            threshold=0.0,
+            interpretation="High re-entry grammar should beat negative controls under classifier and stride perturbations.",
+        ),
+        PaperBenchmarkResult(
+            name="hysteresis_width_grammar_artifact_negative_control_gap",
+            passed=minimum_grammar_artifact_hysteresis_negative_control_gap is not None
+            and minimum_grammar_artifact_hysteresis_negative_control_gap > 0.0,
+            metric="minimum_hysteresis_score_gap_over_negative_controls",
+            observed=minimum_grammar_artifact_hysteresis_negative_control_gap,
+            threshold=0.0,
+            interpretation="Hysteresis grammar should beat negative controls under classifier and stride perturbations.",
+        ),
+        PaperBenchmarkResult(
             name="grammar_branch_certified_accuracy",
             passed=min_grammar_certified_accuracy is not None and min_grammar_certified_accuracy >= 0.95,
             metric="minimum_margin_certified_validation_accuracy",
@@ -513,6 +580,33 @@ def _paper_benchmarks(
             observed=min_grammar_mean_margin,
             threshold=0.05,
             interpretation="Held-out branch decisions should have positive margin, not only tie-breaking accuracy.",
+        ),
+        PaperBenchmarkResult(
+            name="grammar_branch_negative_control_gap",
+            passed=min_grammar_negative_control_gap is not None and min_grammar_negative_control_gap > 0.0,
+            metric="minimum_score_gap_over_feature_only_or_permuted_word_controls",
+            observed=min_grammar_negative_control_gap,
+            threshold=0.0,
+            interpretation="Predeclared grammar branch laws must beat feature-only and permuted-word negative controls.",
+        ),
+        PaperBenchmarkResult(
+            name="high_crossing_grammar_negative_control_gap",
+            passed=high_grammar_negative_control_gap is not None and high_grammar_negative_control_gap > 0.0,
+            metric="score_gap_over_feature_only_or_permuted_word_controls",
+            observed=high_grammar_negative_control_gap,
+            threshold=0.0,
+            interpretation=(
+                "High re-entry grammar must add information beyond smooth scattering features and permuted words."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="hysteresis_width_grammar_negative_control_gap",
+            passed=hysteresis_grammar_negative_control_gap is not None
+            and hysteresis_grammar_negative_control_gap > 0.0,
+            metric="score_gap_over_feature_only_or_permuted_word_controls",
+            observed=hysteresis_grammar_negative_control_gap,
+            threshold=0.0,
+            interpretation="Hysteresis grammar must add information beyond adiabaticity features and permuted words.",
         ),
     )
 
@@ -538,6 +632,14 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
         and benchmark_by_name["grammar_branch_mean_margin"].passed
         and benchmark_by_name["grammar_branch_artifact_certified_accuracy"].passed
         and benchmark_by_name["grammar_branch_artifact_mean_margin"].passed
+    )
+    high_grammar_negative_control_passed = (
+        benchmark_by_name["high_crossing_grammar_negative_control_gap"].passed
+        and benchmark_by_name["high_crossing_grammar_artifact_negative_control_gap"].passed
+    )
+    hysteresis_grammar_negative_control_passed = (
+        benchmark_by_name["hysteresis_width_grammar_negative_control_gap"].passed
+        and benchmark_by_name["hysteresis_width_grammar_artifact_negative_control_gap"].passed
     )
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
@@ -698,11 +800,19 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                     "reentry_branch_prediction",
                     "partial"
                     if high_grammar_passed and grammar_training_signal_passed and grammar_artifact_passed and grammar_margin_passed
+                    and high_grammar_negative_control_passed
                     else "failing",
                     benchmark_by_name["high_crossing_grammar_outcome_validation"].interpretation,
                     None
-                    if high_grammar_passed and grammar_training_signal_passed and grammar_artifact_passed and grammar_margin_passed
-                    else "High re-entry branch lacks held-out validation, discovery training signal, artifact robustness, or decision margin.",
+                    if high_grammar_passed
+                    and grammar_training_signal_passed
+                    and grammar_artifact_passed
+                    and grammar_margin_passed
+                    and high_grammar_negative_control_passed
+                    else (
+                        "High re-entry branch lacks held-out validation, discovery training signal, artifact robustness, "
+                        "decision margin, or negative-control separation."
+                    ),
                 ),
                 ProofObligation(
                     "hysteresis_branch_prediction",
@@ -711,6 +821,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                     and grammar_training_signal_passed
                     and grammar_artifact_passed
                     and grammar_margin_passed
+                    and hysteresis_grammar_negative_control_passed
                     else "failing",
                     benchmark_by_name["hysteresis_width_grammar_outcome_validation"].interpretation,
                     None
@@ -718,7 +829,11 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                     and grammar_training_signal_passed
                     and grammar_artifact_passed
                     and grammar_margin_passed
-                    else "Hysteresis branch lacks held-out validation, discovery training signal, artifact robustness, or decision margin.",
+                    and hysteresis_grammar_negative_control_passed
+                    else (
+                        "Hysteresis branch lacks held-out validation, discovery training signal, artifact robustness, "
+                        "decision margin, or negative-control separation."
+                    ),
                 ),
             ),
         ),

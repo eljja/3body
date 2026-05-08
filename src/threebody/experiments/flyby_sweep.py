@@ -637,6 +637,14 @@ def _validate_grammar_outcome(
             "mean_decision_margin": None,
             "baseline_validation_accuracy": None,
             "validation_accuracy_gain": None,
+            "feature_only_validation_accuracy": None,
+            "feature_only_validation_accuracy_gain": None,
+            "feature_only_complexity_penalized_score": None,
+            "permuted_word_validation_accuracy": None,
+            "permuted_word_validation_accuracy_gain": None,
+            "permuted_word_complexity_penalized_score": None,
+            "negative_control_best_score": None,
+            "grammar_negative_control_score_gap": None,
             "complexity_penalized_validation_score": None,
             "passes_validation": False,
         }
@@ -661,6 +669,35 @@ def _validate_grammar_outcome(
     validation_predictions = np.asarray(
         [
             _predict_grammar_label(discovery, training_labels, row, word_field=word_field, feature_names=feature_names)
+            for row in validation
+        ],
+        dtype=int,
+    )
+    feature_only_predictions = np.asarray(
+        [
+            _predict_grammar_label(
+                discovery,
+                training_labels,
+                row,
+                word_field=word_field,
+                feature_names=feature_names,
+                word_weight=0.0,
+            )
+            for row in validation
+        ],
+        dtype=int,
+    )
+    permuted_word_values = _permuted_word_values(discovery, word_field)
+    permuted_word_predictions = np.asarray(
+        [
+            _predict_grammar_label(
+                discovery,
+                training_labels,
+                row,
+                word_field=word_field,
+                feature_names=feature_names,
+                training_word_values=permuted_word_values,
+            )
             for row in validation
         ],
         dtype=int,
@@ -695,6 +732,14 @@ def _validate_grammar_outcome(
     baseline_validation_accuracy = float(np.mean(baseline_label == validation_labels))
     validation_gain = float(validation_accuracy - baseline_validation_accuracy)
     score = float(validation_gain - 0.02 * (len(feature_names) + 1))
+    feature_only_accuracy = float(np.mean(feature_only_predictions == validation_labels))
+    feature_only_gain = float(feature_only_accuracy - baseline_validation_accuracy)
+    feature_only_score = float(feature_only_gain - 0.02 * len(feature_names))
+    permuted_word_accuracy = float(np.mean(permuted_word_predictions == validation_labels))
+    permuted_word_gain = float(permuted_word_accuracy - baseline_validation_accuracy)
+    permuted_word_score = float(permuted_word_gain - 0.02 * (len(feature_names) + 1))
+    negative_control_best_score = float(max(feature_only_score, permuted_word_score))
+    grammar_negative_control_score_gap = float(score - negative_control_best_score)
     return {
         "target": str(spec["target_name"]),
         "word_field": word_field,
@@ -712,6 +757,14 @@ def _validate_grammar_outcome(
         "mean_decision_margin": mean_decision_margin,
         "baseline_validation_accuracy": baseline_validation_accuracy,
         "validation_accuracy_gain": validation_gain,
+        "feature_only_validation_accuracy": feature_only_accuracy,
+        "feature_only_validation_accuracy_gain": feature_only_gain,
+        "feature_only_complexity_penalized_score": feature_only_score,
+        "permuted_word_validation_accuracy": permuted_word_accuracy,
+        "permuted_word_validation_accuracy_gain": permuted_word_gain,
+        "permuted_word_complexity_penalized_score": permuted_word_score,
+        "negative_control_best_score": negative_control_best_score,
+        "grammar_negative_control_score_gap": grammar_negative_control_score_gap,
         "complexity_penalized_validation_score": score,
         "passes_validation": score > GRAMMAR_BRANCH_SCORE_THRESHOLD,
     }
@@ -725,6 +778,8 @@ def _predict_grammar_label(
     word_field: str,
     feature_names: tuple[str, ...],
     exclude_index: int | None = None,
+    training_word_values: tuple[str, ...] | None = None,
+    word_weight: float = 1.0,
 ) -> int:
     feature_matrix = _grammar_feature_matrix(training_rows, feature_names)
     feature_vector = _grammar_feature_matrix((row,), feature_names)[0]
@@ -742,8 +797,11 @@ def _predict_grammar_label(
     for index, candidate in enumerate(training_rows):
         if exclude_index is not None and index == exclude_index:
             continue
-        candidate_word = _word_symbols(str(getattr(candidate, word_field)))
-        word_component = _normalized_word_distance(candidate_word, row_word)
+        candidate_word_value = (
+            str(getattr(candidate, word_field)) if training_word_values is None else training_word_values[index]
+        )
+        candidate_word = _word_symbols(candidate_word_value)
+        word_component = word_weight * _normalized_word_distance(candidate_word, row_word)
         feature_component = 0.0
         if feature_names:
             feature_component = float(np.linalg.norm(feature_matrix[index] - feature_vector) / np.sqrt(len(feature_names)))
@@ -784,6 +842,8 @@ def _grammar_neighbor_distances(
     *,
     word_field: str,
     feature_names: tuple[str, ...],
+    training_word_values: tuple[str, ...] | None = None,
+    word_weight: float = 1.0,
 ) -> list[tuple[float, int]]:
     feature_matrix = _grammar_feature_matrix(training_rows, feature_names)
     feature_vector = _grammar_feature_matrix((row,), feature_names)[0]
@@ -795,8 +855,11 @@ def _grammar_neighbor_distances(
     row_word = _word_symbols(str(getattr(row, word_field)))
     distances = []
     for index, candidate in enumerate(training_rows):
-        candidate_word = _word_symbols(str(getattr(candidate, word_field)))
-        word_component = _normalized_word_distance(candidate_word, row_word)
+        candidate_word_value = (
+            str(getattr(candidate, word_field)) if training_word_values is None else training_word_values[index]
+        )
+        candidate_word = _word_symbols(candidate_word_value)
+        word_component = word_weight * _normalized_word_distance(candidate_word, row_word)
         feature_component = 0.0
         if feature_names:
             feature_component = float(np.linalg.norm(feature_matrix[index] - feature_vector))
@@ -812,6 +875,14 @@ def _grammar_feature_matrix(rows: tuple[FlybySweepRow, ...], feature_names: tupl
         [[np.log(max(abs(float(getattr(row, name))), 1.0e-12)) for name in feature_names] for row in rows],
         dtype=float,
     )
+
+
+def _permuted_word_values(rows: tuple[FlybySweepRow, ...], word_field: str) -> tuple[str, ...]:
+    words = tuple(str(getattr(row, word_field)) for row in rows)
+    if len(words) < 2:
+        return words
+    shift = max(1, len(words) // 3)
+    return tuple(words[(index + shift) % len(words)] for index in range(len(words)))
 
 
 def _word_symbols(value: str) -> tuple[str, ...]:
