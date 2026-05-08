@@ -587,11 +587,12 @@ def _grammar_outcome_validation_rows(
 ) -> list[dict[str, float | int | str | bool | None]]:
     specs = (
         {
-            "target_name": "high_crossing_grammar_phase_branch",
+            "target_name": "high_crossing_grammar_scattering_branch",
             "target_attr": "high_crossing",
             "word_field": "refined_chart_word",
-            "feature_names": ("binary_phase_cos_positive", "binary_phase_sin_positive"),
+            "feature_names": ("periapsis_distance",),
             "quantile_count": 2,
+            "selection_protocol": "predeclared_scattering_return_branch",
         },
         {
             "target_name": "hysteresis_width_grammar_phase_branch",
@@ -599,6 +600,7 @@ def _grammar_outcome_validation_rows(
             "word_field": "refined_chart_word",
             "feature_names": ("binary_phase_sin_positive",),
             "quantile_count": 2,
+            "selection_protocol": "predeclared_phase_memory_branch",
         },
     )
     return [_validate_grammar_outcome(discovery_rows, validation_rows, spec) for spec in specs]
@@ -620,9 +622,12 @@ def _validate_grammar_outcome(
             "target": str(spec["target_name"]),
             "word_field": word_field,
             "features": ",".join(feature_names),
+            "selection_protocol": str(spec.get("selection_protocol", "predeclared")),
             "training_support": len(discovery),
             "validation_support": len(validation),
             "training_accuracy": None,
+            "baseline_training_accuracy": None,
+            "training_accuracy_gain": None,
             "validation_accuracy": None,
             "baseline_validation_accuracy": None,
             "validation_accuracy_gain": None,
@@ -655,7 +660,9 @@ def _validate_grammar_outcome(
         dtype=int,
     )
     baseline_label = int(np.argmax(np.bincount(training_labels, minlength=quantile_count)))
+    baseline_training_accuracy = float(np.mean(baseline_label == training_labels))
     training_accuracy = float(np.mean(training_predictions == training_labels))
+    training_gain = float(training_accuracy - baseline_training_accuracy)
     validation_accuracy = float(np.mean(validation_predictions == validation_labels))
     baseline_validation_accuracy = float(np.mean(baseline_label == validation_labels))
     validation_gain = float(validation_accuracy - baseline_validation_accuracy)
@@ -664,10 +671,13 @@ def _validate_grammar_outcome(
         "target": str(spec["target_name"]),
         "word_field": word_field,
         "features": ",".join(feature_names),
+        "selection_protocol": str(spec.get("selection_protocol", "predeclared")),
         "quantile_count": quantile_count,
         "training_support": len(discovery),
         "validation_support": len(validation),
         "training_accuracy": training_accuracy,
+        "baseline_training_accuracy": baseline_training_accuracy,
+        "training_accuracy_gain": training_gain,
         "validation_accuracy": validation_accuracy,
         "baseline_validation_accuracy": baseline_validation_accuracy,
         "validation_accuracy_gain": validation_gain,

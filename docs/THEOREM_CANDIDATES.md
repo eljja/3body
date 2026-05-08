@@ -87,7 +87,8 @@ Current proof status for this candidate:
 - Coarse chart words are stable but too low-diversity to trust.
 - Refined physical chart words now pass the current held-out diversity check.
 - Extremum-based return words now pass the current partial stability and diversity checks.
-- High re-entry and hysteresis are now tested as grammar/phase branch classification problems, not scalar boundary-collapse problems.
+- High re-entry and hysteresis are now tested as predeclared grammar branch classification problems, not scalar boundary-collapse problems.
+- The high re-entry branch currently uses refined chart words plus periapsis distance; hysteresis uses refined chart words plus binary phase memory.
 - This is still not a theorem because no grammar invariant bound has been proved.
 
 Open proof obligations:
