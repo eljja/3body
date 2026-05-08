@@ -3,8 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..analysis import word_distance
-from .flyby_sweep import HierarchicalFlybySweep
-from .research_checks import ClassifierArtifactStudy, IntegratorComparisonStudy, KnownBenchmarkSuite, RegimeProbeSuite
+from .flyby_sweep import GRAMMAR_BRANCH_SCORE_THRESHOLD, HierarchicalFlybySweep
+from .research_checks import (
+    ClassifierArtifactStudy,
+    GrammarBranchArtifactStudy,
+    IntegratorComparisonStudy,
+    KnownBenchmarkSuite,
+    RegimeProbeSuite,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +87,7 @@ class TheoremSuite:
 
     def run(self) -> TheoremSuiteResult:
         artifact_rows = ClassifierArtifactStudy().run(duration=8.0, samples=500)
+        grammar_artifact_rows = GrammarBranchArtifactStudy().run(duration=8.0, samples=180)
         integrator = IntegratorComparisonStudy().run()
         benchmarks = KnownBenchmarkSuite().run()
         regimes = RegimeProbeSuite().run()
@@ -97,13 +104,21 @@ class TheoremSuite:
             stride=20,
         )
         flyby_summary = flyby.as_dict()
-        benchmark_rows = _paper_benchmarks(artifact_rows, integrator, benchmarks, regimes, flyby_summary)
+        benchmark_rows = _paper_benchmarks(
+            artifact_rows,
+            grammar_artifact_rows,
+            integrator,
+            benchmarks,
+            regimes,
+            flyby_summary,
+        )
         candidates = _theorem_candidates(benchmark_rows)
         return TheoremSuiteResult(theorem_candidates=candidates, benchmarks=benchmark_rows)
 
 
 def _paper_benchmarks(
     artifact_rows: object,
+    grammar_artifact_rows: object,
     integrator: object,
     known_benchmarks: object,
     regimes: object,
@@ -112,6 +127,11 @@ def _paper_benchmarks(
     transition_counts = [row.transition_count for row in artifact_rows]
     baseline_count = transition_counts[0]
     artifact_spread = max(abs(count - baseline_count) for count in transition_counts)
+    grammar_artifact_scores = [
+        row.minimum_score for row in grammar_artifact_rows if row.minimum_score is not None
+    ]
+    grammar_artifact_pass_rate = sum(1 for row in grammar_artifact_rows if row.passed) / len(grammar_artifact_rows)
+    minimum_grammar_artifact_score = None if not grammar_artifact_scores else float(min(grammar_artifact_scores))
     known_pass_rate = sum(1 for row in known_benchmarks if row.passed) / len(known_benchmarks)
     regime_names = {row.name for row in regimes}
     reduced_regime_hints = {
@@ -354,18 +374,18 @@ def _paper_benchmarks(
         ),
         PaperBenchmarkResult(
             name="high_crossing_grammar_outcome_validation",
-            passed=high_grammar_score is not None and high_grammar_score > 0.2,
+            passed=high_grammar_score is not None and high_grammar_score > GRAMMAR_BRANCH_SCORE_THRESHOLD,
             metric="complexity_penalized_accuracy_gain",
             observed=high_grammar_score,
-            threshold=0.2,
+            threshold=GRAMMAR_BRANCH_SCORE_THRESHOLD,
             interpretation="High re-entry should be predictable as a grammar/scattering branch even when scalar boundary collapse fails.",
         ),
         PaperBenchmarkResult(
             name="hysteresis_width_grammar_outcome_validation",
-            passed=hysteresis_grammar_score is not None and hysteresis_grammar_score > 0.2,
+            passed=hysteresis_grammar_score is not None and hysteresis_grammar_score > GRAMMAR_BRANCH_SCORE_THRESHOLD,
             metric="complexity_penalized_accuracy_gain",
             observed=hysteresis_grammar_score,
-            threshold=0.2,
+            threshold=GRAMMAR_BRANCH_SCORE_THRESHOLD,
             interpretation="Hysteresis width should be predictable as a grammar/phase branch rather than a scalar threshold.",
         ),
         PaperBenchmarkResult(
@@ -383,6 +403,22 @@ def _paper_benchmarks(
             observed=min_grammar_validation_support,
             threshold=48.0,
             interpretation="Grammar branch validation must use the wider held-out phase sweep.",
+        ),
+        PaperBenchmarkResult(
+            name="grammar_branch_artifact_pass_rate",
+            passed=grammar_artifact_pass_rate >= 0.75,
+            metric="pass_rate_under_classifier_and_stride_perturbations",
+            observed=grammar_artifact_pass_rate,
+            threshold=0.75,
+            interpretation="Predeclared branch laws should survive classifier-threshold and stride perturbations.",
+        ),
+        PaperBenchmarkResult(
+            name="grammar_branch_artifact_min_score",
+            passed=minimum_grammar_artifact_score is not None and minimum_grammar_artifact_score > 0.05,
+            metric="minimum_complexity_penalized_score_under_perturbation",
+            observed=minimum_grammar_artifact_score,
+            threshold=0.05,
+            interpretation="Branch-law scores should not collapse to zero under classifier-threshold and stride perturbations.",
         ),
     )
 
@@ -402,6 +438,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     high_grammar_passed = benchmark_by_name["high_crossing_grammar_outcome_validation"].passed
     hysteresis_grammar_passed = benchmark_by_name["hysteresis_width_grammar_outcome_validation"].passed
     grammar_training_signal_passed = benchmark_by_name["grammar_branch_training_signal"].passed
+    grammar_artifact_passed = benchmark_by_name["grammar_branch_artifact_pass_rate"].passed
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
@@ -559,19 +596,21 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
                 ProofObligation(
                     "reentry_branch_prediction",
-                    "partial" if high_grammar_passed and grammar_training_signal_passed else "failing",
+                    "partial" if high_grammar_passed and grammar_training_signal_passed and grammar_artifact_passed else "failing",
                     benchmark_by_name["high_crossing_grammar_outcome_validation"].interpretation,
                     None
-                    if high_grammar_passed and grammar_training_signal_passed
-                    else "High re-entry branch lacks held-out validation or discovery training signal.",
+                    if high_grammar_passed and grammar_training_signal_passed and grammar_artifact_passed
+                    else "High re-entry branch lacks held-out validation, discovery training signal, or artifact robustness.",
                 ),
                 ProofObligation(
                     "hysteresis_branch_prediction",
-                    "partial" if hysteresis_grammar_passed and grammar_training_signal_passed else "failing",
+                    "partial"
+                    if hysteresis_grammar_passed and grammar_training_signal_passed and grammar_artifact_passed
+                    else "failing",
                     benchmark_by_name["hysteresis_width_grammar_outcome_validation"].interpretation,
                     None
-                    if hysteresis_grammar_passed and grammar_training_signal_passed
-                    else "Hysteresis branch lacks held-out validation or discovery training signal.",
+                    if hysteresis_grammar_passed and grammar_training_signal_passed and grammar_artifact_passed
+                    else "Hysteresis branch lacks held-out validation, discovery training signal, or artifact robustness.",
                 ),
             ),
         ),

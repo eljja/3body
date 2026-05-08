@@ -3,6 +3,7 @@ from __future__ import annotations
 from threebody.experiments import (
     ClassifierArtifactStudy,
     FigureEightStabilityProbe,
+    GrammarBranchArtifactStudy,
     IntegratorComparisonStudy,
     KnownBenchmarkSuite,
     RegimeProbeSuite,
@@ -15,6 +16,13 @@ def test_classifier_artifact_study_varies_classifier_settings() -> None:
     assert len(rows) >= 4
     assert {row.label for row in rows} >= {"baseline", "strict_hierarchy", "loose_hierarchy"}
     assert all(row.transition_count >= 0 for row in rows)
+
+
+def test_grammar_branch_artifact_study_varies_classifier_settings() -> None:
+    rows = GrammarBranchArtifactStudy().run(duration=3.0, samples=120)
+
+    assert {row.label for row in rows} >= {"baseline", "strict_hierarchy", "loose_hierarchy"}
+    assert all(row.minimum_score is None or isinstance(row.minimum_score, float) for row in rows)
 
 
 def test_integrator_comparison_reports_regularization_gap() -> None:

@@ -17,6 +17,7 @@ from ..diagnostics import InvariantMonitor, StabilityAnalyzer
 from ..solvers import AdaptiveIntegrator, StructureAwareIntegrator
 from ..systems import GeneralThreeBodySystem
 from .orbit_library import OrbitLibrary
+from .flyby_sweep import HierarchicalFlybySweep
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +79,82 @@ class ClassifierArtifactStudy:
                     close_encounter_radius=classifier.close_encounter_radius,
                     transition_count=len(transitions),
                     primary_chart_count=len({report.primary_chart for report in reports}),
+                )
+            )
+        return tuple(rows)
+
+
+@dataclass(frozen=True, slots=True)
+class GrammarBranchArtifactRow:
+    label: str
+    stride: int
+    hierarchy_perturbation_threshold: float
+    high_score: float | None
+    hysteresis_score: float | None
+    high_passed: bool
+    hysteresis_passed: bool
+
+    @property
+    def minimum_score(self) -> float | None:
+        scores = [score for score in (self.high_score, self.hysteresis_score) if score is not None]
+        return None if not scores else float(min(scores))
+
+    @property
+    def passed(self) -> bool:
+        return self.high_passed and self.hysteresis_passed
+
+    def as_dict(self) -> dict[str, float | int | str | bool | None]:
+        return {
+            "label": self.label,
+            "stride": self.stride,
+            "hierarchy_perturbation_threshold": self.hierarchy_perturbation_threshold,
+            "high_score": self.high_score,
+            "hysteresis_score": self.hysteresis_score,
+            "minimum_score": self.minimum_score,
+            "high_passed": self.high_passed,
+            "hysteresis_passed": self.hysteresis_passed,
+            "passed": self.passed,
+        }
+
+
+@dataclass(slots=True)
+class GrammarBranchArtifactStudy:
+    """Perturb classifier/stride settings for the predeclared grammar branch laws."""
+
+    def run(self, duration: float = 8.0, samples: int = 180) -> tuple[GrammarBranchArtifactRow, ...]:
+        rows = []
+        for label, threshold_factor, stride in (
+            ("baseline", 1.0, 20),
+            ("strict_hierarchy", 0.75, 20),
+            ("loose_hierarchy", 1.5, 20),
+            ("fine_stride", 1.0, 10),
+        ):
+            classifier = ChartClassifier(hierarchy_perturbation_threshold=4.0e-3 * threshold_factor)
+            sweep = HierarchicalFlybySweep(atlas=AnalysisAtlas(classifier=classifier))
+            result = sweep.run_discovery_validation(
+                discovery_binary_phases=(0.0, 1.5707963267948966),
+                validation_binary_phases=(
+                    0.39269908169872414,
+                    0.7853981633974483,
+                    1.1780972450961724,
+                    2.356194490192345,
+                ),
+                duration=duration,
+                samples=samples,
+                stride=stride,
+            )
+            validations = {row["target"]: row for row in result.as_dict()["grammar_outcome_validations"]}
+            high = validations.get("high_crossing_grammar_scattering_branch", {})
+            hysteresis = validations.get("hysteresis_width_grammar_phase_branch", {})
+            rows.append(
+                GrammarBranchArtifactRow(
+                    label=label,
+                    stride=stride,
+                    hierarchy_perturbation_threshold=classifier.hierarchy_perturbation_threshold,
+                    high_score=_optional_float(high.get("complexity_penalized_validation_score")),
+                    hysteresis_score=_optional_float(hysteresis.get("complexity_penalized_validation_score")),
+                    high_passed=bool(high.get("passes_validation", False)),
+                    hysteresis_passed=bool(hysteresis.get("passes_validation", False)),
                 )
             )
         return tuple(rows)
@@ -302,6 +379,12 @@ def _max_abs_drift(system: object, trajectory: object) -> float:
     if drift is None:
         drift = values.get("jacobi_drift")
     return float(np.max(np.abs(drift)))
+
+
+def _optional_float(value: object) -> float | None:
+    if value is None:
+        return None
+    return float(value)
 
 
 def _benchmark(name: str, metric: str, observed_error: float, reference: float, tolerance: float) -> BenchmarkResult:

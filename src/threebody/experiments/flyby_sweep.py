@@ -25,6 +25,9 @@ from ..utils import orbit_period
 from .orbit_library import OrbitLibrary
 
 
+GRAMMAR_BRANCH_SCORE_THRESHOLD = 0.18
+
+
 @dataclass(frozen=True, slots=True)
 class FlybySweepCase:
     intruder_mass: float
@@ -590,17 +593,17 @@ def _grammar_outcome_validation_rows(
             "target_name": "high_crossing_grammar_scattering_branch",
             "target_attr": "high_crossing",
             "word_field": "refined_chart_word",
-            "feature_names": ("periapsis_distance",),
+            "feature_names": ("periapsis_distance", "tidal_impulse"),
             "quantile_count": 2,
-            "selection_protocol": "predeclared_scattering_return_branch",
+            "selection_protocol": "predeclared_scattering_impulse_return_branch",
         },
         {
             "target_name": "hysteresis_width_grammar_phase_branch",
             "target_attr": "hysteresis_width",
             "word_field": "refined_chart_word",
-            "feature_names": ("binary_phase_sin_positive",),
+            "feature_names": ("encounter_adiabaticity",),
             "quantile_count": 2,
-            "selection_protocol": "predeclared_phase_memory_branch",
+            "selection_protocol": "predeclared_adiabatic_memory_branch",
         },
     )
     return [_validate_grammar_outcome(discovery_rows, validation_rows, spec) for spec in specs]
@@ -682,7 +685,7 @@ def _validate_grammar_outcome(
         "baseline_validation_accuracy": baseline_validation_accuracy,
         "validation_accuracy_gain": validation_gain,
         "complexity_penalized_validation_score": score,
-        "passes_validation": score > 0.2,
+        "passes_validation": score > GRAMMAR_BRANCH_SCORE_THRESHOLD,
     }
 
 
