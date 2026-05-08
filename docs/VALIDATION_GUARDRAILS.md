@@ -45,6 +45,7 @@ Forbidden claims:
 - Branch margin certificates must also survive classifier-threshold and stride perturbations.
 - Branch laws must beat negative controls computed on the same held-out split: feature-only nearest-neighbor classification and deterministically permuted chart-word classification.
 - If only one branch beats these controls, the theorem candidate must split by branch instead of promoting a unified grammar law.
+- The theorem suite must report which explanation wins per branch. A feature-selected branch and a grammar-selected branch are not the same theorem.
 - `Chart-Word Grammar` now separates the coarse alphabet from a refined physical alphabet. Refined word diversity survives the current held-out flyby harness, but this is still a symbolic proxy. It cannot be promoted until classifier perturbations and a genuine Poincare/return-map construction agree with the refined words.
 - AIC, BIC, leave-one-out, and bootstrap/OOB diagnostics exist for flyby collapse fits, but the sample count is still small.
 - A true regularized collision integrator is missing, but a McGehee-style scale/shape collision diagnostic now separates hyperradius, radial velocity, shape area, anisotropy, and collision depth.

@@ -276,6 +276,10 @@ def _paper_benchmarks(
     hysteresis_grammar_negative_control_gap = (
         None if hysteresis_grammar is None else float(hysteresis_grammar["grammar_negative_control_score_gap"])
     )
+    high_selected_model, high_selected_score, high_selected_gap = _branch_explanation_selection(high_grammar)
+    hysteresis_selected_model, hysteresis_selected_score, hysteresis_selected_gap = _branch_explanation_selection(
+        hysteresis_grammar
+    )
     grammar_training_gains = [
         float(row["training_accuracy_gain"])
         for row in (high_grammar, hysteresis_grammar)
@@ -600,6 +604,25 @@ def _paper_benchmarks(
             ),
         ),
         PaperBenchmarkResult(
+            name="high_crossing_selected_branch_score",
+            passed=high_selected_model != "permuted_word" and high_selected_score is not None and high_selected_score > 0.25,
+            metric="best_branch_explanation_score",
+            observed=high_selected_score,
+            threshold=0.25,
+            interpretation=(
+                f"Selected high-crossing branch explanation: {high_selected_model}; "
+                f"gap over next competitor: {high_selected_gap}."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="high_crossing_selected_branch_is_feature",
+            passed=high_selected_model == "feature_only",
+            metric="feature_selection_indicator",
+            observed=1.0 if high_selected_model == "feature_only" else 0.0,
+            threshold=1.0,
+            interpretation="High re-entry currently selects smooth scattering features over chart grammar.",
+        ),
+        PaperBenchmarkResult(
             name="hysteresis_width_grammar_negative_control_gap",
             passed=hysteresis_grammar_negative_control_gap is not None
             and hysteresis_grammar_negative_control_gap > 0.0,
@@ -608,7 +631,45 @@ def _paper_benchmarks(
             threshold=0.0,
             interpretation="Hysteresis grammar must add information beyond adiabaticity features and permuted words.",
         ),
+        PaperBenchmarkResult(
+            name="hysteresis_width_selected_branch_score",
+            passed=hysteresis_selected_model == "grammar"
+            and hysteresis_selected_score is not None
+            and hysteresis_selected_score > GRAMMAR_BRANCH_SCORE_THRESHOLD,
+            metric="best_branch_explanation_score",
+            observed=hysteresis_selected_score,
+            threshold=GRAMMAR_BRANCH_SCORE_THRESHOLD,
+            interpretation=(
+                f"Selected hysteresis branch explanation: {hysteresis_selected_model}; "
+                f"gap over next competitor: {hysteresis_selected_gap}."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="hysteresis_width_selected_branch_is_grammar",
+            passed=hysteresis_selected_model == "grammar",
+            metric="grammar_selection_indicator",
+            observed=1.0 if hysteresis_selected_model == "grammar" else 0.0,
+            threshold=1.0,
+            interpretation="Hysteresis currently selects chart grammar over feature-only and permuted-word controls.",
+        ),
     )
+
+
+def _branch_explanation_selection(row: dict[str, object] | None) -> tuple[str, float | None, float | None]:
+    if row is None:
+        return "none", None, None
+    scores = {
+        "grammar": _optional_float(row.get("complexity_penalized_validation_score")),
+        "feature_only": _optional_float(row.get("feature_only_complexity_penalized_score")),
+        "permuted_word": _optional_float(row.get("permuted_word_complexity_penalized_score")),
+    }
+    finite_scores = {name: score for name, score in scores.items() if score is not None}
+    if not finite_scores:
+        return "none", None, None
+    selected_model, selected_score = max(finite_scores.items(), key=lambda item: item[1])
+    competitors = [score for name, score in finite_scores.items() if name != selected_model]
+    gap = None if not competitors else float(selected_score - max(competitors))
+    return selected_model, float(selected_score), gap
 
 
 def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[TheoremCandidate, ...]:
@@ -640,6 +701,14 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     hysteresis_grammar_negative_control_passed = (
         benchmark_by_name["hysteresis_width_grammar_negative_control_gap"].passed
         and benchmark_by_name["hysteresis_width_grammar_artifact_negative_control_gap"].passed
+    )
+    high_selected_feature_passed = (
+        benchmark_by_name["high_crossing_selected_branch_score"].passed
+        and benchmark_by_name["high_crossing_selected_branch_is_feature"].passed
+    )
+    hysteresis_selected_grammar_passed = (
+        benchmark_by_name["hysteresis_width_selected_branch_score"].passed
+        and benchmark_by_name["hysteresis_width_selected_branch_is_grammar"].passed
     )
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
@@ -837,6 +906,50 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
             ),
         ),
+        TheoremCandidate(
+            name="Split Branch Explanation Conjecture",
+            claim=(
+                "In a hierarchical three-body flyby, different transition branches may require different explanatory "
+                "coordinates: high re-entry is currently best explained by smooth scattering features, while "
+                "hysteresis is currently best explained by chart-word memory."
+            ),
+            scope="Declared hierarchical flyby theorem-suite grid with held-out masses, impact parameters, speeds, and phases.",
+            novelty_target=(
+                "Replace a single universal transition law with a falsifiable branch-wise selector over feature, "
+                "grammar, and randomized-control explanations."
+            ),
+            proven=False,
+            obligations=(
+                ProofObligation(
+                    "high_reentry_feature_selection",
+                    "partial" if high_selected_feature_passed else "failing",
+                    benchmark_by_name["high_crossing_selected_branch_score"].interpretation,
+                    None
+                    if high_selected_feature_passed
+                    else "High re-entry does not yet select a non-control feature explanation with sufficient score.",
+                ),
+                ProofObligation(
+                    "hysteresis_grammar_selection",
+                    "partial" if hysteresis_selected_grammar_passed else "failing",
+                    benchmark_by_name["hysteresis_width_selected_branch_score"].interpretation,
+                    None
+                    if hysteresis_selected_grammar_passed
+                    else "Hysteresis does not yet select grammar over feature-only and permuted-word controls.",
+                ),
+                ProofObligation(
+                    "selector_generalization",
+                    "open",
+                    "The selector is tested only on the current flyby family.",
+                    "Extend branch selection to Lagrange-neck, close-encounter, and escape-scattering regimes.",
+                ),
+                ProofObligation(
+                    "selector_error_bound",
+                    "open",
+                    "No theorem-level error bound exists for the branch-wise selector.",
+                    "Derive branch-local perturbation bounds and finite-sample confidence intervals.",
+                ),
+            ),
+        ),
     )
 
 
@@ -885,3 +998,9 @@ def _string_word_distance(first: tuple[str, ...], second: tuple[str, ...]) -> in
             return len(self.symbols)
 
     return word_distance(_Word(first), _Word(second))
+
+
+def _optional_float(value: object) -> float | None:
+    if value is None:
+        return None
+    return float(value)

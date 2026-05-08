@@ -108,6 +108,25 @@ Open proof obligations:
 - Replace the current binary branch classifier with a multi-branch return-map partition and prove its error bound.
 - Prove a lower bound on branch margin under allowed classifier and trajectory perturbations.
 
+## Candidate 5: Split Branch Explanation Conjecture
+
+Claim:
+
+For hierarchical flyby transitions, no single scalar or symbolic law should be promoted globally. Each branch should choose its explanatory coordinate by held-out competition against feature-only, grammar, and randomized-control models.
+
+Current evidence:
+
+- `high_crossing` currently selects smooth scattering features over chart grammar.
+- `hysteresis_width` currently selects chart-word memory over feature-only and permuted-word controls.
+- This gives a more precise interpretation than the earlier unified grammar claim: re-entry threshold location and re-entry memory are different mathematical objects.
+
+Open proof obligations:
+
+- Extend the selector beyond flyby to Lagrange-neck transport, close encounter, and escape scattering.
+- Replace nearest-neighbor branch selection with a genuine return-map partition.
+- Prove branch-local perturbation and finite-sample error bounds.
+- Show that the selected explanation is stable under independent integrators and wider held-out grids.
+
 ## Reproducibility
 
 Run:

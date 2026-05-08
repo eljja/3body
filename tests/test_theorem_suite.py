@@ -11,6 +11,7 @@ def test_theorem_suite_reports_candidates_and_benchmarks() -> None:
     assert summary["benchmarks"]
     assert any(candidate["proven"] is False for candidate in summary["theorem_candidates"])
     assert any(candidate["name"] == "Impulse-Exchange Hierarchy Boundary Conjecture" for candidate in summary["theorem_candidates"])
+    assert any(candidate["name"] == "Split Branch Explanation Conjecture" for candidate in summary["theorem_candidates"])
     assert any(benchmark["name"] == "low_crossing_scattering_map_score" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "low_crossing_scattering_map_selection" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "best_low_crossing_model_validation" for benchmark in summary["benchmarks"])
@@ -38,3 +39,7 @@ def test_theorem_suite_reports_candidates_and_benchmarks() -> None:
     assert any(benchmark["name"] == "hysteresis_width_grammar_negative_control_gap" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "high_crossing_grammar_artifact_negative_control_gap" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "hysteresis_width_grammar_artifact_negative_control_gap" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "high_crossing_selected_branch_score" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "hysteresis_width_selected_branch_score" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "high_crossing_selected_branch_is_feature" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "hysteresis_width_selected_branch_is_grammar" for benchmark in summary["benchmarks"])
