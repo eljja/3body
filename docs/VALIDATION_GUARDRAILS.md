@@ -42,6 +42,7 @@ Forbidden claims:
 - Branch promotion also requires classifier-threshold and stride perturbation robustness. A branch law that only works for one atlas setting remains an artifact candidate.
 - Binary grammar branch validation uses a lower score threshold than scalar boundary collapse because it is a quantile-branch classifier, not a continuous boundary fit. The current threshold is `0.18` after complexity penalty.
 - Branch claims must report positive-margin certified accuracy and certified fraction. Accuracy without decision margin is not enough for theorem promotion.
+- Branch margin certificates must also survive classifier-threshold and stride perturbations.
 - `Chart-Word Grammar` now separates the coarse alphabet from a refined physical alphabet. Refined word diversity survives the current held-out flyby harness, but this is still a symbolic proxy. It cannot be promoted until classifier perturbations and a genuine Poincare/return-map construction agree with the refined words.
 - AIC, BIC, leave-one-out, and bootstrap/OOB diagnostics exist for flyby collapse fits, but the sample count is still small.
 - A true regularized collision integrator is missing, but a McGehee-style scale/shape collision diagnostic now separates hyperradius, radial velocity, shape area, anisotropy, and collision depth.

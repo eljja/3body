@@ -130,8 +130,30 @@ def _paper_benchmarks(
     grammar_artifact_scores = [
         row.minimum_score for row in grammar_artifact_rows if row.minimum_score is not None
     ]
+    grammar_artifact_certified_accuracies = [
+        row.minimum_certified_accuracy
+        for row in grammar_artifact_rows
+        if row.minimum_certified_accuracy is not None
+    ]
+    grammar_artifact_certified_fractions = [
+        row.minimum_certified_fraction
+        for row in grammar_artifact_rows
+        if row.minimum_certified_fraction is not None
+    ]
+    grammar_artifact_mean_margins = [
+        row.minimum_mean_margin for row in grammar_artifact_rows if row.minimum_mean_margin is not None
+    ]
     grammar_artifact_pass_rate = sum(1 for row in grammar_artifact_rows if row.passed) / len(grammar_artifact_rows)
     minimum_grammar_artifact_score = None if not grammar_artifact_scores else float(min(grammar_artifact_scores))
+    minimum_grammar_artifact_certified_accuracy = (
+        None if not grammar_artifact_certified_accuracies else float(min(grammar_artifact_certified_accuracies))
+    )
+    minimum_grammar_artifact_certified_fraction = (
+        None if not grammar_artifact_certified_fractions else float(min(grammar_artifact_certified_fractions))
+    )
+    minimum_grammar_artifact_mean_margin = (
+        None if not grammar_artifact_mean_margins else float(min(grammar_artifact_mean_margins))
+    )
     known_pass_rate = sum(1 for row in known_benchmarks if row.passed) / len(known_benchmarks)
     regime_names = {row.name for row in regimes}
     reduced_regime_hints = {
@@ -443,6 +465,32 @@ def _paper_benchmarks(
             interpretation="Branch-law scores should not collapse to zero under classifier-threshold and stride perturbations.",
         ),
         PaperBenchmarkResult(
+            name="grammar_branch_artifact_certified_accuracy",
+            passed=minimum_grammar_artifact_certified_accuracy is not None
+            and minimum_grammar_artifact_certified_accuracy >= 0.95,
+            metric="minimum_certified_accuracy_under_perturbation",
+            observed=minimum_grammar_artifact_certified_accuracy,
+            threshold=0.95,
+            interpretation="Positive-margin branch predictions should remain nearly error-free under classifier and stride perturbations.",
+        ),
+        PaperBenchmarkResult(
+            name="grammar_branch_artifact_certified_fraction",
+            passed=minimum_grammar_artifact_certified_fraction is not None
+            and minimum_grammar_artifact_certified_fraction >= 0.5,
+            metric="minimum_certified_fraction_under_perturbation",
+            observed=minimum_grammar_artifact_certified_fraction,
+            threshold=0.5,
+            interpretation="Classifier and stride perturbations should not collapse the certified branch region.",
+        ),
+        PaperBenchmarkResult(
+            name="grammar_branch_artifact_mean_margin",
+            passed=minimum_grammar_artifact_mean_margin is not None and minimum_grammar_artifact_mean_margin > 0.05,
+            metric="minimum_mean_margin_under_perturbation",
+            observed=minimum_grammar_artifact_mean_margin,
+            threshold=0.05,
+            interpretation="Classifier and stride perturbations should preserve a positive branch decision margin.",
+        ),
+        PaperBenchmarkResult(
             name="grammar_branch_certified_accuracy",
             passed=min_grammar_certified_accuracy is not None and min_grammar_certified_accuracy >= 0.95,
             metric="minimum_margin_certified_validation_accuracy",
@@ -485,9 +533,12 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     hysteresis_grammar_passed = benchmark_by_name["hysteresis_width_grammar_outcome_validation"].passed
     grammar_training_signal_passed = benchmark_by_name["grammar_branch_training_signal"].passed
     grammar_artifact_passed = benchmark_by_name["grammar_branch_artifact_pass_rate"].passed
-    grammar_margin_passed = benchmark_by_name["grammar_branch_certified_accuracy"].passed and benchmark_by_name[
-        "grammar_branch_mean_margin"
-    ].passed
+    grammar_margin_passed = (
+        benchmark_by_name["grammar_branch_certified_accuracy"].passed
+        and benchmark_by_name["grammar_branch_mean_margin"].passed
+        and benchmark_by_name["grammar_branch_artifact_certified_accuracy"].passed
+        and benchmark_by_name["grammar_branch_artifact_mean_margin"].passed
+    )
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (

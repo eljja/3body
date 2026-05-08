@@ -91,6 +91,7 @@ Current proof status for this candidate:
 - The high re-entry branch currently uses refined chart words plus periapsis distance and tidal impulse; hysteresis uses refined chart words plus encounter adiabaticity.
 - Branch robustness is now tested against classifier-threshold and stride perturbations.
 - Branch predictions now report a nearest-neighbor decision margin; positive-margin predictions are tracked separately as certified branch decisions.
+- Branch margin certificates are now also tested under classifier-threshold and stride perturbations.
 - This is still not a theorem because no grammar invariant bound has been proved.
 
 Open proof obligations:

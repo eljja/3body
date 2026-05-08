@@ -91,6 +91,12 @@ class GrammarBranchArtifactRow:
     hierarchy_perturbation_threshold: float
     high_score: float | None
     hysteresis_score: float | None
+    high_certified_accuracy: float | None
+    hysteresis_certified_accuracy: float | None
+    high_certified_fraction: float | None
+    hysteresis_certified_fraction: float | None
+    high_mean_margin: float | None
+    hysteresis_mean_margin: float | None
     high_passed: bool
     hysteresis_passed: bool
 
@@ -103,6 +109,29 @@ class GrammarBranchArtifactRow:
     def passed(self) -> bool:
         return self.high_passed and self.hysteresis_passed
 
+    @property
+    def minimum_certified_accuracy(self) -> float | None:
+        values = [
+            value
+            for value in (self.high_certified_accuracy, self.hysteresis_certified_accuracy)
+            if value is not None
+        ]
+        return None if not values else float(min(values))
+
+    @property
+    def minimum_certified_fraction(self) -> float | None:
+        values = [
+            value
+            for value in (self.high_certified_fraction, self.hysteresis_certified_fraction)
+            if value is not None
+        ]
+        return None if not values else float(min(values))
+
+    @property
+    def minimum_mean_margin(self) -> float | None:
+        values = [value for value in (self.high_mean_margin, self.hysteresis_mean_margin) if value is not None]
+        return None if not values else float(min(values))
+
     def as_dict(self) -> dict[str, float | int | str | bool | None]:
         return {
             "label": self.label,
@@ -111,6 +140,15 @@ class GrammarBranchArtifactRow:
             "high_score": self.high_score,
             "hysteresis_score": self.hysteresis_score,
             "minimum_score": self.minimum_score,
+            "high_certified_accuracy": self.high_certified_accuracy,
+            "hysteresis_certified_accuracy": self.hysteresis_certified_accuracy,
+            "minimum_certified_accuracy": self.minimum_certified_accuracy,
+            "high_certified_fraction": self.high_certified_fraction,
+            "hysteresis_certified_fraction": self.hysteresis_certified_fraction,
+            "minimum_certified_fraction": self.minimum_certified_fraction,
+            "high_mean_margin": self.high_mean_margin,
+            "hysteresis_mean_margin": self.hysteresis_mean_margin,
+            "minimum_mean_margin": self.minimum_mean_margin,
             "high_passed": self.high_passed,
             "hysteresis_passed": self.hysteresis_passed,
             "passed": self.passed,
@@ -153,6 +191,12 @@ class GrammarBranchArtifactStudy:
                     hierarchy_perturbation_threshold=classifier.hierarchy_perturbation_threshold,
                     high_score=_optional_float(high.get("complexity_penalized_validation_score")),
                     hysteresis_score=_optional_float(hysteresis.get("complexity_penalized_validation_score")),
+                    high_certified_accuracy=_optional_float(high.get("certified_validation_accuracy")),
+                    hysteresis_certified_accuracy=_optional_float(hysteresis.get("certified_validation_accuracy")),
+                    high_certified_fraction=_optional_float(high.get("certified_validation_fraction")),
+                    hysteresis_certified_fraction=_optional_float(hysteresis.get("certified_validation_fraction")),
+                    high_mean_margin=_optional_float(high.get("mean_decision_margin")),
+                    hysteresis_mean_margin=_optional_float(hysteresis.get("mean_decision_margin")),
                     high_passed=bool(high.get("passes_validation", False)),
                     hysteresis_passed=bool(hysteresis.get("passes_validation", False)),
                 )
