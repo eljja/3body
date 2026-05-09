@@ -11,6 +11,7 @@ from .gateway import GatewayTransitEstimate, gateway_transit_estimate
 from .exchange import EncounterExchangeMetrics, encounter_exchange_metrics
 from .hierarchy import HierarchicalElements, hierarchical_elements
 from .hysteresis import TransitionHysteresisLoop, detect_hysteresis_loops, hysteresis_loop_rows
+from .interpretation import InterpretationSegment, ThreeBodyInterpreter, TrajectoryInterpretation
 from .rule_miner import CandidateTransitionLaw, TransitionRuleMiner
 from .scattering import PeriapsisScatteringMap, periapsis_scattering_map
 from .pipeline import ResearchPipeline, ResearchRunResult, ResearchValidationResult
@@ -61,6 +62,7 @@ __all__ = [
     "GatewayTransitEstimate",
     "GeneralThreeBodyFeatures",
     "HierarchicalElements",
+    "InterpretationSegment",
     "LocalLinearization",
     "McGeheeCollisionDiagnostic",
     "PerturbationEnsemble",
@@ -75,6 +77,7 @@ __all__ = [
     "TransitionEventEvidence",
     "TransitionBoundaryEstimate",
     "TransitionGraph",
+    "ThreeBodyInterpreter",
     "TransitionLawValidation",
     "TransitionLawValidator",
     "TransitionHysteresisLoop",
@@ -82,6 +85,7 @@ __all__ = [
     "TransitionSample",
     "TransitionSurvey",
     "TransitionSurveyResult",
+    "TrajectoryInterpretation",
     "ShapeSpaceCoordinates",
     "feature_vector_for_report",
     "finite_difference_jacobian",
