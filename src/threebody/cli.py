@@ -346,6 +346,7 @@ def run_interpret_command(args: argparse.Namespace) -> int:
     output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"wrote {output}")
     print(f"segments={len(interpretation.segments)} transitions={len(interpretation.transitions)}")
+    print(f"regime_status={interpretation.certificate.regime_status}")
     print(f"unresolved_obligations={len(interpretation.unresolved_obligations)}")
     return 0
 

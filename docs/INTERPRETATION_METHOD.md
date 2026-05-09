@@ -12,7 +12,8 @@ The working claim is stricter and more useful:
 3. Merge consecutive states with the same dominant chart into interpretation segments.
 4. Attach a local model family to each segment.
 5. Attach a validity statement and unresolved proof obligations to each segment.
-6. Treat transitions between segments as the real research object.
+6. Emit an interpretation certificate: `theorem_ready`, `local_interpretation_available`, `regime_status`, blockers, and the path to a proof.
+7. Treat transitions between segments as the real research object.
 
 The code entry point is `ThreeBodyInterpreter`.
 The command-line entry point is:
@@ -55,3 +56,13 @@ The target is a theorem suite of the following form:
 5. The selected explanation beats negative controls and independent integrators.
 
 Only after those conditions are met can this be called an accepted interpretation theory for that regime.
+
+## Certificate Meaning
+
+- `theorem_ready`: every active segment has a resolved local bound and no unresolved obligations remain.
+- `local_interpretation_available`: every active segment has a model family and a validity statement.
+- `locally_interpretable_not_theorem_ready`: the trajectory can be explained chart-by-chart, but the proof obligations still block a theorem-level claim.
+
+This is the current honest answer to "is the three-body problem interpreted?":
+
+> Individual trajectories can now be interpreted locally by an explicit atlas. A general theorem requires completing the certificate obligations.

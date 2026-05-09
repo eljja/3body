@@ -55,5 +55,7 @@ def test_interpret_cli_writes_chart_local_segments(tmp_path) -> None:
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert exit_code == 0
     assert payload["metadata"]["kind"] == "trajectory-interpretation"
+    assert payload["summary"]["certificate"]["local_interpretation_available"] is True
+    assert payload["summary"]["certificate"]["theorem_ready"] is False
     assert payload["summary"]["segments"]
     assert payload["summary"]["unresolved_obligations"]

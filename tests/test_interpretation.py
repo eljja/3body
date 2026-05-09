@@ -18,8 +18,14 @@ def test_three_body_interpreter_returns_chart_local_claims() -> None:
     summary = interpretation.as_dict()
 
     assert interpretation.segments
+    assert interpretation.certificate.local_interpretation_available
+    assert interpretation.certificate.theorem_ready is False
+    assert interpretation.certificate.regime_status == "locally_interpretable_not_theorem_ready"
     assert summary["method_statement"]
+    assert summary["certificate"]["path_to_solution"]
     assert summary["chart_distribution"]
     assert all(segment.model_family for segment in interpretation.segments)
+    assert all(segment.proof_status for segment in interpretation.segments)
+    assert all(segment.interpretability_score > 0.0 for segment in interpretation.segments)
     assert all(segment.validity_statement for segment in interpretation.segments)
     assert interpretation.unresolved_obligations
