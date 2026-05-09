@@ -15,6 +15,11 @@ The working claim is stricter and more useful:
 6. Treat transitions between segments as the real research object.
 
 The code entry point is `ThreeBodyInterpreter`.
+The command-line entry point is:
+
+```powershell
+threebody interpret --scenario hierarchical-flyby --periods 8.0 --samples 600 --stride 20
+```
 
 ## Chart Families
 
@@ -50,4 +55,3 @@ The target is a theorem suite of the following form:
 5. The selected explanation beats negative controls and independent integrators.
 
 Only after those conditions are met can this be called an accepted interpretation theory for that regime.
-

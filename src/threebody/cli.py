@@ -7,7 +7,7 @@ from math import pi
 from pathlib import Path
 from typing import Sequence
 
-from .analysis import ResearchPipeline
+from .analysis import ResearchPipeline, ThreeBodyInterpreter
 from .experiments import (
     BoundaryResolutionStudy,
     ClassifierArtifactStudy,
@@ -113,6 +113,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-theorem-suite.json.",
     )
     theorem.set_defaults(func=run_theorem_suite_command)
+    interpret = subparsers.add_parser("interpret", help="Integrate a reference scenario and export chart-local interpretation segments.")
+    interpret.add_argument(
+        "--scenario",
+        choices=("figure-eight", "hierarchical-flyby", "restricted-l4", "restricted-l5"),
+        default="hierarchical-flyby",
+        help="Reference scenario to interpret.",
+    )
+    interpret.add_argument(
+        "--periods",
+        type=float,
+        default=0.25,
+        help="Scenario duration. For periodic scenarios this is periods; for flyby it is integration time.",
+    )
+    interpret.add_argument("--samples", type=int, default=600, help="Number of solver sample times.")
+    interpret.add_argument("--stride", type=int, default=20, help="Classification stride through the trajectory.")
+    interpret.add_argument("--rtol", type=float, default=1.0e-9, help="Adaptive integrator relative tolerance.")
+    interpret.add_argument("--atol", type=float, default=1.0e-11, help="Adaptive integrator absolute tolerance.")
+    interpret.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-interpret.json.",
+    )
+    interpret.set_defaults(func=run_interpret_command)
     return parser
 
 
@@ -288,6 +312,41 @@ def run_theorem_suite_command(args: argparse.Namespace) -> int:
     output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"wrote {output}")
     print(f"theorem_candidates={len(result.theorem_candidates)} benchmarks={len(result.benchmarks)}")
+    return 0
+
+
+def run_interpret_command(args: argparse.Namespace) -> int:
+    scenario = _scenario_from_args(args)
+    trajectory = AdaptiveIntegrator(rtol=args.rtol, atol=args.atol).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+    interpretation = ThreeBodyInterpreter().interpret(scenario.system, trajectory, stride=args.stride)
+    output = args.output or _default_output_path("interpret")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "metadata": {
+            "created_at": datetime.now(UTC).isoformat(),
+            "kind": "trajectory-interpretation",
+            "scenario": scenario.name,
+            "description": scenario.description,
+            "t_span": list(scenario.t_span),
+            "samples": 0 if scenario.t_eval is None else int(len(scenario.t_eval)),
+            "parameters": {
+                "periods": args.periods,
+                "stride": args.stride,
+                "rtol": args.rtol,
+                "atol": args.atol,
+            },
+        },
+        "summary": interpretation.as_dict(),
+    }
+    output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"wrote {output}")
+    print(f"segments={len(interpretation.segments)} transitions={len(interpretation.transitions)}")
+    print(f"unresolved_obligations={len(interpretation.unresolved_obligations)}")
     return 0
 
 
