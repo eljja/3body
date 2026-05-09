@@ -65,6 +65,8 @@ Only after those conditions are met can this be called an accepted interpretatio
 
 Hierarchy segments now include a numerical action-drift certificate: the inner Kepler action and angular momentum drift are compared against a tidal perturbation budget. This resolves a numerical certification task, but it does not replace the remaining analytic proof obligation.
 
+Periodic-neighborhood segments now include a finite-difference flow-map monodromy certificate: spectral radius, condition number, endpoint error, closure ratio, and a shadowing-radius proxy. The certificate explicitly marks whether the segment is a full-period candidate; otherwise it remains a local flow-map proxy, not a Floquet theorem.
+
 This is the current honest answer to "is the three-body problem interpreted?":
 
 > Individual trajectories can now be interpreted locally by an explicit atlas. A general theorem requires completing the certificate obligations.

@@ -28,7 +28,13 @@ from .transition_model import (
 from .transition_graph import TransitionGraph
 from .types import AnalysisReport, ChartScore, ChartTransition, ChartType
 from .validation import TransitionLawValidation, TransitionLawValidator
-from .variational import LocalLinearization, finite_difference_jacobian, local_linearization
+from .variational import (
+    LocalLinearization,
+    PeriodicMonodromyCertificate,
+    finite_difference_jacobian,
+    local_linearization,
+    periodic_monodromy_certificate,
+)
 from .word_algebra import (
     ChartWord,
     ChartWordSignature,
@@ -65,6 +71,7 @@ __all__ = [
     "HierarchyActionDriftBound",
     "InterpretationSegment",
     "LocalLinearization",
+    "PeriodicMonodromyCertificate",
     "McGeheeCollisionDiagnostic",
     "PerturbationEnsemble",
     "PerturbationMember",
@@ -102,6 +109,7 @@ __all__ = [
     "hierarchy_action_drift_bound",
     "hysteresis_loop_rows",
     "local_linearization",
+    "periodic_monodromy_certificate",
     "gateway_transit_estimate",
     "mcgehee_collision_diagnostic",
     "periapsis_scattering_map",

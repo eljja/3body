@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from threebody.analysis import finite_difference_jacobian, local_linearization
+from threebody.analysis import finite_difference_jacobian, local_linearization, periodic_monodromy_certificate
+from threebody.solvers import AdaptiveIntegrator
 from threebody.experiments import OrbitLibrary
 
 
@@ -23,3 +24,21 @@ def test_local_linearization_reports_spectral_radius() -> None:
     assert linearization.jacobian.shape == (4, 4)
     assert linearization.spectral_radius > 0.0
     assert np.all(np.isfinite(linearization.eigenvalues))
+
+
+def test_periodic_monodromy_certificate_reports_flow_map_diagnostics() -> None:
+    scenario = OrbitLibrary().general_figure_eight(periods=0.02, samples=20)
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    certificate = periodic_monodromy_certificate(scenario.system, trajectory, start_index=0, end_index=5)
+
+    assert certificate.state_dimension == scenario.initial_state.size
+    assert certificate.duration > 0.0
+    assert certificate.spectral_radius > 0.0
+    assert certificate.shadowing_radius_proxy >= 0.0
+    assert np.isfinite(certificate.endpoint_error)

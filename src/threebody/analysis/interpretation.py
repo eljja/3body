@@ -9,6 +9,7 @@ from .atlas import AnalysisAtlas
 from .error_bounds import chart_validity_bound
 from .hierarchy import hierarchy_action_drift_bound
 from .types import ChartTransition, ChartType
+from .variational import periodic_monodromy_certificate
 
 
 @dataclass(frozen=True, slots=True)
@@ -232,6 +233,17 @@ def _make_segment(
         diagnostics.update({f"hierarchy_{key}": value for key, value in hierarchy_bound.as_dict().items()})
         if hierarchy_bound.bound_satisfied:
             resolved_obligations = ("numerically certify hierarchy action drift against perturbation budget",)
+    if chart == ChartType.PERIODIC_ORBIT_NEIGHBORHOOD and hasattr(system, "rhs"):
+        mono_start = max(0, start_index - stride)
+        mono_end = min(len(trajectory.t) - 1, max(end_index, mono_start + 1))
+        monodromy = periodic_monodromy_certificate(system, trajectory, start_index=mono_start, end_index=mono_end)
+        diagnostics.update({f"monodromy_{key}": value for key, value in monodromy.as_dict().items()})
+        if monodromy.numerically_resolved:
+            resolved_obligations = (
+                *resolved_obligations,
+                "numerically compute segment flow-map monodromy",
+                "estimate numerical shadowing radius proxy",
+            )
     return InterpretationSegment(
         start_index=start_index,
         end_index=end_index,
