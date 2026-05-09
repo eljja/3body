@@ -28,4 +28,6 @@ def test_three_body_interpreter_returns_chart_local_claims() -> None:
     assert all(segment.proof_status for segment in interpretation.segments)
     assert all(segment.interpretability_score > 0.0 for segment in interpretation.segments)
     assert all(segment.validity_statement for segment in interpretation.segments)
+    hierarchy_segments = [segment for segment in interpretation.segments if segment.chart.value == "two_body_hierarchy"]
+    assert not hierarchy_segments or "hierarchy_relative_action_drift" in hierarchy_segments[0].diagnostics
     assert interpretation.unresolved_obligations

@@ -7,6 +7,7 @@ import numpy as np
 from ..types import TrajectoryResult
 from .atlas import AnalysisAtlas
 from .error_bounds import chart_validity_bound
+from .hierarchy import hierarchy_action_drift_bound
 from .types import ChartTransition, ChartType
 
 
@@ -27,6 +28,8 @@ class InterpretationSegment:
     interpretability_score: float
     confidence_min: float
     confidence_mean: float
+    diagnostics: dict[str, float | int | bool | str | tuple[int, int]] = field(default_factory=dict)
+    resolved_obligations: tuple[str, ...] = ()
     unresolved_obligations: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, float | int | str | list[str]]:
@@ -44,6 +47,8 @@ class InterpretationSegment:
             "interpretability_score": self.interpretability_score,
             "confidence_min": self.confidence_min,
             "confidence_mean": self.confidence_mean,
+            "diagnostics": self.diagnostics,
+            "resolved_obligations": list(self.resolved_obligations),
             "unresolved_obligations": list(self.unresolved_obligations),
         }
 
@@ -60,6 +65,7 @@ class InterpretationCertificate:
     minimum_confidence: float | None
     mean_interpretability_score: float | None
     primary_blockers: tuple[str, ...]
+    resolved_obligations: tuple[str, ...]
     path_to_solution: tuple[str, ...]
 
     def as_dict(self) -> dict[str, bool | float | int | str | list[str] | None]:
@@ -72,6 +78,7 @@ class InterpretationCertificate:
             "minimum_confidence": self.minimum_confidence,
             "mean_interpretability_score": self.mean_interpretability_score,
             "primary_blockers": list(self.primary_blockers),
+            "resolved_obligations": list(self.resolved_obligations),
             "path_to_solution": list(self.path_to_solution),
         }
 
@@ -93,6 +100,13 @@ class TrajectoryInterpretation:
         return tuple(dict.fromkeys(obligations))
 
     @property
+    def resolved_obligations(self) -> tuple[str, ...]:
+        obligations = []
+        for segment in self.segments:
+            obligations.extend(segment.resolved_obligations)
+        return tuple(dict.fromkeys(obligations))
+
+    @property
     def certificate(self) -> InterpretationCertificate:
         if not self.segments:
             return InterpretationCertificate(
@@ -104,6 +118,7 @@ class TrajectoryInterpretation:
                 minimum_confidence=None,
                 mean_interpretability_score=None,
                 primary_blockers=("no chart segment was classified",),
+                resolved_obligations=(),
                 path_to_solution=_path_to_solution(),
             )
         minimum_confidence = float(min(segment.confidence_min for segment in self.segments))
@@ -125,6 +140,7 @@ class TrajectoryInterpretation:
             minimum_confidence=minimum_confidence,
             mean_interpretability_score=mean_score,
             primary_blockers=self.unresolved_obligations[:5],
+            resolved_obligations=self.resolved_obligations,
             path_to_solution=_path_to_solution(),
         )
 
@@ -144,6 +160,7 @@ class TrajectoryInterpretation:
                 for transition in self.transitions
             ],
             "chart_distribution": {chart.value: fraction for chart, fraction in self.chart_distribution.items()},
+            "resolved_obligations": list(self.resolved_obligations),
             "unresolved_obligations": list(self.unresolved_obligations),
         }
 
@@ -159,7 +176,7 @@ class ThreeBodyInterpreter:
             raise ValueError("stride must be >= 1.")
         reports = self.atlas.analyze_trajectory(system, trajectory, stride=stride)
         transitions = self.atlas.transitions(system, trajectory, stride=stride)
-        segments = _segments_from_reports(reports, trajectory, stride)
+        segments = _segments_from_reports(system, reports, trajectory, stride)
         return TrajectoryInterpretation(
             method_statement=(
                 "No global closed form is asserted. The trajectory is interpreted by a finite atlas of local "
@@ -172,6 +189,7 @@ class ThreeBodyInterpreter:
 
 
 def _segments_from_reports(
+    system: object,
     reports: tuple[object, ...],
     trajectory: TrajectoryResult,
     stride: int,
@@ -184,14 +202,15 @@ def _segments_from_reports(
     for index, report in enumerate(reports[1:], start=1):
         if report.primary_chart == current_chart:
             continue
-        segments.append(_make_segment(reports[start:index], trajectory, stride, start, index - 1))
+        segments.append(_make_segment(system, reports[start:index], trajectory, stride, start, index - 1))
         start = index
         current_chart = report.primary_chart
-    segments.append(_make_segment(reports[start:], trajectory, stride, start, len(reports) - 1))
+    segments.append(_make_segment(system, reports[start:], trajectory, stride, start, len(reports) - 1))
     return tuple(segments)
 
 
 def _make_segment(
+    system: object,
     reports: tuple[object, ...],
     trajectory: TrajectoryResult,
     stride: int,
@@ -204,6 +223,15 @@ def _make_segment(
     confidences = np.asarray([report.confidence for report in reports], dtype=float)
     start_index = min(report_start * stride, len(trajectory.t) - 1)
     end_index = min(report_end * stride, len(trajectory.t) - 1)
+    diagnostics: dict[str, float | int | bool | str | tuple[int, int]] = {}
+    resolved_obligations: tuple[str, ...] = ()
+    if chart == ChartType.TWO_BODY_HIERARCHY and getattr(system, "body_count", None) == 3:
+        bound_start = max(0, start_index - stride)
+        bound_end = min(len(trajectory.t) - 1, max(end_index + stride, start_index + 1))
+        hierarchy_bound = hierarchy_action_drift_bound(system, trajectory, start_index=bound_start, end_index=bound_end)
+        diagnostics.update({f"hierarchy_{key}": value for key, value in hierarchy_bound.as_dict().items()})
+        if hierarchy_bound.bound_satisfied:
+            resolved_obligations = ("numerically certify hierarchy action drift against perturbation budget",)
     return InterpretationSegment(
         start_index=start_index,
         end_index=end_index,
@@ -218,19 +246,21 @@ def _make_segment(
         interpretability_score=float(model["interpretability_score"]),
         confidence_min=float(np.min(confidences)),
         confidence_mean=float(np.mean(confidences)),
+        diagnostics=diagnostics,
+        resolved_obligations=resolved_obligations,
         unresolved_obligations=tuple(model["unresolved_obligations"]),
     )
 
 
-def _model_for_chart(chart: ChartType) -> dict[str, str | tuple[str, ...]]:
-    models: dict[ChartType, dict[str, str | tuple[str, ...]]] = {
+def _model_for_chart(chart: ChartType) -> dict[str, str | float | tuple[str, ...]]:
+    models: dict[ChartType, dict[str, str | float | tuple[str, ...]]] = {
         ChartType.TWO_BODY_HIERARCHY: {
             "model_family": "osculating_kepler_plus_tidal_perturbation",
             "local_claim": "Treat the tight pair as an osculating Kepler binary driven by third-body tidal forcing.",
             "proof_status": "perturbative_local_model_available",
             "interpretability_score": 0.7,
             "unresolved_obligations": (
-                "derive hierarchy action drift bounds",
+                "prove analytic hierarchy action drift bound",
                 "separate resonant and nonresonant hierarchy intervals",
             ),
         },

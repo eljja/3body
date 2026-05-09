@@ -63,6 +63,8 @@ Only after those conditions are met can this be called an accepted interpretatio
 - `local_interpretation_available`: every active segment has a model family and a validity statement.
 - `locally_interpretable_not_theorem_ready`: the trajectory can be explained chart-by-chart, but the proof obligations still block a theorem-level claim.
 
+Hierarchy segments now include a numerical action-drift certificate: the inner Kepler action and angular momentum drift are compared against a tidal perturbation budget. This resolves a numerical certification task, but it does not replace the remaining analytic proof obligation.
+
 This is the current honest answer to "is the three-body problem interpreted?":
 
 > Individual trajectories can now be interpreted locally by an explicit atlas. A general theorem requires completing the certificate obligations.

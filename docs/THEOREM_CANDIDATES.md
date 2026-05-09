@@ -19,6 +19,7 @@ Current proof status:
 - `ReducedThreeBodyState` exists.
 - Hierarchy, collision, gateway, escape, and scattering diagnostics exist.
 - `ThreeBodyInterpreter` now converts a trajectory into chart-local interpretation segments with model families, validity statements, and unresolved proof obligations.
+- Hierarchy interpretation now emits a numerical inner-action drift certificate against a tidal perturbation budget. The analytic drift theorem is still open.
 - Held-out and artifact guardrails exist.
 - No theorem-level covering proof exists.
 

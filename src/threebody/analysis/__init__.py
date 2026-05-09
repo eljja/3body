@@ -9,7 +9,7 @@ from .events import TransitionEventEvidence, transition_event_evidence, transiti
 from .error_bounds import ChartValidityBound, chart_validity_bound
 from .gateway import GatewayTransitEstimate, gateway_transit_estimate
 from .exchange import EncounterExchangeMetrics, encounter_exchange_metrics
-from .hierarchy import HierarchicalElements, hierarchical_elements
+from .hierarchy import HierarchicalElements, HierarchyActionDriftBound, hierarchical_elements, hierarchy_action_drift_bound
 from .hysteresis import TransitionHysteresisLoop, detect_hysteresis_loops, hysteresis_loop_rows
 from .interpretation import InterpretationSegment, ThreeBodyInterpreter, TrajectoryInterpretation
 from .rule_miner import CandidateTransitionLaw, TransitionRuleMiner
@@ -62,6 +62,7 @@ __all__ = [
     "GatewayTransitEstimate",
     "GeneralThreeBodyFeatures",
     "HierarchicalElements",
+    "HierarchyActionDriftBound",
     "InterpretationSegment",
     "LocalLinearization",
     "McGeheeCollisionDiagnostic",
@@ -98,6 +99,7 @@ __all__ = [
     "detect_hysteresis_loops",
     "encounter_exchange_metrics",
     "hierarchical_elements",
+    "hierarchy_action_drift_bound",
     "hysteresis_loop_rows",
     "local_linearization",
     "gateway_transit_estimate",
