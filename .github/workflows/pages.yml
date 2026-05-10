@@ -29,9 +29,6 @@ jobs:
       - name: Install package
         run: python -m pip install -e .
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
       - name: Build static visualizer
         run: python -m threebody.ui.static_site --output site
 
