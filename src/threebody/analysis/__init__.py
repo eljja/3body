@@ -9,6 +9,7 @@ from .collision import (
     LeviCivitaEquivalenceCertificate,
     LeviCivitaFlowCertificate,
     LeviCivitaRegularizedFlowState,
+    LeviCivitaTidalBoundCertificate,
     McGeheeCollisionDiagnostic,
     collision_regularization_certificate,
     levi_civita_binary_chart,
@@ -16,6 +17,7 @@ from .collision import (
     levi_civita_equivalence_certificate,
     levi_civita_flow_certificate,
     levi_civita_regularized_flow_state,
+    levi_civita_tidal_bound_certificate,
     mcgehee_collision_diagnostic,
 )
 from .coordinates import GeneralThreeBodyFeatures, RestrictedThreeBodyFeatures
@@ -100,6 +102,7 @@ __all__ = [
     "LeviCivitaEquivalenceCertificate",
     "LeviCivitaFlowCertificate",
     "LeviCivitaRegularizedFlowState",
+    "LeviCivitaTidalBoundCertificate",
     "LocalLinearization",
     "PeriodicMonodromyCertificate",
     "McGeheeCollisionDiagnostic",
@@ -148,6 +151,7 @@ __all__ = [
     "levi_civita_equivalence_certificate",
     "levi_civita_flow_certificate",
     "levi_civita_regularized_flow_state",
+    "levi_civita_tidal_bound_certificate",
     "periodic_monodromy_certificate",
     "gateway_transit_estimate",
     "restricted_chart_certificate",

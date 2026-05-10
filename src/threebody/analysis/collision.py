@@ -170,6 +170,32 @@ class LeviCivitaEquivalenceCertificate:
 
 
 @dataclass(frozen=True, slots=True)
+class LeviCivitaTidalBoundCertificate:
+    """Conservative third-body tidal bound relative to the inner Kepler core."""
+
+    sample_count: int
+    pair: tuple[int, int]
+    minimum_outer_distance: float
+    maximum_inner_distance: float
+    tidal_constant_bound: float
+    maximum_bound_ratio: float
+    maximum_observed_ratio: float
+    bound_satisfied: bool
+
+    def as_dict(self) -> dict[str, float | int | bool | tuple[int, int]]:
+        return {
+            "sample_count": self.sample_count,
+            "pair": self.pair,
+            "minimum_outer_distance": self.minimum_outer_distance,
+            "maximum_inner_distance": self.maximum_inner_distance,
+            "tidal_constant_bound": self.tidal_constant_bound,
+            "maximum_bound_ratio": self.maximum_bound_ratio,
+            "maximum_observed_ratio": self.maximum_observed_ratio,
+            "bound_satisfied": self.bound_satisfied,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class CollisionRegularizationCertificate:
     """Interval-level certificate that raw coordinates should be replaced near collision."""
 
@@ -470,6 +496,62 @@ def levi_civita_equivalence_certificate(
     )
 
 
+def levi_civita_tidal_bound_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    start_index: int = 0,
+    end_index: int | None = None,
+    pair: tuple[int, int] | None = None,
+) -> LeviCivitaTidalBoundCertificate:
+    """Bound third-body forcing by a tidal Lipschitz constant on a finite interval."""
+
+    if getattr(system, "body_count", None) != 3:
+        raise TypeError("levi_civita_tidal_bound_certificate requires a general three-body system.")
+    if getattr(system, "dimension", None) != 2:
+        raise ValueError("levi_civita_tidal_bound_certificate is only implemented for planar systems.")
+    end = len(trajectory.t) - 1 if end_index is None else min(end_index, len(trajectory.t) - 1)
+    start = max(0, min(start_index, end))
+    if pair is None:
+        pair = _dominant_close_pair(system, trajectory, start, end)
+    i, j = pair
+    outer = next(index for index in range(3) if index not in pair)
+    masses = np.asarray(system.masses, dtype=float)
+    inner_mass = float(masses[i] + masses[j])
+    outer_mass = float(masses[outer])
+    minimum_outer_distance = np.inf
+    maximum_inner_distance = 0.0
+    maximum_observed_ratio = 0.0
+    maximum_bound_ratio = 0.0
+    maximum_tidal_constant = 0.0
+    for state in trajectory.y[start : end + 1]:
+        positions, _velocities = system.split_state(state)
+        inner_distance = float(np.linalg.norm(positions[j] - positions[i]))
+        outer_distance = float(
+            min(
+                np.linalg.norm(positions[outer] - positions[i]),
+                np.linalg.norm(positions[outer] - positions[j]),
+            )
+        )
+        minimum_outer_distance = min(minimum_outer_distance, outer_distance)
+        maximum_inner_distance = max(maximum_inner_distance, inner_distance)
+        tidal_constant = float((2.0 * outer_mass / inner_mass) / max(outer_distance**3, 1.0e-18))
+        bound_ratio = float(tidal_constant * inner_distance**3)
+        maximum_tidal_constant = max(maximum_tidal_constant, tidal_constant)
+        maximum_bound_ratio = max(maximum_bound_ratio, bound_ratio)
+        observed_ratio = _observed_perturbation_to_kepler_ratio(system, state, pair)
+        maximum_observed_ratio = max(maximum_observed_ratio, observed_ratio)
+    return LeviCivitaTidalBoundCertificate(
+        sample_count=end - start + 1,
+        pair=pair,
+        minimum_outer_distance=float(minimum_outer_distance),
+        maximum_inner_distance=maximum_inner_distance,
+        tidal_constant_bound=maximum_tidal_constant,
+        maximum_bound_ratio=maximum_bound_ratio,
+        maximum_observed_ratio=maximum_observed_ratio,
+        bound_satisfied=maximum_observed_ratio <= maximum_bound_ratio,
+    )
+
+
 def collision_regularization_certificate(
     system: object,
     trajectory: TrajectoryResult,
@@ -592,6 +674,21 @@ def _regularized_flow_residual(
         finite_difference = (u_primes[index + 1] - u_primes[index - 1]) / denominator
         residuals.append(float(np.linalg.norm(finite_difference - flow_states[index].u_double_prime)))
     return None if not residuals else float(max(residuals))
+
+
+def _observed_perturbation_to_kepler_ratio(system: object, state: np.ndarray, pair: tuple[int, int]) -> float:
+    positions, _velocities = system.split_state(state)
+    i, j = pair
+    masses = np.asarray(system.masses, dtype=float)
+    accelerations = system.acceleration_field(positions)
+    relative_acceleration = np.asarray(accelerations[j] - accelerations[i], dtype=float)
+    relative_position = np.asarray(positions[j] - positions[i], dtype=float)
+    radius = float(np.linalg.norm(relative_position))
+    mu = float(system.gravitational_constant * (masses[i] + masses[j]))
+    kepler_acceleration = -mu * relative_position / max(radius**3, 1.0e-18)
+    perturbation = relative_acceleration - kepler_acceleration
+    kepler_norm = mu / max(radius**2, 1.0e-18)
+    return float(np.linalg.norm(perturbation) / max(kepler_norm, 1.0e-18))
 
 
 def _levi_civita_velocity(u: np.ndarray, u_prime: np.ndarray) -> np.ndarray:

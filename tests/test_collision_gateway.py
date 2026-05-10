@@ -10,6 +10,7 @@ from threebody.analysis import (
     levi_civita_equivalence_certificate,
     levi_civita_flow_certificate,
     levi_civita_regularized_flow_state,
+    levi_civita_tidal_bound_certificate,
     mcgehee_collision_diagnostic,
     restricted_chart_certificate,
 )
@@ -170,6 +171,26 @@ def test_levi_civita_equivalence_certificate_reconstructs_inertial_dynamics() ->
     assert certificate.maximum_position_residual < 1.0e-10
     assert certificate.maximum_velocity_residual < 1.0e-10
     assert certificate.maximum_acceleration_residual < 1.0e-8
+
+
+def test_levi_civita_tidal_bound_certificate_bounds_observed_perturbation() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 1.0, 0.05), dimension=2)
+    state = system.flatten_state(
+        np.array([[-0.01, 0.0], [0.01, 0.0], [1.0, 0.2]], dtype=float),
+        np.zeros((3, 2), dtype=float),
+    )
+    trajectory = TrajectoryResult(
+        t=np.array([0.0, 1.0]),
+        y=np.vstack([state, state]),
+        success=True,
+        message="synthetic tidal bound",
+    )
+
+    certificate = levi_civita_tidal_bound_certificate(system, trajectory, pair=(0, 1))
+
+    assert certificate.bound_satisfied is True
+    assert certificate.tidal_constant_bound > 0.0
+    assert certificate.maximum_observed_ratio <= certificate.maximum_bound_ratio
 
 
 def test_gateway_transit_estimate_reports_neck_openness() -> None:

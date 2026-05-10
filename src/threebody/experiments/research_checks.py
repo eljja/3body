@@ -12,6 +12,7 @@ from ..analysis import (
     gateway_transit_estimate,
     levi_civita_equivalence_certificate,
     levi_civita_flow_certificate,
+    levi_civita_tidal_bound_certificate,
     local_linearization,
     mcgehee_collision_diagnostic,
     reduced_three_body_state,
@@ -643,6 +644,9 @@ class NearCollisionScalingRow:
     maximum_perturbation_acceleration_norm: float
     maximum_perturbation_to_kepler_ratio: float
     tidal_constant_estimate: float
+    tidal_lipschitz_constant_bound: float
+    tidal_bound_ratio: float
+    tidal_bound_satisfied: bool
     maximum_finite_difference_residual: float | None
     normalized_residual: float | None
     maximum_equivalence_acceleration_residual: float
@@ -659,6 +663,9 @@ class NearCollisionScalingRow:
             "maximum_perturbation_acceleration_norm": self.maximum_perturbation_acceleration_norm,
             "maximum_perturbation_to_kepler_ratio": self.maximum_perturbation_to_kepler_ratio,
             "tidal_constant_estimate": self.tidal_constant_estimate,
+            "tidal_lipschitz_constant_bound": self.tidal_lipschitz_constant_bound,
+            "tidal_bound_ratio": self.tidal_bound_ratio,
+            "tidal_bound_satisfied": self.tidal_bound_satisfied,
             "maximum_finite_difference_residual": self.maximum_finite_difference_residual,
             "normalized_residual": self.normalized_residual,
             "maximum_equivalence_acceleration_residual": self.maximum_equivalence_acceleration_residual,
@@ -676,6 +683,7 @@ class NearCollisionScalingResult:
     maximum_allowed_perturbation_ratio: float = 5.0e-7
     minimum_allowed_perturbation_ratio_slope: float = 2.5
     maximum_allowed_tidal_constant: float = 6.0e-2
+    maximum_allowed_tidal_lipschitz_constant: float = 8.0e-2
 
     @property
     def minimum_pair_distance(self) -> float | None:
@@ -729,8 +737,18 @@ class NearCollisionScalingResult:
         return None if not self.rows else float(max(row.tidal_constant_estimate for row in self.rows))
 
     @property
+    def tidal_lipschitz_constant_bound(self) -> float | None:
+        return None if not self.rows else float(max(row.tidal_lipschitz_constant_bound for row in self.rows))
+
+    @property
     def tidal_bound_resolved(self) -> bool:
-        return self.tidal_constant_bound is not None and self.tidal_constant_bound <= self.maximum_allowed_tidal_constant
+        return (
+            self.tidal_constant_bound is not None
+            and self.tidal_constant_bound <= self.maximum_allowed_tidal_constant
+            and self.tidal_lipschitz_constant_bound is not None
+            and self.tidal_lipschitz_constant_bound <= self.maximum_allowed_tidal_lipschitz_constant
+            and all(row.tidal_bound_satisfied for row in self.rows)
+        )
 
     @property
     def pass_rate(self) -> float:
@@ -766,6 +784,7 @@ class NearCollisionScalingResult:
             "maximum_allowed_perturbation_ratio": self.maximum_allowed_perturbation_ratio,
             "minimum_allowed_perturbation_ratio_slope": self.minimum_allowed_perturbation_ratio_slope,
             "maximum_allowed_tidal_constant": self.maximum_allowed_tidal_constant,
+            "maximum_allowed_tidal_lipschitz_constant": self.maximum_allowed_tidal_lipschitz_constant,
             "minimum_pair_distance": self.minimum_pair_distance,
             "maximum_residual": self.maximum_residual,
             "maximum_normalized_residual": self.maximum_normalized_residual,
@@ -775,6 +794,7 @@ class NearCollisionScalingResult:
             "maximum_perturbation_to_kepler_ratio": self.maximum_perturbation_to_kepler_ratio,
             "perturbation_ratio_scaling_exponent": self.perturbation_ratio_scaling_exponent,
             "tidal_constant_bound": self.tidal_constant_bound,
+            "tidal_lipschitz_constant_bound": self.tidal_lipschitz_constant_bound,
             "tidal_bound_resolved": self.tidal_bound_resolved,
             "pass_rate": self.pass_rate,
             "scaling_resolved": self.scaling_resolved,
@@ -822,6 +842,7 @@ class NearCollisionScalingStudy:
                 residual_tolerance=self.residual_threshold,
             )
             equivalence = levi_civita_equivalence_certificate(scenario.system, trajectory, pair=(0, 1))
+            tidal_bound = levi_civita_tidal_bound_certificate(scenario.system, trajectory, pair=(0, 1))
             normalized = (
                 None
                 if certificate.maximum_finite_difference_residual is None
@@ -847,6 +868,9 @@ class NearCollisionScalingStudy:
                     maximum_perturbation_acceleration_norm=certificate.maximum_perturbation_acceleration_norm,
                     maximum_perturbation_to_kepler_ratio=perturbation_ratio,
                     tidal_constant_estimate=tidal_constant,
+                    tidal_lipschitz_constant_bound=tidal_bound.tidal_constant_bound,
+                    tidal_bound_ratio=tidal_bound.maximum_bound_ratio,
+                    tidal_bound_satisfied=tidal_bound.bound_satisfied,
                     maximum_finite_difference_residual=certificate.maximum_finite_difference_residual,
                     normalized_residual=normalized,
                     maximum_equivalence_acceleration_residual=equivalence.maximum_acceleration_residual,

@@ -94,6 +94,8 @@ def test_near_collision_scaling_study_controls_normalized_residual() -> None:
     assert result.perturbation_ratio_scaling_exponent >= result.minimum_allowed_perturbation_ratio_slope
     assert result.tidal_constant_bound is not None
     assert result.tidal_constant_bound <= result.maximum_allowed_tidal_constant
+    assert result.tidal_lipschitz_constant_bound is not None
+    assert result.tidal_lipschitz_constant_bound <= result.maximum_allowed_tidal_lipschitz_constant
     assert result.tidal_bound_resolved is True
 
 

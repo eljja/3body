@@ -487,6 +487,17 @@ def _paper_benchmarks(
             ),
         ),
         PaperBenchmarkResult(
+            name="levi_civita_tidal_lipschitz_bound",
+            passed=near_collision.tidal_bound_resolved,
+            metric="tidal_lipschitz_constant_bound",
+            observed=near_collision.tidal_lipschitz_constant_bound,
+            threshold=near_collision.maximum_allowed_tidal_lipschitz_constant,
+            interpretation=(
+                "A conservative Lipschitz tidal bound should dominate the observed third-body perturbation "
+                "over the near-collision scaling grid."
+            ),
+        ),
+        PaperBenchmarkResult(
             name="low_crossing_scattering_map_score",
             passed=low_scattering_score is not None and low_scattering_score > 0.25,
             metric="complexity_penalized_validation_score",
@@ -850,6 +861,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     levi_civita_slope_passed = benchmark_by_name["levi_civita_normalized_residual_slope"].passed
     levi_civita_tidal_passed = benchmark_by_name["levi_civita_tidal_perturbation_scaling"].passed
     levi_civita_tidal_bound_passed = benchmark_by_name["levi_civita_tidal_constant_bound"].passed
+    levi_civita_lipschitz_bound_passed = benchmark_by_name["levi_civita_tidal_lipschitz_bound"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
         TheoremCandidate(
@@ -889,6 +901,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                             and levi_civita_slope_passed
                             and levi_civita_tidal_passed
                             and levi_civita_tidal_bound_passed
+                            and levi_civita_lipschitz_bound_passed
                         )
                         else "open"
                     ),
@@ -896,8 +909,8 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                         "Levi-Civita binary chart reconstruction and perturbation-aware regularized RHS are "
                         "certified, the current integrated residual grid passes, and local inertial equivalence "
                         "residuals are controlled through the current near-collision scaling grid. The third-body "
-                        "perturbation also satisfies an explicit finite tidal bound relative to the inner Kepler core. "
-                        "A collision manifold theorem remains open."
+                        "perturbation also satisfies explicit finite and Lipschitz tidal bounds relative to the "
+                        "inner Kepler core. A collision manifold theorem remains open."
                     ),
                     "Turn the finite near-collision scaling certificate into an analytic limiting bound.",
                 ),
