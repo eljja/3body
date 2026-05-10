@@ -88,6 +88,10 @@ def test_near_collision_scaling_study_controls_normalized_residual() -> None:
     assert result.normalized_residual_scaling_exponent is not None
     assert result.normalized_residual_scaling_exponent >= result.minimum_allowed_normalized_slope
     assert result.absolute_residual_scaling_exponent is not None
+    assert result.maximum_perturbation_to_kepler_ratio is not None
+    assert result.maximum_perturbation_to_kepler_ratio <= result.maximum_allowed_perturbation_ratio
+    assert result.perturbation_ratio_scaling_exponent is not None
+    assert result.perturbation_ratio_scaling_exponent >= result.minimum_allowed_perturbation_ratio_slope
 
 
 def test_known_benchmarks_and_regime_probes_return_rows() -> None:

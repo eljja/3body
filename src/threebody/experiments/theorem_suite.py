@@ -460,6 +460,22 @@ def _paper_benchmarks(
             ),
         ),
         PaperBenchmarkResult(
+            name="levi_civita_tidal_perturbation_scaling",
+            passed=near_collision.perturbation_ratio_scaling_exponent is not None
+            and near_collision.perturbation_ratio_scaling_exponent
+            >= near_collision.minimum_allowed_perturbation_ratio_slope
+            and near_collision.maximum_perturbation_to_kepler_ratio is not None
+            and near_collision.maximum_perturbation_to_kepler_ratio
+            <= near_collision.maximum_allowed_perturbation_ratio,
+            metric="perturbation_ratio_loglog_slope",
+            observed=near_collision.perturbation_ratio_scaling_exponent,
+            threshold=near_collision.minimum_allowed_perturbation_ratio_slope,
+            interpretation=(
+                "The third-body perturbation should shrink relative to the inner Kepler acceleration with "
+                "approximately tidal scaling as binary separation decreases."
+            ),
+        ),
+        PaperBenchmarkResult(
             name="low_crossing_scattering_map_score",
             passed=low_scattering_score is not None and low_scattering_score > 0.25,
             metric="complexity_penalized_validation_score",
@@ -821,6 +837,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     levi_civita_equivalence_passed = benchmark_by_name["levi_civita_local_equivalence"].passed
     levi_civita_near_collision_passed = benchmark_by_name["levi_civita_near_collision_scaling"].passed
     levi_civita_slope_passed = benchmark_by_name["levi_civita_normalized_residual_slope"].passed
+    levi_civita_tidal_passed = benchmark_by_name["levi_civita_tidal_perturbation_scaling"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
         TheoremCandidate(
@@ -858,13 +875,15 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                             and levi_civita_equivalence_passed
                             and levi_civita_near_collision_passed
                             and levi_civita_slope_passed
+                            and levi_civita_tidal_passed
                         )
                         else "open"
                     ),
                     (
                         "Levi-Civita binary chart reconstruction and perturbation-aware regularized RHS are "
                         "certified, the current integrated residual grid passes, and local inertial equivalence "
-                        "residuals are controlled through the current near-collision scaling grid. A collision "
+                        "residuals are controlled through the current near-collision scaling grid. The third-body "
+                        "perturbation also shows tidal shrinkage relative to the inner Kepler core. A collision "
                         "manifold theorem remains open."
                     ),
                     "Turn the finite near-collision scaling certificate into an analytic limiting bound.",

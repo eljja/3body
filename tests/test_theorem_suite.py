@@ -20,6 +20,7 @@ def test_theorem_suite_reports_candidates_and_benchmarks() -> None:
     assert any(benchmark["name"] == "levi_civita_local_equivalence" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "levi_civita_near_collision_scaling" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "levi_civita_normalized_residual_slope" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "levi_civita_tidal_perturbation_scaling" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "low_crossing_scattering_map_selection" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "best_low_crossing_model_validation" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "best_hysteresis_width_model_validation" for benchmark in summary["benchmarks"])

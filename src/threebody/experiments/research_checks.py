@@ -640,6 +640,8 @@ class NearCollisionScalingRow:
     sample_count: int
     minimum_pair_distance: float
     maximum_rhs_norm: float
+    maximum_perturbation_acceleration_norm: float
+    maximum_perturbation_to_kepler_ratio: float
     maximum_finite_difference_residual: float | None
     normalized_residual: float | None
     maximum_equivalence_acceleration_residual: float
@@ -653,6 +655,8 @@ class NearCollisionScalingRow:
             "sample_count": self.sample_count,
             "minimum_pair_distance": self.minimum_pair_distance,
             "maximum_rhs_norm": self.maximum_rhs_norm,
+            "maximum_perturbation_acceleration_norm": self.maximum_perturbation_acceleration_norm,
+            "maximum_perturbation_to_kepler_ratio": self.maximum_perturbation_to_kepler_ratio,
             "maximum_finite_difference_residual": self.maximum_finite_difference_residual,
             "normalized_residual": self.normalized_residual,
             "maximum_equivalence_acceleration_residual": self.maximum_equivalence_acceleration_residual,
@@ -667,6 +671,8 @@ class NearCollisionScalingResult:
     residual_threshold: float
     normalized_residual_threshold: float
     minimum_allowed_normalized_slope: float = -0.25
+    maximum_allowed_perturbation_ratio: float = 5.0e-7
+    minimum_allowed_perturbation_ratio_slope: float = 2.5
 
     @property
     def minimum_pair_distance(self) -> float | None:
@@ -705,6 +711,17 @@ class NearCollisionScalingResult:
         )
 
     @property
+    def maximum_perturbation_to_kepler_ratio(self) -> float | None:
+        return None if not self.rows else float(max(row.maximum_perturbation_to_kepler_ratio for row in self.rows))
+
+    @property
+    def perturbation_ratio_scaling_exponent(self) -> float | None:
+        return _loglog_slope(
+            tuple(row.minimum_pair_distance for row in self.rows),
+            tuple(row.maximum_perturbation_to_kepler_ratio for row in self.rows),
+        )
+
+    @property
     def pass_rate(self) -> float:
         if not self.rows:
             return 0.0
@@ -713,6 +730,7 @@ class NearCollisionScalingResult:
     @property
     def scaling_resolved(self) -> bool:
         slope = self.normalized_residual_scaling_exponent
+        perturbation_slope = self.perturbation_ratio_scaling_exponent
         return (
             self.pass_rate == 1.0
             and self.maximum_residual is not None
@@ -721,6 +739,10 @@ class NearCollisionScalingResult:
             and self.maximum_normalized_residual <= self.normalized_residual_threshold
             and slope is not None
             and slope >= self.minimum_allowed_normalized_slope
+            and self.maximum_perturbation_to_kepler_ratio is not None
+            and self.maximum_perturbation_to_kepler_ratio <= self.maximum_allowed_perturbation_ratio
+            and perturbation_slope is not None
+            and perturbation_slope >= self.minimum_allowed_perturbation_ratio_slope
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -729,12 +751,16 @@ class NearCollisionScalingResult:
             "residual_threshold": self.residual_threshold,
             "normalized_residual_threshold": self.normalized_residual_threshold,
             "minimum_allowed_normalized_slope": self.minimum_allowed_normalized_slope,
+            "maximum_allowed_perturbation_ratio": self.maximum_allowed_perturbation_ratio,
+            "minimum_allowed_perturbation_ratio_slope": self.minimum_allowed_perturbation_ratio_slope,
             "minimum_pair_distance": self.minimum_pair_distance,
             "maximum_residual": self.maximum_residual,
             "maximum_normalized_residual": self.maximum_normalized_residual,
             "maximum_equivalence_acceleration_residual": self.maximum_equivalence_acceleration_residual,
             "normalized_residual_scaling_exponent": self.normalized_residual_scaling_exponent,
             "absolute_residual_scaling_exponent": self.absolute_residual_scaling_exponent,
+            "maximum_perturbation_to_kepler_ratio": self.maximum_perturbation_to_kepler_ratio,
+            "perturbation_ratio_scaling_exponent": self.perturbation_ratio_scaling_exponent,
             "pass_rate": self.pass_rate,
             "scaling_resolved": self.scaling_resolved,
         }
@@ -786,6 +812,15 @@ class NearCollisionScalingStudy:
                 if certificate.maximum_finite_difference_residual is None
                 else float(certificate.maximum_finite_difference_residual / max(certificate.maximum_rhs_norm, 1.0e-18))
             )
+            masses = np.asarray(scenario.system.masses, dtype=float)
+            kepler_acceleration = float(
+                scenario.system.gravitational_constant
+                * (masses[0] + masses[1])
+                / max(certificate.minimum_radius**2, 1.0e-18)
+            )
+            perturbation_ratio = float(
+                certificate.maximum_perturbation_acceleration_norm / max(kepler_acceleration, 1.0e-18)
+            )
             rows.append(
                 NearCollisionScalingRow(
                     binary_separation=separation,
@@ -793,6 +828,8 @@ class NearCollisionScalingStudy:
                     sample_count=certificate.sample_count,
                     minimum_pair_distance=certificate.minimum_radius,
                     maximum_rhs_norm=certificate.maximum_rhs_norm,
+                    maximum_perturbation_acceleration_norm=certificate.maximum_perturbation_acceleration_norm,
+                    maximum_perturbation_to_kepler_ratio=perturbation_ratio,
                     maximum_finite_difference_residual=certificate.maximum_finite_difference_residual,
                     normalized_residual=normalized,
                     maximum_equivalence_acceleration_residual=equivalence.maximum_acceleration_residual,
