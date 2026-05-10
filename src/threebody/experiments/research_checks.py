@@ -642,6 +642,7 @@ class NearCollisionScalingRow:
     maximum_rhs_norm: float
     maximum_perturbation_acceleration_norm: float
     maximum_perturbation_to_kepler_ratio: float
+    tidal_constant_estimate: float
     maximum_finite_difference_residual: float | None
     normalized_residual: float | None
     maximum_equivalence_acceleration_residual: float
@@ -657,6 +658,7 @@ class NearCollisionScalingRow:
             "maximum_rhs_norm": self.maximum_rhs_norm,
             "maximum_perturbation_acceleration_norm": self.maximum_perturbation_acceleration_norm,
             "maximum_perturbation_to_kepler_ratio": self.maximum_perturbation_to_kepler_ratio,
+            "tidal_constant_estimate": self.tidal_constant_estimate,
             "maximum_finite_difference_residual": self.maximum_finite_difference_residual,
             "normalized_residual": self.normalized_residual,
             "maximum_equivalence_acceleration_residual": self.maximum_equivalence_acceleration_residual,
@@ -673,6 +675,7 @@ class NearCollisionScalingResult:
     minimum_allowed_normalized_slope: float = -0.25
     maximum_allowed_perturbation_ratio: float = 5.0e-7
     minimum_allowed_perturbation_ratio_slope: float = 2.5
+    maximum_allowed_tidal_constant: float = 6.0e-2
 
     @property
     def minimum_pair_distance(self) -> float | None:
@@ -722,6 +725,14 @@ class NearCollisionScalingResult:
         )
 
     @property
+    def tidal_constant_bound(self) -> float | None:
+        return None if not self.rows else float(max(row.tidal_constant_estimate for row in self.rows))
+
+    @property
+    def tidal_bound_resolved(self) -> bool:
+        return self.tidal_constant_bound is not None and self.tidal_constant_bound <= self.maximum_allowed_tidal_constant
+
+    @property
     def pass_rate(self) -> float:
         if not self.rows:
             return 0.0
@@ -743,6 +754,7 @@ class NearCollisionScalingResult:
             and self.maximum_perturbation_to_kepler_ratio <= self.maximum_allowed_perturbation_ratio
             and perturbation_slope is not None
             and perturbation_slope >= self.minimum_allowed_perturbation_ratio_slope
+            and self.tidal_bound_resolved
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -753,6 +765,7 @@ class NearCollisionScalingResult:
             "minimum_allowed_normalized_slope": self.minimum_allowed_normalized_slope,
             "maximum_allowed_perturbation_ratio": self.maximum_allowed_perturbation_ratio,
             "minimum_allowed_perturbation_ratio_slope": self.minimum_allowed_perturbation_ratio_slope,
+            "maximum_allowed_tidal_constant": self.maximum_allowed_tidal_constant,
             "minimum_pair_distance": self.minimum_pair_distance,
             "maximum_residual": self.maximum_residual,
             "maximum_normalized_residual": self.maximum_normalized_residual,
@@ -761,6 +774,8 @@ class NearCollisionScalingResult:
             "absolute_residual_scaling_exponent": self.absolute_residual_scaling_exponent,
             "maximum_perturbation_to_kepler_ratio": self.maximum_perturbation_to_kepler_ratio,
             "perturbation_ratio_scaling_exponent": self.perturbation_ratio_scaling_exponent,
+            "tidal_constant_bound": self.tidal_constant_bound,
+            "tidal_bound_resolved": self.tidal_bound_resolved,
             "pass_rate": self.pass_rate,
             "scaling_resolved": self.scaling_resolved,
         }
@@ -821,6 +836,7 @@ class NearCollisionScalingStudy:
             perturbation_ratio = float(
                 certificate.maximum_perturbation_acceleration_norm / max(kepler_acceleration, 1.0e-18)
             )
+            tidal_constant = float(perturbation_ratio / max(certificate.minimum_radius**3, 1.0e-18))
             rows.append(
                 NearCollisionScalingRow(
                     binary_separation=separation,
@@ -830,6 +846,7 @@ class NearCollisionScalingStudy:
                     maximum_rhs_norm=certificate.maximum_rhs_norm,
                     maximum_perturbation_acceleration_norm=certificate.maximum_perturbation_acceleration_norm,
                     maximum_perturbation_to_kepler_ratio=perturbation_ratio,
+                    tidal_constant_estimate=tidal_constant,
                     maximum_finite_difference_residual=certificate.maximum_finite_difference_residual,
                     normalized_residual=normalized,
                     maximum_equivalence_acceleration_residual=equivalence.maximum_acceleration_residual,
