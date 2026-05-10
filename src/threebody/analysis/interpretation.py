@@ -6,6 +6,7 @@ import numpy as np
 
 from ..types import TrajectoryResult
 from .atlas import AnalysisAtlas
+from .collision import collision_regularization_certificate
 from .coordinates import general_three_body_features
 from .error_bounds import chart_validity_bound
 from .hierarchy import hierarchy_action_drift_bound, hierarchy_resonance_diagnostic
@@ -261,6 +262,21 @@ def _make_segment(
             resolved_obligations = (
                 *resolved_obligations,
                 "numerically certify outgoing escape asymptotics",
+            )
+    if chart == ChartType.CLOSE_ENCOUNTER and getattr(system, "body_count", None) == 3:
+        collision_start = max(0, start_index - stride)
+        collision_end = min(len(trajectory.t) - 1, max(end_index + stride, start_index + 1))
+        collision = collision_regularization_certificate(
+            system,
+            trajectory,
+            start_index=collision_start,
+            end_index=collision_end,
+        )
+        diagnostics.update({f"collision_{key}": value for key, value in collision.as_dict().items()})
+        if collision.regularization_required:
+            resolved_obligations = (
+                *resolved_obligations,
+                "numerically certify close-encounter regularization requirement",
             )
     return InterpretationSegment(
         start_index=start_index,

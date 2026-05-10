@@ -4,7 +4,7 @@ from threebody.analysis import ThreeBodyInterpreter
 from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
 from threebody.systems import GeneralThreeBodySystem
-from threebody.types import Scenario
+from threebody.types import Scenario, TrajectoryResult
 import numpy as np
 
 
@@ -65,3 +65,24 @@ def test_three_body_interpreter_attaches_escape_asymptotic_certificate() -> None
     assert escape_segments
     assert "escape_outgoing_energy" in escape_segments[-1].diagnostics
     assert "escape_asymptotic_resolved" in escape_segments[-1].diagnostics
+
+
+def test_three_body_interpreter_attaches_collision_regularization_certificate() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 1.0, 1.0), dimension=2)
+    state = system.flatten_state(
+        np.array([[0.0, 0.0], [0.005, 0.0], [1.0, 0.0]], dtype=float),
+        np.zeros((3, 2), dtype=float),
+    )
+    trajectory = TrajectoryResult(
+        t=np.array([0.0, 0.01]),
+        y=np.vstack([state, state]),
+        success=True,
+        message="synthetic close encounter",
+    )
+
+    interpretation = ThreeBodyInterpreter().interpret(system, trajectory, stride=1)
+    close_segments = [segment for segment in interpretation.segments if segment.chart.value == "close_encounter"]
+
+    assert close_segments
+    assert "collision_minimum_pair_distance" in close_segments[0].diagnostics
+    assert close_segments[0].diagnostics["collision_regularization_required"] is True

@@ -71,6 +71,8 @@ Periodic-neighborhood segments now include a finite-difference flow-map monodrom
 
 Escape segments now include an asymptotic convergence certificate: outgoing two-body energy, tail energy drift, radius growth, deflection drift, and escape speed at infinity. A finite trajectory is only promoted to escape support when the outgoing tail is energetically positive and numerically convergent.
 
+Close-encounter segments now include a collision-regularization certificate: minimum pair distance, hyperradius, collision depth, observed collision type, inward speed, and whether regularized coordinates are required. A close-encounter law cannot be promoted while this certificate says regularization is required but no regularized flow exists.
+
 This is the current honest answer to "is the three-body problem interpreted?":
 
 > Individual trajectories can now be interpreted locally by an explicit atlas. A general theorem requires completing the certificate obligations.

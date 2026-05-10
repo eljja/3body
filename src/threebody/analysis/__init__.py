@@ -2,7 +2,12 @@ from .atlas import AnalysisAtlas
 from .boundaries import TransitionBoundaryEstimate, estimate_transition_boundaries, transition_boundary_rows
 from .charts import ChartClassifier
 from .collapse import BoundaryCollapseFit, BoundaryCollapseValidation, fit_power_law_boundary_collapse, validate_power_law_boundary_collapse
-from .collision import McGeheeCollisionDiagnostic, mcgehee_collision_diagnostic
+from .collision import (
+    CollisionRegularizationCertificate,
+    McGeheeCollisionDiagnostic,
+    collision_regularization_certificate,
+    mcgehee_collision_diagnostic,
+)
 from .coordinates import GeneralThreeBodyFeatures, RestrictedThreeBodyFeatures
 from .ensembles import PerturbationEnsemble, PerturbationMember
 from .events import TransitionEventEvidence, transition_event_evidence, transition_event_rows
@@ -68,6 +73,7 @@ __all__ = [
     "ChartWord",
     "ChartWordSignature",
     "ChartValidityBound",
+    "CollisionRegularizationCertificate",
     "ChartType",
     "CandidateTransitionLaw",
     "EncounterExchangeMetrics",
@@ -108,6 +114,7 @@ __all__ = [
     "finite_difference_jacobian",
     "chart_validity_bound",
     "chart_word_from_reports",
+    "collision_regularization_certificate",
     "chart_word_signature",
     "estimate_transition_boundaries",
     "fit_power_law_boundary_collapse",

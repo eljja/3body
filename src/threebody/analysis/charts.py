@@ -76,7 +76,10 @@ class ChartClassifier:
         return AnalysisReport(primary_chart=ranked[0].chart, scores=ranked, features=features)
 
     def _score_close_encounter(self, features: object) -> ChartScore:
-        score = _clamped_score(1.0 - features.nearest_distance / self.close_encounter_radius)
+        if features.nearest_distance <= 0.1 * self.close_encounter_radius:
+            score = 1.0
+        else:
+            score = _clamped_score(1.0 - features.nearest_distance / self.close_encounter_radius)
         return ChartScore(
             ChartType.CLOSE_ENCOUNTER,
             score,
