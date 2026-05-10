@@ -10,6 +10,7 @@ from ..analysis import (
     ThreeBodyInterpreter,
     chart_validity_bound,
     gateway_transit_estimate,
+    levi_civita_equivalence_certificate,
     levi_civita_flow_certificate,
     local_linearization,
     mcgehee_collision_diagnostic,
@@ -416,6 +417,8 @@ class CloseEncounterResidualResult:
     residual_threshold: float
     residual_resolved: bool
     flow_defined: bool
+    maximum_equivalence_acceleration_residual: float
+    equivalence_resolved: bool
 
     def as_dict(self) -> dict[str, float | int | bool | None]:
         return {
@@ -425,6 +428,8 @@ class CloseEncounterResidualResult:
             "residual_threshold": self.residual_threshold,
             "residual_resolved": self.residual_resolved,
             "flow_defined": self.flow_defined,
+            "maximum_equivalence_acceleration_residual": self.maximum_equivalence_acceleration_residual,
+            "equivalence_resolved": self.equivalence_resolved,
         }
 
 
@@ -452,6 +457,7 @@ class CloseEncounterResidualStudy:
             pair=(0, 1),
             residual_tolerance=self.residual_threshold,
         )
+        equivalence = levi_civita_equivalence_certificate(scenario.system, trajectory, pair=(0, 1))
         return CloseEncounterResidualResult(
             sample_count=certificate.sample_count,
             minimum_pair_distance=certificate.minimum_radius,
@@ -459,6 +465,8 @@ class CloseEncounterResidualStudy:
             residual_threshold=self.residual_threshold,
             residual_resolved=certificate.residual_resolved,
             flow_defined=certificate.flow_defined,
+            maximum_equivalence_acceleration_residual=equivalence.maximum_acceleration_residual,
+            equivalence_resolved=equivalence.equivalence_resolved,
         )
 
 
@@ -472,6 +480,8 @@ class CloseEncounterResidualGridRow:
     maximum_finite_difference_residual: float | None
     residual_resolved: bool
     flow_defined: bool
+    maximum_equivalence_acceleration_residual: float
+    equivalence_resolved: bool
 
     def as_dict(self) -> dict[str, float | int | bool | str | None]:
         return {
@@ -483,6 +493,8 @@ class CloseEncounterResidualGridRow:
             "maximum_finite_difference_residual": self.maximum_finite_difference_residual,
             "residual_resolved": self.residual_resolved,
             "flow_defined": self.flow_defined,
+            "maximum_equivalence_acceleration_residual": self.maximum_equivalence_acceleration_residual,
+            "equivalence_resolved": self.equivalence_resolved,
         }
 
 
@@ -498,6 +510,12 @@ class CloseEncounterResidualGridResult:
         return float(sum(row.residual_resolved for row in self.rows) / len(self.rows))
 
     @property
+    def equivalence_pass_rate(self) -> float:
+        if not self.rows:
+            return 0.0
+        return float(sum(row.equivalence_resolved for row in self.rows) / len(self.rows))
+
+    @property
     def maximum_residual(self) -> float | None:
         residuals = [
             row.maximum_finite_difference_residual
@@ -506,12 +524,20 @@ class CloseEncounterResidualGridResult:
         ]
         return None if not residuals else float(max(residuals))
 
+    @property
+    def maximum_equivalence_acceleration_residual(self) -> float | None:
+        if not self.rows:
+            return None
+        return float(max(row.maximum_equivalence_acceleration_residual for row in self.rows))
+
     def as_dict(self) -> dict[str, object]:
         return {
             "rows": [row.as_dict() for row in self.rows],
             "residual_threshold": self.residual_threshold,
             "pass_rate": self.pass_rate,
+            "equivalence_pass_rate": self.equivalence_pass_rate,
             "maximum_residual": self.maximum_residual,
+            "maximum_equivalence_acceleration_residual": self.maximum_equivalence_acceleration_residual,
         }
 
 
@@ -541,6 +567,7 @@ class CloseEncounterResidualGridStudy:
                 pair=(0, 1),
                 residual_tolerance=self.residual_threshold,
             )
+            equivalence = levi_civita_equivalence_certificate(scenario.system, trajectory, pair=(0, 1))
             rows.append(
                 CloseEncounterResidualGridRow(
                     label=label,
@@ -551,6 +578,8 @@ class CloseEncounterResidualGridStudy:
                     maximum_finite_difference_residual=certificate.maximum_finite_difference_residual,
                     residual_resolved=certificate.residual_resolved,
                     flow_defined=certificate.flow_defined,
+                    maximum_equivalence_acceleration_residual=equivalence.maximum_acceleration_residual,
+                    equivalence_resolved=equivalence.equivalence_resolved,
                 )
             )
         return CloseEncounterResidualGridResult(rows=tuple(rows), residual_threshold=self.residual_threshold)

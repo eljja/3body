@@ -7,6 +7,7 @@ from threebody.analysis import (
     gateway_transit_estimate,
     levi_civita_binary_chart,
     levi_civita_chart_certificate,
+    levi_civita_equivalence_certificate,
     levi_civita_flow_certificate,
     levi_civita_regularized_flow_state,
     mcgehee_collision_diagnostic,
@@ -49,6 +50,7 @@ def test_collision_regularization_certificate_aggregates_interval() -> None:
     assert certificate.levi_civita_chart_resolved is True
     assert certificate.levi_civita_pair == (0, 1)
     assert certificate.levi_civita_flow_defined is True
+    assert certificate.levi_civita_equivalence_resolved is True
     assert certificate.minimum_pair_distance > 0.0
     assert "binary_collision_candidate" in certificate.collision_types
 
@@ -147,6 +149,27 @@ def test_levi_civita_flow_certificate_reports_defined_rhs() -> None:
     assert certificate.maximum_rhs_norm > 0.0
     assert certificate.maximum_perturbation_acceleration_norm > 0.0
     assert certificate.maximum_finite_difference_residual is not None
+
+
+def test_levi_civita_equivalence_certificate_reconstructs_inertial_dynamics() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 2.0, 0.5), dimension=2)
+    state = system.flatten_state(
+        np.array([[0.0, 0.0], [0.006, 0.004], [1.0, -0.2]], dtype=float),
+        np.array([[0.0, 0.0], [0.1, -0.2], [0.0, 0.05]], dtype=float),
+    )
+    trajectory = TrajectoryResult(
+        t=np.array([0.0, 1.0]),
+        y=np.vstack([state, state]),
+        success=True,
+        message="synthetic equivalence",
+    )
+
+    certificate = levi_civita_equivalence_certificate(system, trajectory, pair=(0, 1))
+
+    assert certificate.equivalence_resolved is True
+    assert certificate.maximum_position_residual < 1.0e-10
+    assert certificate.maximum_velocity_residual < 1.0e-10
+    assert certificate.maximum_acceleration_residual < 1.0e-8
 
 
 def test_gateway_transit_estimate_reports_neck_openness() -> None:

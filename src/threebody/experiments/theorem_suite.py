@@ -205,6 +205,9 @@ def _paper_benchmarks(
     levi_civita_flow_defined = "construct perturbation-aware Levi-Civita regularized RHS" in set(
         interpretation.resolved_obligations
     )
+    levi_civita_equivalence_resolved = "numerically certify Levi-Civita inertial equivalence residual" in set(
+        interpretation.resolved_obligations
+    )
     best_models = flyby_summary["best_validation_models"]
     grammar_outcomes = flyby_summary["grammar_outcome_validations"]
     low_best = next((row for row in best_models if str(row["target"]).startswith("low_")), None)
@@ -416,6 +419,17 @@ def _paper_benchmarks(
             interpretation=(
                 "The regularized RHS residual must remain below threshold over a predeclared grid of "
                 "integrated close-encounter probes."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="levi_civita_local_equivalence",
+            passed=levi_civita_equivalence_resolved and close_residual_grid.equivalence_pass_rate == 1.0,
+            metric="maximum_equivalence_acceleration_residual",
+            observed=close_residual_grid.maximum_equivalence_acceleration_residual,
+            threshold=1.0e-7,
+            interpretation=(
+                "The regularized chart must reconstruct inertial position, velocity, and acceleration over the "
+                "current close-encounter grid before an analytic equivalence theorem is attempted."
             ),
         ),
         PaperBenchmarkResult(
@@ -777,6 +791,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     levi_civita_flow_passed = benchmark_by_name["levi_civita_regularized_rhs_certificate"].passed
     levi_civita_residual_passed = benchmark_by_name["levi_civita_non_synthetic_residual"].passed
     levi_civita_grid_passed = benchmark_by_name["levi_civita_residual_grid"].passed
+    levi_civita_equivalence_passed = benchmark_by_name["levi_civita_local_equivalence"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
         TheoremCandidate(
@@ -811,14 +826,16 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                             and levi_civita_flow_passed
                             and levi_civita_residual_passed
                             and levi_civita_grid_passed
+                            and levi_civita_equivalence_passed
                         )
                         else "open"
                     ),
                     (
                         "Levi-Civita binary chart reconstruction and perturbation-aware regularized RHS are "
-                        "certified, and the current integrated residual grid passes. A collision manifold theorem remains open."
+                        "certified, the current integrated residual grid passes, and local inertial equivalence "
+                        "residuals are controlled. A collision manifold theorem remains open."
                     ),
-                    "Prove coordinate equivalence and expand the residual grid toward near-collision limits.",
+                    "Turn the local equivalence certificate into an analytic theorem and expand toward near-collision limits.",
                 ),
             ),
         ),

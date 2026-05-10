@@ -54,8 +54,10 @@ def test_close_encounter_residual_study_validates_integrated_probe() -> None:
 
     assert result.flow_defined is True
     assert result.residual_resolved is True
+    assert result.equivalence_resolved is True
     assert result.maximum_finite_difference_residual is not None
     assert result.maximum_finite_difference_residual <= result.residual_threshold
+    assert result.maximum_equivalence_acceleration_residual < 1.0e-7
 
 
 def test_close_encounter_residual_grid_validates_declared_cases() -> None:
@@ -63,8 +65,11 @@ def test_close_encounter_residual_grid_validates_declared_cases() -> None:
 
     assert len(result.rows) >= 4
     assert result.pass_rate == 1.0
+    assert result.equivalence_pass_rate == 1.0
     assert result.maximum_residual is not None
     assert result.maximum_residual <= result.residual_threshold
+    assert result.maximum_equivalence_acceleration_residual is not None
+    assert result.maximum_equivalence_acceleration_residual < 1.0e-7
     assert all(row.flow_defined for row in result.rows)
 
 
