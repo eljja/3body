@@ -11,6 +11,7 @@ from .analysis import ResearchPipeline, ThreeBodyInterpreter
 from .experiments import (
     BoundaryResolutionStudy,
     ClassifierArtifactStudy,
+    CloseEncounterResidualStudy,
     FigureEightStabilityProbe,
     HierarchicalFlybySweep,
     InterpretationSuite,
@@ -289,6 +290,7 @@ def run_research_checks_command(args: argparse.Namespace) -> int:
     benchmarks = KnownBenchmarkSuite().run()
     regimes = RegimeProbeSuite().run()
     figure_eight = FigureEightStabilityProbe().run()
+    close_residual = CloseEncounterResidualStudy().run()
     output = args.output or _default_output_path("research-checks")
     output.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -302,6 +304,7 @@ def run_research_checks_command(args: argparse.Namespace) -> int:
             "known_benchmarks": [row.as_dict() for row in benchmarks],
             "regime_probes": [row.as_dict() for row in regimes],
             "figure_eight_stability": figure_eight.as_dict(),
+            "close_encounter_residual": close_residual.as_dict(),
         },
     }
     output.write_text(json.dumps(payload, indent=2), encoding="utf-8")

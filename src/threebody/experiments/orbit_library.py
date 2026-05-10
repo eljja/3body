@@ -192,6 +192,54 @@ class OrbitLibrary:
             },
         )
 
+    def general_close_encounter_probe(
+        self,
+        binary_separation: float = 0.02,
+        intruder_mass: float = 0.05,
+        intruder_position: tuple[float, float] = (1.0, 0.2),
+        intruder_velocity: tuple[float, float] = (0.0, -0.1),
+        duration: float = 0.02,
+        samples: int = 401,
+    ) -> Scenario:
+        system = GeneralThreeBodySystem(masses=(1.0, 1.0, intruder_mass), dimension=2)
+        half = 0.5 * binary_separation
+        binary_speed = 0.5 * math.sqrt(
+            system.gravitational_constant * (system.masses[0] + system.masses[1]) / binary_separation
+        )
+        positions = np.array(
+            [
+                [-half, 0.0],
+                [half, 0.0],
+                [intruder_position[0], intruder_position[1]],
+            ],
+            dtype=float,
+        )
+        velocities = np.array(
+            [
+                [0.0, binary_speed],
+                [0.0, -binary_speed],
+                [intruder_velocity[0], intruder_velocity[1]],
+            ],
+            dtype=float,
+        )
+        positions, velocities = _recenter(system, positions, velocities)
+        initial_state = system.flatten_state(positions, velocities)
+        t_eval = np.linspace(0.0, duration, samples)
+        return Scenario(
+            name="general-close-encounter-probe",
+            system=system,
+            initial_state=initial_state,
+            t_span=(0.0, duration),
+            t_eval=t_eval,
+            description="Integrated close binary with third-body perturbation for Levi-Civita residual validation.",
+            metadata={
+                "binary_separation": binary_separation,
+                "intruder_mass": intruder_mass,
+                "intruder_position": intruder_position,
+                "intruder_velocity": intruder_velocity,
+            },
+        )
+
 
 def _recenter(system: GeneralThreeBodySystem, positions: np.ndarray, velocities: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     masses = np.asarray(system.masses, dtype=float)

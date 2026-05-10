@@ -10,6 +10,7 @@ from ..analysis import (
     ThreeBodyInterpreter,
     chart_validity_bound,
     gateway_transit_estimate,
+    levi_civita_flow_certificate,
     local_linearization,
     mcgehee_collision_diagnostic,
     reduced_three_body_state,
@@ -404,6 +405,60 @@ class IntegratorComparisonStudy:
             endpoint_separation=endpoint_separation,
             regularized_available=False,
             warning="No true collision-regularized integrator is implemented yet; close-encounter laws remain provisional.",
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CloseEncounterResidualResult:
+    sample_count: int
+    minimum_pair_distance: float
+    maximum_finite_difference_residual: float | None
+    residual_threshold: float
+    residual_resolved: bool
+    flow_defined: bool
+
+    def as_dict(self) -> dict[str, float | int | bool | None]:
+        return {
+            "sample_count": self.sample_count,
+            "minimum_pair_distance": self.minimum_pair_distance,
+            "maximum_finite_difference_residual": self.maximum_finite_difference_residual,
+            "residual_threshold": self.residual_threshold,
+            "residual_resolved": self.residual_resolved,
+            "flow_defined": self.flow_defined,
+        }
+
+
+@dataclass(slots=True)
+class CloseEncounterResidualStudy:
+    """Validate Levi-Civita regularized RHS residual on an integrated close encounter."""
+
+    library: OrbitLibrary = field(default_factory=OrbitLibrary)
+    integrator: AdaptiveIntegrator = field(
+        default_factory=lambda: AdaptiveIntegrator(rtol=1.0e-11, atol=1.0e-13, max_step=1.0e-4)
+    )
+    residual_threshold: float = 1.0e-4
+
+    def run(self) -> CloseEncounterResidualResult:
+        scenario = self.library.general_close_encounter_probe()
+        trajectory = self.integrator.integrate(
+            scenario.system,
+            scenario.t_span,
+            scenario.initial_state,
+            t_eval=scenario.t_eval,
+        )
+        certificate = levi_civita_flow_certificate(
+            scenario.system,
+            trajectory,
+            pair=(0, 1),
+            residual_tolerance=self.residual_threshold,
+        )
+        return CloseEncounterResidualResult(
+            sample_count=certificate.sample_count,
+            minimum_pair_distance=certificate.minimum_radius,
+            maximum_finite_difference_residual=certificate.maximum_finite_difference_residual,
+            residual_threshold=self.residual_threshold,
+            residual_resolved=certificate.residual_resolved,
+            flow_defined=certificate.flow_defined,
         )
 
 

@@ -6,6 +6,7 @@ from ..analysis import word_distance
 from .flyby_sweep import GRAMMAR_BRANCH_SCORE_THRESHOLD, HierarchicalFlybySweep
 from .research_checks import (
     ClassifierArtifactStudy,
+    CloseEncounterResidualStudy,
     GrammarBranchArtifactStudy,
     IntegratorComparisonStudy,
     InterpretationSuite,
@@ -93,6 +94,7 @@ class TheoremSuite:
         benchmarks = KnownBenchmarkSuite().run()
         regimes = RegimeProbeSuite().run()
         interpretation = InterpretationSuite().run()
+        close_residual = CloseEncounterResidualStudy().run()
         flyby = HierarchicalFlybySweep().run_discovery_validation(
             discovery_binary_phases=(0.0, 1.5707963267948966),
             validation_binary_phases=(
@@ -113,6 +115,7 @@ class TheoremSuite:
             benchmarks,
             regimes,
             interpretation,
+            close_residual,
             flyby_summary,
         )
         candidates = _theorem_candidates(benchmark_rows)
@@ -126,6 +129,7 @@ def _paper_benchmarks(
     known_benchmarks: object,
     regimes: object,
     interpretation: object,
+    close_residual: object,
     flyby_summary: dict[str, object],
 ) -> tuple[PaperBenchmarkResult, ...]:
     transition_counts = [row.transition_count for row in artifact_rows]
@@ -386,6 +390,17 @@ def _paper_benchmarks(
             interpretation=(
                 "The close-encounter chart must expose a perturbation-aware regularized-time RHS before "
                 "finite residual and equivalence proofs can be attempted."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="levi_civita_non_synthetic_residual",
+            passed=close_residual.residual_resolved,
+            metric="maximum_finite_difference_residual",
+            observed=close_residual.maximum_finite_difference_residual,
+            threshold=close_residual.residual_threshold,
+            interpretation=(
+                "The regularized RHS must match finite-difference du'/ds on an integrated close-encounter "
+                "trajectory, not only on synthetic static states."
             ),
         ),
         PaperBenchmarkResult(
@@ -745,6 +760,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
     levi_civita_passed = benchmark_by_name["levi_civita_collision_chart_certificate"].passed
     levi_civita_flow_passed = benchmark_by_name["levi_civita_regularized_rhs_certificate"].passed
+    levi_civita_residual_passed = benchmark_by_name["levi_civita_non_synthetic_residual"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
         TheoremCandidate(
@@ -772,12 +788,12 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
                 ProofObligation(
                     "regularized_collision_flow",
-                    "partial" if levi_civita_passed and levi_civita_flow_passed else "open",
+                    "partial" if levi_civita_passed and levi_civita_flow_passed and levi_civita_residual_passed else "open",
                     (
                         "Levi-Civita binary chart reconstruction and perturbation-aware regularized RHS are "
-                        "certified, but finite residual validation and a collision manifold theorem remain open."
+                        "certified, and a non-synthetic residual smoke test passes. A collision manifold theorem remains open."
                     ),
-                    "Validate regularized residuals on non-synthetic close trajectories and prove coordinate equivalence.",
+                    "Prove coordinate equivalence and expand residual validation across a close-encounter grid.",
                 ),
             ),
         ),

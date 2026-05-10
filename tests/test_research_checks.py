@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from threebody.experiments import (
     ClassifierArtifactStudy,
+    CloseEncounterResidualStudy,
     FigureEightStabilityProbe,
     GrammarBranchArtifactStudy,
     InterpretationSuite,
@@ -45,6 +46,15 @@ def test_integrator_comparison_reports_regularization_gap() -> None:
     assert result.structure_energy_drift >= 0.0
     assert result.endpoint_separation >= 0.0
     assert result.regularized_available is False
+
+
+def test_close_encounter_residual_study_validates_integrated_probe() -> None:
+    result = CloseEncounterResidualStudy().run()
+
+    assert result.flow_defined is True
+    assert result.residual_resolved is True
+    assert result.maximum_finite_difference_residual is not None
+    assert result.maximum_finite_difference_residual <= result.residual_threshold
 
 
 def test_known_benchmarks_and_regime_probes_return_rows() -> None:

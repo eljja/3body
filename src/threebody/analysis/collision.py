@@ -128,6 +128,7 @@ class LeviCivitaFlowCertificate:
     sample_count: int
     pair: tuple[int, int]
     flow_defined: bool
+    minimum_radius: float
     maximum_rhs_norm: float
     maximum_perturbation_acceleration_norm: float
     maximum_finite_difference_residual: float | None
@@ -138,6 +139,7 @@ class LeviCivitaFlowCertificate:
             "sample_count": self.sample_count,
             "pair": self.pair,
             "flow_defined": self.flow_defined,
+            "minimum_radius": self.minimum_radius,
             "maximum_rhs_norm": self.maximum_rhs_norm,
             "maximum_perturbation_acceleration_norm": self.maximum_perturbation_acceleration_norm,
             "maximum_finite_difference_residual": self.maximum_finite_difference_residual,
@@ -306,8 +308,16 @@ def levi_civita_regularized_flow_state(
     """
 
     chart = levi_civita_binary_chart(system, state, pair)
+    return _levi_civita_regularized_flow_state_from_chart(system, state, chart)
+
+
+def _levi_civita_regularized_flow_state_from_chart(
+    system: object,
+    state: np.ndarray,
+    chart: LeviCivitaBinaryChart,
+) -> LeviCivitaRegularizedFlowState:
     positions, _velocities = system.split_state(state)
-    i, j = pair
+    i, j = chart.pair
     masses = np.asarray(system.masses, dtype=float)
     accelerations = system.acceleration_field(positions)
     relative_acceleration = np.asarray(accelerations[j] - accelerations[i], dtype=float)
@@ -321,7 +331,7 @@ def levi_civita_regularized_flow_state(
         relative_acceleration,
     )
     return LeviCivitaRegularizedFlowState(
-        pair=pair,
+        pair=chart.pair,
         u=chart.u,
         u_prime=chart.u_prime,
         u_double_prime=u_double_prime,
@@ -349,7 +359,13 @@ def levi_civita_flow_certificate(
     start = max(0, min(start_index, end))
     if pair is None:
         pair = _dominant_close_pair(system, trajectory, start, end)
-    flow_states = tuple(levi_civita_regularized_flow_state(system, state, pair) for state in trajectory.y[start : end + 1])
+    charts = _continuous_levi_civita_charts(
+        tuple(levi_civita_binary_chart(system, state, pair) for state in trajectory.y[start : end + 1])
+    )
+    flow_states = tuple(
+        _levi_civita_regularized_flow_state_from_chart(system, state, chart)
+        for state, chart in zip(trajectory.y[start : end + 1], charts, strict=True)
+    )
     flow_defined = all(
         np.all(np.isfinite(flow.u_double_prime)) and np.all(np.isfinite(flow.u_prime))
         for flow in flow_states
@@ -360,6 +376,7 @@ def levi_civita_flow_certificate(
         sample_count=len(flow_states),
         pair=pair,
         flow_defined=flow_defined,
+        minimum_radius=float(min(flow.radius for flow in flow_states)),
         maximum_rhs_norm=float(max(np.linalg.norm(flow.u_double_prime) for flow in flow_states)),
         maximum_perturbation_acceleration_norm=float(
             max(flow.perturbation_acceleration_norm for flow in flow_states)
