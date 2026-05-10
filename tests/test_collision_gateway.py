@@ -5,6 +5,8 @@ import numpy as np
 from threebody.analysis import (
     collision_regularization_certificate,
     gateway_transit_estimate,
+    levi_civita_binary_chart,
+    levi_civita_chart_certificate,
     mcgehee_collision_diagnostic,
     restricted_chart_certificate,
 )
@@ -42,8 +44,67 @@ def test_collision_regularization_certificate_aggregates_interval() -> None:
     certificate = collision_regularization_certificate(system, trajectory)
 
     assert certificate.regularization_required is True
+    assert certificate.levi_civita_chart_resolved is True
+    assert certificate.levi_civita_pair == (0, 1)
     assert certificate.minimum_pair_distance > 0.0
     assert "binary_collision_candidate" in certificate.collision_types
+
+
+def test_levi_civita_binary_chart_reconstructs_relative_position() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 1.0, 1.0), dimension=2)
+    state = system.flatten_state(
+        np.array([[0.0, 0.0], [0.003, 0.004], [1.0, 0.0]], dtype=float),
+        np.array([[0.0, 0.0], [0.1, -0.2], [0.0, 0.0]], dtype=float),
+    )
+
+    chart = levi_civita_binary_chart(system, state, (0, 1))
+
+    assert chart.radius == np.linalg.norm(chart.relative_position)
+    assert chart.regularized_radius == np.sqrt(chart.radius)
+    assert chart.reconstruction_error < 1.0e-14
+
+
+def test_levi_civita_chart_certificate_resolves_interval_chart() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 1.0, 1.0), dimension=2)
+    state = system.flatten_state(
+        np.array([[0.0, 0.0], [0.005, 0.0], [1.0, 0.0]], dtype=float),
+        np.zeros((3, 2), dtype=float),
+    )
+    trajectory = TrajectoryResult(
+        t=np.array([0.0, 1.0]),
+        y=np.vstack([state, state]),
+        success=True,
+        message="synthetic",
+    )
+
+    certificate = levi_civita_chart_certificate(system, trajectory)
+
+    assert certificate.pair == (0, 1)
+    assert certificate.chart_resolved is True
+    assert certificate.maximum_reconstruction_error < 1.0e-14
+
+
+def test_levi_civita_chart_certificate_selects_continuous_branch() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 1.0, 1.0), dimension=2)
+    states = []
+    for y in (-1.0e-4, 1.0e-4):
+        states.append(
+            system.flatten_state(
+                np.array([[0.0, 0.0], [-1.0, y], [3.0, 0.0]], dtype=float),
+                np.zeros((3, 2), dtype=float),
+            )
+        )
+    trajectory = TrajectoryResult(
+        t=np.array([0.0, 1.0]),
+        y=np.vstack(states),
+        success=True,
+        message="branch cut crossing",
+    )
+
+    certificate = levi_civita_chart_certificate(system, trajectory, pair=(0, 1))
+
+    assert certificate.chart_resolved is True
+    assert certificate.maximum_branch_jump < 1.0e-3
 
 
 def test_gateway_transit_estimate_reports_neck_openness() -> None:

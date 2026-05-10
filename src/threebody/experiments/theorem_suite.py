@@ -8,6 +8,7 @@ from .research_checks import (
     ClassifierArtifactStudy,
     GrammarBranchArtifactStudy,
     IntegratorComparisonStudy,
+    InterpretationSuite,
     KnownBenchmarkSuite,
     RegimeProbeSuite,
 )
@@ -91,6 +92,7 @@ class TheoremSuite:
         integrator = IntegratorComparisonStudy().run()
         benchmarks = KnownBenchmarkSuite().run()
         regimes = RegimeProbeSuite().run()
+        interpretation = InterpretationSuite().run()
         flyby = HierarchicalFlybySweep().run_discovery_validation(
             discovery_binary_phases=(0.0, 1.5707963267948966),
             validation_binary_phases=(
@@ -110,6 +112,7 @@ class TheoremSuite:
             integrator,
             benchmarks,
             regimes,
+            interpretation,
             flyby_summary,
         )
         candidates = _theorem_candidates(benchmark_rows)
@@ -122,6 +125,7 @@ def _paper_benchmarks(
     integrator: object,
     known_benchmarks: object,
     regimes: object,
+    interpretation: object,
     flyby_summary: dict[str, object],
 ) -> tuple[PaperBenchmarkResult, ...]:
     transition_counts = [row.transition_count for row in artifact_rows]
@@ -187,6 +191,9 @@ def _paper_benchmarks(
         for row in regimes
         if "reduced_regime_hint" in row.extra
     }
+    levi_civita_chart_resolved = "numerically construct Levi-Civita binary collision chart" in set(
+        interpretation.resolved_obligations
+    )
     best_models = flyby_summary["best_validation_models"]
     grammar_outcomes = flyby_summary["grammar_outcome_validations"]
     low_best = next((row for row in best_models if str(row["target"]).startswith("low_")), None)
@@ -355,6 +362,17 @@ def _paper_benchmarks(
             observed=float(len(regime_names)),
             threshold=4.0,
             interpretation="The atlas must exercise non-flyby regimes before making broad claims.",
+        ),
+        PaperBenchmarkResult(
+            name="levi_civita_collision_chart_certificate",
+            passed=levi_civita_chart_resolved,
+            metric="resolved_certificate_indicator",
+            observed=1.0 if levi_civita_chart_resolved else 0.0,
+            threshold=1.0,
+            interpretation=(
+                "Close-encounter promotion now requires a Levi-Civita binary chart that reconstructs the inertial "
+                "relative state over the certified interval."
+            ),
         ),
         PaperBenchmarkResult(
             name="low_crossing_scattering_map_score",
@@ -711,6 +729,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
         and benchmark_by_name["hysteresis_width_selected_branch_is_grammar"].passed
     )
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
+    levi_civita_passed = benchmark_by_name["levi_civita_collision_chart_certificate"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
         TheoremCandidate(
@@ -738,9 +757,12 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
                 ProofObligation(
                     "regularized_collision_flow",
-                    "open",
-                    "McGehee-style diagnostics exist, but no regularized flow or collision manifold theorem is implemented.",
-                    "Implement Levi-Civita/McGehee regularized dynamics and prove coordinate equivalence.",
+                    "partial" if levi_civita_passed else "open",
+                    (
+                        "Levi-Civita binary chart reconstruction is certified, but no perturbation-aware "
+                        "regularized time flow or collision manifold theorem is implemented."
+                    ),
+                    "Implement regularized dynamics and prove coordinate equivalence.",
                 ),
             ),
         ),

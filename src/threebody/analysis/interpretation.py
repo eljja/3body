@@ -279,6 +279,11 @@ def _make_segment(
                 *resolved_obligations,
                 "numerically certify close-encounter regularization requirement",
             )
+        if collision.levi_civita_chart_resolved:
+            resolved_obligations = (
+                *resolved_obligations,
+                "numerically construct Levi-Civita binary collision chart",
+            )
     if chart in {ChartType.RESTRICTED_LAGRANGE, ChartType.RESTRICTED_GATEWAY} and hasattr(system, "jacobi_constant"):
         restricted_start = max(0, start_index - stride)
         restricted_end = min(len(trajectory.t) - 1, max(end_index + stride, start_index + 1))
@@ -330,9 +335,9 @@ def _model_for_chart(chart: ChartType) -> dict[str, str | float | tuple[str, ...
             "model_family": "regularized_collision_chart",
             "local_claim": "Raw coordinates are not analytic enough; switch to Levi-Civita/McGehee-style coordinates.",
             "proof_status": "blocked_until_regularized_flow_exists",
-            "interpretability_score": 0.25,
+            "interpretability_score": 0.35,
             "unresolved_obligations": (
-                "implement regularized flow",
+                "implement perturbation-aware regularized time flow",
                 "prove equivalence between regularized and inertial charts away from collision",
             ),
         },

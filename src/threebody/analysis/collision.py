@@ -39,6 +39,62 @@ class McGeheeCollisionDiagnostic:
 
 
 @dataclass(frozen=True, slots=True)
+class LeviCivitaBinaryChart:
+    """Planar Levi-Civita lift for one binary relative coordinate.
+
+    The relative vector r=(x,y) is represented by the complex square u^2.
+    Regularized time is chosen by dt/ds=|r|=|u|^2, so u_prime is du/ds.
+    """
+
+    pair: tuple[int, int]
+    relative_position: np.ndarray
+    relative_velocity: np.ndarray
+    u: np.ndarray
+    u_prime: np.ndarray
+    radius: float
+    regularized_radius: float
+    reconstruction_error: float
+
+    def as_dict(self) -> dict[str, float | tuple[int, int]]:
+        return {
+            "pair": self.pair,
+            "radius": self.radius,
+            "regularized_radius": self.regularized_radius,
+            "u0": float(self.u[0]),
+            "u1": float(self.u[1]),
+            "u_prime0": float(self.u_prime[0]),
+            "u_prime1": float(self.u_prime[1]),
+            "reconstruction_error": self.reconstruction_error,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class LeviCivitaChartCertificate:
+    """Interval-level check that the binary collision chart is numerically well-defined."""
+
+    sample_count: int
+    pair: tuple[int, int]
+    minimum_radius: float
+    minimum_regularized_radius: float
+    maximum_regularized_speed: float
+    maximum_branch_jump: float
+    maximum_reconstruction_error: float
+    chart_resolved: bool
+
+    def as_dict(self) -> dict[str, float | int | bool | tuple[int, int]]:
+        return {
+            "sample_count": self.sample_count,
+            "pair": self.pair,
+            "minimum_radius": self.minimum_radius,
+            "minimum_regularized_radius": self.minimum_regularized_radius,
+            "maximum_regularized_speed": self.maximum_regularized_speed,
+            "maximum_branch_jump": self.maximum_branch_jump,
+            "maximum_reconstruction_error": self.maximum_reconstruction_error,
+            "chart_resolved": self.chart_resolved,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class CollisionRegularizationCertificate:
     """Interval-level certificate that raw coordinates should be replaced near collision."""
 
@@ -49,9 +105,12 @@ class CollisionRegularizationCertificate:
     maximum_inward_speed: float
     collision_types: tuple[str, ...]
     regularization_required: bool
+    levi_civita_pair: tuple[int, int] | None
+    levi_civita_chart_resolved: bool
+    levi_civita_max_reconstruction_error: float | None
     warning: str
 
-    def as_dict(self) -> dict[str, float | int | bool | str]:
+    def as_dict(self) -> dict[str, float | int | bool | str | tuple[int, int] | None]:
         return {
             "sample_count": self.sample_count,
             "minimum_hyperradius": self.minimum_hyperradius,
@@ -60,6 +119,9 @@ class CollisionRegularizationCertificate:
             "maximum_inward_speed": self.maximum_inward_speed,
             "collision_types": ",".join(self.collision_types),
             "regularization_required": self.regularization_required,
+            "levi_civita_pair": self.levi_civita_pair,
+            "levi_civita_chart_resolved": self.levi_civita_chart_resolved,
+            "levi_civita_max_reconstruction_error": self.levi_civita_max_reconstruction_error,
             "warning": self.warning,
         }
 
@@ -107,6 +169,74 @@ def mcgehee_collision_diagnostic(
     )
 
 
+def levi_civita_binary_chart(system: object, state: np.ndarray, pair: tuple[int, int]) -> LeviCivitaBinaryChart:
+    """Lift one planar binary relative state into a Levi-Civita collision chart."""
+
+    if getattr(system, "dimension", None) != 2:
+        raise ValueError("Levi-Civita binary chart is only implemented for planar systems.")
+    positions, velocities = system.split_state(state)
+    i, j = pair
+    relative_position = np.asarray(positions[j] - positions[i], dtype=float)
+    relative_velocity = np.asarray(velocities[j] - velocities[i], dtype=float)
+    radius = float(np.linalg.norm(relative_position))
+    if radius <= 0.0:
+        raise ValueError("Levi-Civita chart cannot choose a square-root branch at exact collision.")
+    u = _levi_civita_square_root(relative_position)
+    matrix = np.array([[u[0], -u[1]], [u[1], u[0]]], dtype=float)
+    u_prime = 0.5 * matrix.T @ relative_velocity
+    reconstructed_position = _levi_civita_square(u)
+    reconstruction_error = float(np.linalg.norm(reconstructed_position - relative_position))
+    return LeviCivitaBinaryChart(
+        pair=pair,
+        relative_position=relative_position,
+        relative_velocity=relative_velocity,
+        u=u,
+        u_prime=u_prime,
+        radius=radius,
+        regularized_radius=float(np.linalg.norm(u)),
+        reconstruction_error=reconstruction_error,
+    )
+
+
+def levi_civita_chart_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    start_index: int = 0,
+    end_index: int | None = None,
+    pair: tuple[int, int] | None = None,
+    reconstruction_tolerance: float = 1.0e-8,
+) -> LeviCivitaChartCertificate:
+    """Check that a consistent Levi-Civita chart exists over an interval."""
+
+    if getattr(system, "body_count", None) != 3:
+        raise TypeError("levi_civita_chart_certificate requires a general three-body system.")
+    if getattr(system, "dimension", None) != 2:
+        raise ValueError("levi_civita_chart_certificate is only implemented for planar systems.")
+    end = len(trajectory.t) - 1 if end_index is None else min(end_index, len(trajectory.t) - 1)
+    start = max(0, min(start_index, end))
+    if pair is None:
+        pair = _dominant_close_pair(system, trajectory, start, end)
+    charts = _continuous_levi_civita_charts(
+        tuple(levi_civita_binary_chart(system, state, pair) for state in trajectory.y[start : end + 1])
+    )
+    maximum_reconstruction_error = float(max(chart.reconstruction_error for chart in charts))
+    branch_jumps = [
+        float(np.linalg.norm(charts[index].u - charts[index - 1].u))
+        for index in range(1, len(charts))
+    ]
+    chart_resolved = bool(np.isfinite(maximum_reconstruction_error) and maximum_reconstruction_error <= reconstruction_tolerance)
+    return LeviCivitaChartCertificate(
+        sample_count=len(charts),
+        pair=pair,
+        minimum_radius=float(min(chart.radius for chart in charts)),
+        minimum_regularized_radius=float(min(chart.regularized_radius for chart in charts)),
+        maximum_regularized_speed=float(max(np.linalg.norm(chart.u_prime) for chart in charts)),
+        maximum_branch_jump=0.0 if not branch_jumps else float(max(branch_jumps)),
+        maximum_reconstruction_error=maximum_reconstruction_error,
+        chart_resolved=chart_resolved,
+    )
+
+
 def collision_regularization_certificate(
     system: object,
     trajectory: TrajectoryResult,
@@ -136,9 +266,15 @@ def collision_regularization_certificate(
     maximum_inward_speed = float(max(max(-diagnostic.radial_velocity, 0.0) for diagnostic in diagnostics))
     collision_types = tuple(dict.fromkeys(diagnostic.collision_type for diagnostic in diagnostics))
     regularization_required = any(diagnostic.regularization_required for diagnostic in diagnostics)
+    levi_civita: LeviCivitaChartCertificate | None = None
+    if regularization_required and getattr(system, "dimension", None) == 2:
+        levi_civita = levi_civita_chart_certificate(system, trajectory, start_index=start, end_index=end)
     warning = ""
     if regularization_required:
-        warning = "regularized collision coordinates are required before promoting a close-encounter law"
+        if levi_civita is not None and levi_civita.chart_resolved:
+            warning = "Levi-Civita chart is resolved; regularized time-flow equivalence remains unproved"
+        else:
+            warning = "regularized collision coordinates are required before promoting a close-encounter law"
     return CollisionRegularizationCertificate(
         sample_count=len(diagnostics),
         minimum_hyperradius=minimum_hyperradius,
@@ -147,5 +283,61 @@ def collision_regularization_certificate(
         maximum_inward_speed=maximum_inward_speed,
         collision_types=collision_types,
         regularization_required=regularization_required,
+        levi_civita_pair=None if levi_civita is None else levi_civita.pair,
+        levi_civita_chart_resolved=False if levi_civita is None else levi_civita.chart_resolved,
+        levi_civita_max_reconstruction_error=None if levi_civita is None else levi_civita.maximum_reconstruction_error,
         warning=warning,
     )
+
+
+def _dominant_close_pair(system: object, trajectory: TrajectoryResult, start: int, end: int) -> tuple[int, int]:
+    pair_minima: dict[tuple[int, int], float] = {}
+    for pair in PAIR_INDICES:
+        i, j = pair
+        distances = []
+        for state in trajectory.y[start : end + 1]:
+            positions, _velocities = system.split_state(state)
+            distances.append(float(np.linalg.norm(positions[j] - positions[i])))
+        pair_minima[pair] = min(distances)
+    return min(pair_minima, key=pair_minima.get)
+
+
+def _continuous_levi_civita_charts(charts: tuple[LeviCivitaBinaryChart, ...]) -> tuple[LeviCivitaBinaryChart, ...]:
+    if not charts:
+        return ()
+    continuous = [charts[0]]
+    for chart in charts[1:]:
+        previous = continuous[-1]
+        if np.linalg.norm(-chart.u - previous.u) < np.linalg.norm(chart.u - previous.u):
+            chart = _flip_levi_civita_branch(chart)
+        continuous.append(chart)
+    return tuple(continuous)
+
+
+def _flip_levi_civita_branch(chart: LeviCivitaBinaryChart) -> LeviCivitaBinaryChart:
+    return LeviCivitaBinaryChart(
+        pair=chart.pair,
+        relative_position=chart.relative_position,
+        relative_velocity=chart.relative_velocity,
+        u=-chart.u,
+        u_prime=-chart.u_prime,
+        radius=chart.radius,
+        regularized_radius=chart.regularized_radius,
+        reconstruction_error=chart.reconstruction_error,
+    )
+
+
+def _levi_civita_square_root(position: np.ndarray) -> np.ndarray:
+    x = float(position[0])
+    y = float(position[1])
+    radius = float(np.hypot(x, y))
+    u0 = np.sqrt(max(0.5 * (radius + x), 0.0))
+    if u0 > 0.0:
+        u1 = y / (2.0 * u0)
+    else:
+        u1 = np.sign(y) * np.sqrt(max(0.5 * (radius - x), 0.0))
+    return np.array([u0, u1], dtype=float)
+
+
+def _levi_civita_square(u: np.ndarray) -> np.ndarray:
+    return np.array([u[0] ** 2 - u[1] ** 2, 2.0 * u[0] * u[1]], dtype=float)
