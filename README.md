@@ -35,6 +35,7 @@ The project is built around five ideas:
   - `CompactModelFitter`
 - `ui`
   - Streamlit application for interactive exploration
+  - Static GitHub Pages visualizer generated from precomputed reference runs
 
 ## Scientific Position
 
@@ -66,6 +67,12 @@ Launch the visualizer:
 & 'D:\Codex\.venv\Scripts\python.exe' -m streamlit run src/threebody/ui/app.py
 ```
 
+Build the static GitHub Pages visualizer:
+
+```powershell
+& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.ui.static_site --output site
+```
+
 Run a transition survey:
 
 ```powershell
@@ -81,6 +88,7 @@ Run a transition survey:
 - [Research Program](docs/RESEARCH_PROGRAM.md)
 - [Research Runs](docs/RESEARCH_RUNS.md)
 - [Current Hypotheses](docs/CURRENT_HYPOTHESES.md)
+- [GitHub Pages Static Visualizer](docs/GITHUB_PAGES.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## Suggested Workflow
