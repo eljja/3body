@@ -85,6 +85,9 @@ def test_near_collision_scaling_study_controls_normalized_residual() -> None:
     assert result.maximum_residual <= result.residual_threshold
     assert result.maximum_normalized_residual is not None
     assert result.maximum_normalized_residual <= result.normalized_residual_threshold
+    assert result.normalized_residual_scaling_exponent is not None
+    assert result.normalized_residual_scaling_exponent >= result.minimum_allowed_normalized_slope
+    assert result.absolute_residual_scaling_exponent is not None
 
 
 def test_known_benchmarks_and_regime_probes_return_rows() -> None:

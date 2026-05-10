@@ -448,6 +448,18 @@ def _paper_benchmarks(
             ),
         ),
         PaperBenchmarkResult(
+            name="levi_civita_normalized_residual_slope",
+            passed=near_collision.normalized_residual_scaling_exponent is not None
+            and near_collision.normalized_residual_scaling_exponent >= near_collision.minimum_allowed_normalized_slope,
+            metric="normalized_residual_loglog_slope",
+            observed=near_collision.normalized_residual_scaling_exponent,
+            threshold=near_collision.minimum_allowed_normalized_slope,
+            interpretation=(
+                "The normalized regularized RHS residual should not show a negative blow-up exponent over the "
+                "near-collision scaling grid."
+            ),
+        ),
+        PaperBenchmarkResult(
             name="low_crossing_scattering_map_score",
             passed=low_scattering_score is not None and low_scattering_score > 0.25,
             metric="complexity_penalized_validation_score",
@@ -808,6 +820,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     levi_civita_grid_passed = benchmark_by_name["levi_civita_residual_grid"].passed
     levi_civita_equivalence_passed = benchmark_by_name["levi_civita_local_equivalence"].passed
     levi_civita_near_collision_passed = benchmark_by_name["levi_civita_near_collision_scaling"].passed
+    levi_civita_slope_passed = benchmark_by_name["levi_civita_normalized_residual_slope"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
         TheoremCandidate(
@@ -844,6 +857,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                             and levi_civita_grid_passed
                             and levi_civita_equivalence_passed
                             and levi_civita_near_collision_passed
+                            and levi_civita_slope_passed
                         )
                         else "open"
                     ),

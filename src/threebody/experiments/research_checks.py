@@ -666,6 +666,7 @@ class NearCollisionScalingResult:
     rows: tuple[NearCollisionScalingRow, ...]
     residual_threshold: float
     normalized_residual_threshold: float
+    minimum_allowed_normalized_slope: float = -0.25
 
     @property
     def minimum_pair_distance(self) -> float | None:
@@ -690,6 +691,20 @@ class NearCollisionScalingResult:
         return None if not self.rows else float(max(row.maximum_equivalence_acceleration_residual for row in self.rows))
 
     @property
+    def normalized_residual_scaling_exponent(self) -> float | None:
+        return _loglog_slope(
+            tuple(row.minimum_pair_distance for row in self.rows),
+            tuple(row.normalized_residual for row in self.rows),
+        )
+
+    @property
+    def absolute_residual_scaling_exponent(self) -> float | None:
+        return _loglog_slope(
+            tuple(row.minimum_pair_distance for row in self.rows),
+            tuple(row.maximum_finite_difference_residual for row in self.rows),
+        )
+
+    @property
     def pass_rate(self) -> float:
         if not self.rows:
             return 0.0
@@ -697,12 +712,15 @@ class NearCollisionScalingResult:
 
     @property
     def scaling_resolved(self) -> bool:
+        slope = self.normalized_residual_scaling_exponent
         return (
             self.pass_rate == 1.0
             and self.maximum_residual is not None
             and self.maximum_residual <= self.residual_threshold
             and self.maximum_normalized_residual is not None
             and self.maximum_normalized_residual <= self.normalized_residual_threshold
+            and slope is not None
+            and slope >= self.minimum_allowed_normalized_slope
         )
 
     def as_dict(self) -> dict[str, object]:
@@ -710,10 +728,13 @@ class NearCollisionScalingResult:
             "rows": [row.as_dict() for row in self.rows],
             "residual_threshold": self.residual_threshold,
             "normalized_residual_threshold": self.normalized_residual_threshold,
+            "minimum_allowed_normalized_slope": self.minimum_allowed_normalized_slope,
             "minimum_pair_distance": self.minimum_pair_distance,
             "maximum_residual": self.maximum_residual,
             "maximum_normalized_residual": self.maximum_normalized_residual,
             "maximum_equivalence_acceleration_residual": self.maximum_equivalence_acceleration_residual,
+            "normalized_residual_scaling_exponent": self.normalized_residual_scaling_exponent,
+            "absolute_residual_scaling_exponent": self.absolute_residual_scaling_exponent,
             "pass_rate": self.pass_rate,
             "scaling_resolved": self.scaling_resolved,
         }
@@ -965,6 +986,16 @@ def _optional_float(value: object) -> float | None:
     if value is None:
         return None
     return float(value)
+
+
+def _loglog_slope(xs: tuple[float, ...], ys: tuple[float | None, ...]) -> float | None:
+    pairs = [(float(x), float(y)) for x, y in zip(xs, ys, strict=True) if y is not None and x > 0.0 and y > 0.0]
+    if len(pairs) < 2:
+        return None
+    log_x = np.log([pair[0] for pair in pairs])
+    log_y = np.log([pair[1] for pair in pairs])
+    slope, _intercept = np.polyfit(log_x, log_y, 1)
+    return float(slope)
 
 
 def _benchmark(name: str, metric: str, observed_error: float, reference: float, tolerance: float) -> BenchmarkResult:
