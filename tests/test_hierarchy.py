@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from threebody.analysis import hierarchical_elements, hierarchy_action_drift_bound
+from threebody.analysis import hierarchical_elements, hierarchy_action_drift_bound, hierarchy_resonance_diagnostic
 from threebody.solvers import AdaptiveIntegrator
 from threebody.types import Scenario
 from threebody.analysis.coordinates import general_three_body_features
@@ -63,3 +63,10 @@ def test_hierarchy_action_drift_bound_tracks_perturbation_budget() -> None:
     assert bound.max_perturbation_strength < 1.0e-7
     assert bound.relative_action_drift >= 0.0
     assert bound.relative_angular_momentum_drift >= 0.0
+
+    resonance = hierarchy_resonance_diagnostic(system, trajectory)
+    assert resonance.sample_count == 80
+    assert resonance.inner_pair == (0, 1)
+    assert resonance.median_frequency_ratio > 0.0
+    assert resonance.nearest_resonance_denominator <= 8
+    assert resonance.classification in {"near_resonant", "nonresonant", "unresolved"}

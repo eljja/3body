@@ -7,7 +7,7 @@ import numpy as np
 from ..types import TrajectoryResult
 from .atlas import AnalysisAtlas
 from .error_bounds import chart_validity_bound
-from .hierarchy import hierarchy_action_drift_bound
+from .hierarchy import hierarchy_action_drift_bound, hierarchy_resonance_diagnostic
 from .types import ChartTransition, ChartType
 from .variational import periodic_monodromy_certificate
 
@@ -230,9 +230,16 @@ def _make_segment(
         bound_start = max(0, start_index - stride)
         bound_end = min(len(trajectory.t) - 1, max(end_index + stride, start_index + 1))
         hierarchy_bound = hierarchy_action_drift_bound(system, trajectory, start_index=bound_start, end_index=bound_end)
+        resonance = hierarchy_resonance_diagnostic(system, trajectory, start_index=bound_start, end_index=bound_end)
         diagnostics.update({f"hierarchy_{key}": value for key, value in hierarchy_bound.as_dict().items()})
+        diagnostics.update({f"resonance_{key}": value for key, value in resonance.as_dict().items()})
         if hierarchy_bound.bound_satisfied:
             resolved_obligations = ("numerically certify hierarchy action drift against perturbation budget",)
+        if resonance.classification in {"near_resonant", "nonresonant"}:
+            resolved_obligations = (
+                *resolved_obligations,
+                "numerically classify hierarchy resonance detuning",
+            )
     if chart == ChartType.PERIODIC_ORBIT_NEIGHBORHOOD and hasattr(system, "rhs"):
         mono_start = max(0, start_index - stride)
         mono_end = min(len(trajectory.t) - 1, max(end_index, mono_start + 1))
@@ -273,7 +280,7 @@ def _model_for_chart(chart: ChartType) -> dict[str, str | float | tuple[str, ...
             "interpretability_score": 0.7,
             "unresolved_obligations": (
                 "prove analytic hierarchy action drift bound",
-                "separate resonant and nonresonant hierarchy intervals",
+                "prove stability of resonant and nonresonant hierarchy split",
             ),
         },
         ChartType.CLOSE_ENCOUNTER: {

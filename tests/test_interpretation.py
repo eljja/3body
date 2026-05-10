@@ -30,6 +30,7 @@ def test_three_body_interpreter_returns_chart_local_claims() -> None:
     assert all(segment.validity_statement for segment in interpretation.segments)
     hierarchy_segments = [segment for segment in interpretation.segments if segment.chart.value == "two_body_hierarchy"]
     assert not hierarchy_segments or "hierarchy_relative_action_drift" in hierarchy_segments[0].diagnostics
+    assert not hierarchy_segments or "resonance_relative_detuning" in hierarchy_segments[0].diagnostics
     periodic_segments = [
         segment for segment in interpretation.segments if segment.chart.value == "periodic_orbit_neighborhood"
     ]

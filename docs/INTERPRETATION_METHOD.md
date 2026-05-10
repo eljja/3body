@@ -65,6 +65,8 @@ Only after those conditions are met can this be called an accepted interpretatio
 
 Hierarchy segments now include a numerical action-drift certificate: the inner Kepler action and angular momentum drift are compared against a tidal perturbation budget. This resolves a numerical certification task, but it does not replace the remaining analytic proof obligation.
 
+Hierarchy segments also include a resonance-detuning certificate: the median inner/outer frequency ratio is compared with small-denominator rational resonances. This numerically separates near-resonant and nonresonant intervals, but the stability of that split still needs a proof.
+
 Periodic-neighborhood segments now include a finite-difference flow-map monodromy certificate: spectral radius, condition number, endpoint error, closure ratio, and a shadowing-radius proxy. The certificate explicitly marks whether the segment is a full-period candidate; otherwise it remains a local flow-map proxy, not a Floquet theorem.
 
 This is the current honest answer to "is the three-body problem interpreted?":

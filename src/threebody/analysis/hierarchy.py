@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fractions import Fraction
 
 import numpy as np
 
@@ -56,6 +57,36 @@ class HierarchyActionDriftBound:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class HierarchyResonanceDiagnostic:
+    """Numerical resonance classifier for a hierarchical inner/outer split."""
+
+    inner_pair: tuple[int, int]
+    outer_body: int
+    sample_count: int
+    median_frequency_ratio: float
+    nearest_resonance_numerator: int
+    nearest_resonance_denominator: int
+    relative_detuning: float
+    resonance_tolerance: float
+    classification: str
+    warning: str
+
+    def as_dict(self) -> dict[str, float | int | str | tuple[int, int]]:
+        return {
+            "inner_pair": self.inner_pair,
+            "outer_body": self.outer_body,
+            "sample_count": self.sample_count,
+            "median_frequency_ratio": self.median_frequency_ratio,
+            "nearest_resonance_numerator": self.nearest_resonance_numerator,
+            "nearest_resonance_denominator": self.nearest_resonance_denominator,
+            "relative_detuning": self.relative_detuning,
+            "resonance_tolerance": self.resonance_tolerance,
+            "classification": self.classification,
+            "warning": self.warning,
+        }
+
+
 def hierarchical_elements(system: object, state: np.ndarray) -> HierarchicalElements:
     """Extract the leading two-body hierarchy from a general three-body state."""
 
@@ -90,6 +121,71 @@ def hierarchical_elements(system: object, state: np.ndarray) -> HierarchicalElem
         perturbation_strength=features.hierarchy_perturbation_strength,
         hierarchy_ratio=features.hierarchy_ratio,
         is_inner_bound=bool(inner_energy < 0.0 and eccentricity < 1.0),
+    )
+
+
+def hierarchy_resonance_diagnostic(
+    system: object,
+    trajectory: TrajectoryResult,
+    start_index: int = 0,
+    end_index: int | None = None,
+    max_denominator: int = 8,
+    resonance_tolerance: float = 0.02,
+) -> HierarchyResonanceDiagnostic:
+    """Classify a hierarchy interval as resonant or nonresonant by frequency detuning."""
+
+    if getattr(system, "body_count", None) != 3:
+        raise TypeError("hierarchy_resonance_diagnostic requires a general three-body system.")
+    end = len(trajectory.t) - 1 if end_index is None else min(end_index, len(trajectory.t) - 1)
+    start = max(0, min(start_index, end))
+    states = trajectory.y[start : end + 1]
+    elements = tuple(hierarchical_elements(system, state) for state in states)
+    pair = elements[0].inner_pair
+    outer = elements[0].outer_body
+    pair_changed = any(element.inner_pair != pair or element.outer_body != outer for element in elements)
+    ratios = []
+    for state, element in zip(states, elements, strict=True):
+        inner_frequency = _inner_mean_motion(system, pair, element.inner_semimajor_axis)
+        outer_frequency = _outer_angular_frequency(system, state, pair, outer)
+        if np.isfinite(inner_frequency) and np.isfinite(outer_frequency) and abs(outer_frequency) > 1.0e-12:
+            ratios.append(abs(inner_frequency / outer_frequency))
+    if not ratios:
+        return HierarchyResonanceDiagnostic(
+            inner_pair=pair,
+            outer_body=outer,
+            sample_count=len(states),
+            median_frequency_ratio=np.inf,
+            nearest_resonance_numerator=0,
+            nearest_resonance_denominator=1,
+            relative_detuning=np.inf,
+            resonance_tolerance=resonance_tolerance,
+            classification="unresolved",
+            warning="no finite inner/outer frequency ratio could be computed",
+        )
+    median_ratio = float(np.median(np.asarray(ratios, dtype=float)))
+    resonance = Fraction(median_ratio).limit_denominator(max_denominator)
+    resonance_value = float(resonance.numerator / resonance.denominator)
+    detuning = float(abs(median_ratio - resonance_value) / max(abs(median_ratio), 1.0e-12))
+    if pair_changed:
+        classification = "unresolved"
+        warning = "nearest inner pair changed inside interval; resonance class is not stable"
+    elif detuning <= resonance_tolerance:
+        classification = "near_resonant"
+        warning = ""
+    else:
+        classification = "nonresonant"
+        warning = ""
+    return HierarchyResonanceDiagnostic(
+        inner_pair=pair,
+        outer_body=outer,
+        sample_count=len(states),
+        median_frequency_ratio=median_ratio,
+        nearest_resonance_numerator=int(resonance.numerator),
+        nearest_resonance_denominator=int(resonance.denominator),
+        relative_detuning=detuning,
+        resonance_tolerance=resonance_tolerance,
+        classification=classification,
+        warning=warning,
     )
 
 
@@ -182,6 +278,29 @@ def _inner_period(mu: float, semimajor_axis: float) -> float:
     if not np.isfinite(semimajor_axis) or semimajor_axis <= 0.0:
         return np.inf
     return float(2.0 * np.pi * np.sqrt(semimajor_axis**3 / max(mu, 1.0e-12)))
+
+
+def _inner_mean_motion(system: object, pair: tuple[int, int], semimajor_axis: float) -> float:
+    if not np.isfinite(semimajor_axis) or semimajor_axis <= 0.0:
+        return np.inf
+    masses = np.asarray(system.masses, dtype=float)
+    mu = float(system.gravitational_constant * (masses[pair[0]] + masses[pair[1]]))
+    return float(np.sqrt(mu / semimajor_axis**3))
+
+
+def _outer_angular_frequency(system: object, state: np.ndarray, pair: tuple[int, int], outer: int) -> float:
+    positions, velocities = system.split_state(state)
+    masses = np.asarray(system.masses, dtype=float)
+    pair_mass = masses[pair[0]] + masses[pair[1]]
+    pair_center = (masses[pair[0]] * positions[pair[0]] + masses[pair[1]] * positions[pair[1]]) / pair_mass
+    pair_velocity = (masses[pair[0]] * velocities[pair[0]] + masses[pair[1]] * velocities[pair[1]]) / pair_mass
+    radius = positions[outer] - pair_center
+    velocity = velocities[outer] - pair_velocity
+    radius_norm = float(np.linalg.norm(radius))
+    if radius_norm <= 1.0e-12:
+        return np.inf
+    angular = cross_3d(radius, velocity)
+    return float(np.linalg.norm(angular) / radius_norm**2)
 
 
 def _relative_span(values: np.ndarray) -> float:
