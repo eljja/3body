@@ -20,7 +20,7 @@ from .hierarchy import (
 from .hysteresis import TransitionHysteresisLoop, detect_hysteresis_loops, hysteresis_loop_rows
 from .interpretation import InterpretationSegment, ThreeBodyInterpreter, TrajectoryInterpretation
 from .rule_miner import CandidateTransitionLaw, TransitionRuleMiner
-from .scattering import PeriapsisScatteringMap, periapsis_scattering_map
+from .scattering import EscapeAsymptoticCertificate, PeriapsisScatteringMap, escape_asymptotic_certificate, periapsis_scattering_map
 from .pipeline import ResearchPipeline, ResearchRunResult, ResearchValidationResult
 from .reduced_state import ReducedThreeBodyState, reduced_state_series, reduced_three_body_state
 from .shape import ShapeSpaceCoordinates, shape_space_coordinates
@@ -71,6 +71,7 @@ __all__ = [
     "ChartType",
     "CandidateTransitionLaw",
     "EncounterExchangeMetrics",
+    "EscapeAsymptoticCertificate",
     "FeatureConditionedTransitionModel",
     "GatewayTransitEstimate",
     "GeneralThreeBodyFeatures",
@@ -113,6 +114,7 @@ __all__ = [
     "validate_power_law_boundary_collapse",
     "detect_hysteresis_loops",
     "encounter_exchange_metrics",
+    "escape_asymptotic_certificate",
     "hierarchical_elements",
     "hierarchy_action_drift_bound",
     "hierarchy_resonance_diagnostic",

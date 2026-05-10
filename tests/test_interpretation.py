@@ -3,6 +3,9 @@ from __future__ import annotations
 from threebody.analysis import ThreeBodyInterpreter
 from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
+from threebody.systems import GeneralThreeBodySystem
+from threebody.types import Scenario
+import numpy as np
 
 
 def test_three_body_interpreter_returns_chart_local_claims() -> None:
@@ -36,3 +39,29 @@ def test_three_body_interpreter_returns_chart_local_claims() -> None:
     ]
     assert not periodic_segments or "monodromy_spectral_radius" in periodic_segments[0].diagnostics
     assert interpretation.unresolved_obligations
+
+
+def test_three_body_interpreter_attaches_escape_asymptotic_certificate() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 1.0, 0.1), dimension=2)
+    positions = np.array([[-0.1, 0.0], [0.1, 0.0], [8.0, 0.0]], dtype=float)
+    velocities = np.array([[0.0, 0.4], [0.0, -0.4], [4.0, 0.0]], dtype=float)
+    scenario = Scenario(
+        name="escape-interpretation",
+        system=system,
+        initial_state=system.flatten_state(positions, velocities),
+        t_span=(0.0, 1.0),
+        t_eval=np.linspace(0.0, 1.0, 80),
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-8, atol=1.0e-10).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    interpretation = ThreeBodyInterpreter().interpret(system, trajectory, stride=10)
+    escape_segments = [segment for segment in interpretation.segments if segment.chart.value == "escape_transport"]
+
+    assert escape_segments
+    assert "escape_outgoing_energy" in escape_segments[-1].diagnostics
+    assert "escape_asymptotic_resolved" in escape_segments[-1].diagnostics

@@ -69,6 +69,8 @@ Hierarchy segments also include a resonance-detuning certificate: the median inn
 
 Periodic-neighborhood segments now include a finite-difference flow-map monodromy certificate: spectral radius, condition number, endpoint error, closure ratio, and a shadowing-radius proxy. The certificate explicitly marks whether the segment is a full-period candidate; otherwise it remains a local flow-map proxy, not a Floquet theorem.
 
+Escape segments now include an asymptotic convergence certificate: outgoing two-body energy, tail energy drift, radius growth, deflection drift, and escape speed at infinity. A finite trajectory is only promoted to escape support when the outgoing tail is energetically positive and numerically convergent.
+
 This is the current honest answer to "is the three-body problem interpreted?":
 
 > Individual trajectories can now be interpreted locally by an explicit atlas. A general theorem requires completing the certificate obligations.

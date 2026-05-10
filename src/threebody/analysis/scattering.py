@@ -54,6 +54,36 @@ class PeriapsisScatteringMap:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class EscapeAsymptoticCertificate:
+    """Finite-time certificate for whether an escape label has asymptotic support."""
+
+    inner_pair: tuple[int, int]
+    outer_body: int
+    tail_sample_count: int
+    outgoing_energy: float
+    relative_energy_drift: float
+    radius_growth_fraction: float
+    deflection_angle_drift: float
+    escape_speed_at_infinity: float
+    asymptotic_resolved: bool
+    warning: str
+
+    def as_dict(self) -> dict[str, float | int | bool | str | tuple[int, int]]:
+        return {
+            "inner_pair": self.inner_pair,
+            "outer_body": self.outer_body,
+            "tail_sample_count": self.tail_sample_count,
+            "outgoing_energy": self.outgoing_energy,
+            "relative_energy_drift": self.relative_energy_drift,
+            "radius_growth_fraction": self.radius_growth_fraction,
+            "deflection_angle_drift": self.deflection_angle_drift,
+            "escape_speed_at_infinity": self.escape_speed_at_infinity,
+            "asymptotic_resolved": self.asymptotic_resolved,
+            "warning": self.warning,
+        }
+
+
 def periapsis_scattering_map(
     system: object,
     trajectory: TrajectoryResult,
@@ -121,6 +151,57 @@ def periapsis_scattering_map(
     )
 
 
+def escape_asymptotic_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    inner_pair: tuple[int, int] = (0, 1),
+    tail_fraction: float = 0.25,
+    energy_tolerance: float = 5.0e-2,
+    deflection_tolerance: float = 5.0e-2,
+) -> EscapeAsymptoticCertificate:
+    """Check whether the outgoing leg has converged enough to support an escape/scattering label."""
+
+    if getattr(system, "body_count", None) != 3:
+        raise TypeError("escape_asymptotic_certificate requires a general three-body system.")
+    outer = next(index for index in range(3) if index not in inner_pair)
+    tail_count = max(3, int(np.ceil(len(trajectory.t) * tail_fraction)))
+    tail_states = trajectory.y[-tail_count:]
+    radii, energies, velocities = _outer_relative_series(system, tail_states, inner_pair, outer)
+    outgoing_energy = float(energies[-1])
+    relative_energy_drift = _relative_span(energies)
+    radius_growth_fraction = float(np.mean(np.diff(radii) > 0.0)) if radii.size > 1 else 0.0
+    deflection_angles = np.asarray([_angle_between(velocities[0], velocity) for velocity in velocities], dtype=float)
+    deflection_angle_drift = float(np.max(deflection_angles) - np.min(deflection_angles))
+    escape_speed = float(np.sqrt(max(2.0 * outgoing_energy, 0.0)))
+    asymptotic_resolved = (
+        outgoing_energy > 0.0
+        and relative_energy_drift <= energy_tolerance
+        and radius_growth_fraction >= 0.8
+        and deflection_angle_drift <= deflection_tolerance
+    )
+    warning = ""
+    if outgoing_energy <= 0.0:
+        warning = "outgoing two-body energy is not positive"
+    elif radius_growth_fraction < 0.8:
+        warning = "outer radius is not monotonically increasing over the tail"
+    elif relative_energy_drift > energy_tolerance:
+        warning = "outgoing energy has not converged over the tail"
+    elif deflection_angle_drift > deflection_tolerance:
+        warning = "deflection angle has not converged over the tail"
+    return EscapeAsymptoticCertificate(
+        inner_pair=inner_pair,
+        outer_body=outer,
+        tail_sample_count=tail_count,
+        outgoing_energy=outgoing_energy,
+        relative_energy_drift=relative_energy_drift,
+        radius_growth_fraction=radius_growth_fraction,
+        deflection_angle_drift=deflection_angle_drift,
+        escape_speed_at_infinity=escape_speed,
+        asymptotic_resolved=asymptotic_resolved,
+        warning=warning,
+    )
+
+
 def _angle_between(first: np.ndarray, second: np.ndarray) -> float:
     first_norm = float(np.linalg.norm(first))
     second_norm = float(np.linalg.norm(second))
@@ -128,6 +209,45 @@ def _angle_between(first: np.ndarray, second: np.ndarray) -> float:
         return 0.0
     cosine = float(np.dot(first, second) / (first_norm * second_norm))
     return float(np.arccos(np.clip(cosine, -1.0, 1.0)))
+
+
+def _outer_relative_series(
+    system: object,
+    states: np.ndarray,
+    inner_pair: tuple[int, int],
+    outer: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    masses = np.asarray(system.masses, dtype=float)
+    i, j = inner_pair
+    pair_mass = masses[i] + masses[j]
+    radii = []
+    energies = []
+    velocities_out = []
+    for state in states:
+        positions, velocities = system.split_state(state)
+        pair_center = (masses[i] * positions[i] + masses[j] * positions[j]) / pair_mass
+        pair_velocity = (masses[i] * velocities[i] + masses[j] * velocities[j]) / pair_mass
+        relative_position = positions[outer] - pair_center
+        relative_velocity = velocities[outer] - pair_velocity
+        radius = float(np.linalg.norm(relative_position))
+        mu = system.gravitational_constant * (pair_mass + masses[outer])
+        energy = 0.5 * float(np.dot(relative_velocity, relative_velocity)) - mu / max(radius, 1.0e-12)
+        radii.append(radius)
+        energies.append(energy)
+        velocities_out.append(relative_velocity)
+    return (
+        np.asarray(radii, dtype=float),
+        np.asarray(energies, dtype=float),
+        np.asarray(velocities_out, dtype=float),
+    )
+
+
+def _relative_span(values: np.ndarray) -> float:
+    finite = np.asarray(values[np.isfinite(values)], dtype=float)
+    if finite.size == 0:
+        return np.inf
+    scale = max(abs(float(finite[-1])), 1.0e-12)
+    return float((np.max(finite) - np.min(finite)) / scale)
 
 
 def _relative_orbital_elements(

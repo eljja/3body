@@ -6,8 +6,10 @@ import numpy as np
 
 from ..types import TrajectoryResult
 from .atlas import AnalysisAtlas
+from .coordinates import general_three_body_features
 from .error_bounds import chart_validity_bound
 from .hierarchy import hierarchy_action_drift_bound, hierarchy_resonance_diagnostic
+from .scattering import escape_asymptotic_certificate
 from .types import ChartTransition, ChartType
 from .variational import periodic_monodromy_certificate
 
@@ -250,6 +252,15 @@ def _make_segment(
                 *resolved_obligations,
                 "numerically compute segment flow-map monodromy",
                 "estimate numerical shadowing radius proxy",
+            )
+    if chart == ChartType.ESCAPE_TRANSPORT and getattr(system, "body_count", None) == 3:
+        features = general_three_body_features(system, trajectory.y[start_index])
+        escape = escape_asymptotic_certificate(system, trajectory, inner_pair=features.nearest_pair)
+        diagnostics.update({f"escape_{key}": value for key, value in escape.as_dict().items()})
+        if escape.asymptotic_resolved:
+            resolved_obligations = (
+                *resolved_obligations,
+                "numerically certify outgoing escape asymptotics",
             )
     return InterpretationSegment(
         start_index=start_index,

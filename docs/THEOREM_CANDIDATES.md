@@ -22,6 +22,7 @@ Current proof status:
 - Hierarchy interpretation now emits a numerical inner-action drift certificate against a tidal perturbation budget. The analytic drift theorem is still open.
 - Hierarchy interpretation also emits a resonance-detuning certificate against small-denominator rational ratios. Stability of the resonant/nonresonant split is still open.
 - Periodic-neighborhood interpretation now emits a finite-difference monodromy/shadowing proxy. Full Floquet promotion still requires a certified full-period return.
+- Escape interpretation now emits an outgoing asymptotic convergence certificate. A finite-time escape label is no longer accepted without tail convergence evidence.
 - Held-out and artifact guardrails exist.
 - No theorem-level covering proof exists.
 
