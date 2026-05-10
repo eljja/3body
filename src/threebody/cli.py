@@ -18,6 +18,7 @@ from .experiments import (
     InterpretationSuite,
     IntegratorComparisonStudy,
     KnownBenchmarkSuite,
+    NearCollisionScalingStudy,
     OrbitLibrary,
     RegimeProbeSuite,
     TheoremSuite,
@@ -293,6 +294,7 @@ def run_research_checks_command(args: argparse.Namespace) -> int:
     figure_eight = FigureEightStabilityProbe().run()
     close_residual = CloseEncounterResidualStudy().run()
     close_residual_grid = CloseEncounterResidualGridStudy().run()
+    near_collision_scaling = NearCollisionScalingStudy().run()
     output = args.output or _default_output_path("research-checks")
     output.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -308,6 +310,7 @@ def run_research_checks_command(args: argparse.Namespace) -> int:
             "figure_eight_stability": figure_eight.as_dict(),
             "close_encounter_residual": close_residual.as_dict(),
             "close_encounter_residual_grid": close_residual_grid.as_dict(),
+            "near_collision_scaling": near_collision_scaling.as_dict(),
         },
     }
     output.write_text(json.dumps(payload, indent=2), encoding="utf-8")

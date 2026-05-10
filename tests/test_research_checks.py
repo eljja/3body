@@ -9,6 +9,7 @@ from threebody.experiments import (
     InterpretationSuite,
     IntegratorComparisonStudy,
     KnownBenchmarkSuite,
+    NearCollisionScalingStudy,
     RegimeProbeSuite,
 )
 
@@ -71,6 +72,19 @@ def test_close_encounter_residual_grid_validates_declared_cases() -> None:
     assert result.maximum_equivalence_acceleration_residual is not None
     assert result.maximum_equivalence_acceleration_residual < 1.0e-7
     assert all(row.flow_defined for row in result.rows)
+
+
+def test_near_collision_scaling_study_controls_normalized_residual() -> None:
+    result = NearCollisionScalingStudy().run()
+
+    assert len(result.rows) >= 5
+    assert result.scaling_resolved is True
+    assert result.minimum_pair_distance is not None
+    assert result.minimum_pair_distance <= 0.0081
+    assert result.maximum_residual is not None
+    assert result.maximum_residual <= result.residual_threshold
+    assert result.maximum_normalized_residual is not None
+    assert result.maximum_normalized_residual <= result.normalized_residual_threshold
 
 
 def test_known_benchmarks_and_regime_probes_return_rows() -> None:

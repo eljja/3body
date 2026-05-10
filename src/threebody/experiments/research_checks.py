@@ -634,6 +634,159 @@ class CloseEncounterResidualGridStudy:
 
 
 @dataclass(frozen=True, slots=True)
+class NearCollisionScalingRow:
+    binary_separation: float
+    duration: float
+    sample_count: int
+    minimum_pair_distance: float
+    maximum_rhs_norm: float
+    maximum_finite_difference_residual: float | None
+    normalized_residual: float | None
+    maximum_equivalence_acceleration_residual: float
+    residual_resolved: bool
+    equivalence_resolved: bool
+
+    def as_dict(self) -> dict[str, float | int | bool | None]:
+        return {
+            "binary_separation": self.binary_separation,
+            "duration": self.duration,
+            "sample_count": self.sample_count,
+            "minimum_pair_distance": self.minimum_pair_distance,
+            "maximum_rhs_norm": self.maximum_rhs_norm,
+            "maximum_finite_difference_residual": self.maximum_finite_difference_residual,
+            "normalized_residual": self.normalized_residual,
+            "maximum_equivalence_acceleration_residual": self.maximum_equivalence_acceleration_residual,
+            "residual_resolved": self.residual_resolved,
+            "equivalence_resolved": self.equivalence_resolved,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class NearCollisionScalingResult:
+    rows: tuple[NearCollisionScalingRow, ...]
+    residual_threshold: float
+    normalized_residual_threshold: float
+
+    @property
+    def minimum_pair_distance(self) -> float | None:
+        return None if not self.rows else float(min(row.minimum_pair_distance for row in self.rows))
+
+    @property
+    def maximum_residual(self) -> float | None:
+        residuals = [
+            row.maximum_finite_difference_residual
+            for row in self.rows
+            if row.maximum_finite_difference_residual is not None
+        ]
+        return None if not residuals else float(max(residuals))
+
+    @property
+    def maximum_normalized_residual(self) -> float | None:
+        residuals = [row.normalized_residual for row in self.rows if row.normalized_residual is not None]
+        return None if not residuals else float(max(residuals))
+
+    @property
+    def maximum_equivalence_acceleration_residual(self) -> float | None:
+        return None if not self.rows else float(max(row.maximum_equivalence_acceleration_residual for row in self.rows))
+
+    @property
+    def pass_rate(self) -> float:
+        if not self.rows:
+            return 0.0
+        return float(sum(row.residual_resolved and row.equivalence_resolved for row in self.rows) / len(self.rows))
+
+    @property
+    def scaling_resolved(self) -> bool:
+        return (
+            self.pass_rate == 1.0
+            and self.maximum_residual is not None
+            and self.maximum_residual <= self.residual_threshold
+            and self.maximum_normalized_residual is not None
+            and self.maximum_normalized_residual <= self.normalized_residual_threshold
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "rows": [row.as_dict() for row in self.rows],
+            "residual_threshold": self.residual_threshold,
+            "normalized_residual_threshold": self.normalized_residual_threshold,
+            "minimum_pair_distance": self.minimum_pair_distance,
+            "maximum_residual": self.maximum_residual,
+            "maximum_normalized_residual": self.maximum_normalized_residual,
+            "maximum_equivalence_acceleration_residual": self.maximum_equivalence_acceleration_residual,
+            "pass_rate": self.pass_rate,
+            "scaling_resolved": self.scaling_resolved,
+        }
+
+
+@dataclass(slots=True)
+class NearCollisionScalingStudy:
+    """Push the Levi-Civita residual certificate toward smaller binary separations."""
+
+    library: OrbitLibrary = field(default_factory=OrbitLibrary)
+    integrator: AdaptiveIntegrator = field(
+        default_factory=lambda: AdaptiveIntegrator(rtol=1.0e-11, atol=1.0e-13, max_step=5.0e-5)
+    )
+    residual_threshold: float = 5.0e-4
+    normalized_residual_threshold: float = 5.0e-5
+
+    def run(self) -> NearCollisionScalingResult:
+        rows = []
+        for separation, duration, samples in (
+            (0.020, 0.020, 401),
+            (0.016, 0.016, 401),
+            (0.012, 0.012, 481),
+            (0.010, 0.010, 501),
+            (0.008, 0.008, 641),
+        ):
+            scenario = self.library.general_close_encounter_probe(
+                binary_separation=separation,
+                intruder_mass=0.05,
+                intruder_position=(1.0, 0.2),
+                intruder_velocity=(0.0, -0.1),
+                duration=duration,
+                samples=samples,
+            )
+            trajectory = self.integrator.integrate(
+                scenario.system,
+                scenario.t_span,
+                scenario.initial_state,
+                t_eval=scenario.t_eval,
+            )
+            certificate = levi_civita_flow_certificate(
+                scenario.system,
+                trajectory,
+                pair=(0, 1),
+                residual_tolerance=self.residual_threshold,
+            )
+            equivalence = levi_civita_equivalence_certificate(scenario.system, trajectory, pair=(0, 1))
+            normalized = (
+                None
+                if certificate.maximum_finite_difference_residual is None
+                else float(certificate.maximum_finite_difference_residual / max(certificate.maximum_rhs_norm, 1.0e-18))
+            )
+            rows.append(
+                NearCollisionScalingRow(
+                    binary_separation=separation,
+                    duration=duration,
+                    sample_count=certificate.sample_count,
+                    minimum_pair_distance=certificate.minimum_radius,
+                    maximum_rhs_norm=certificate.maximum_rhs_norm,
+                    maximum_finite_difference_residual=certificate.maximum_finite_difference_residual,
+                    normalized_residual=normalized,
+                    maximum_equivalence_acceleration_residual=equivalence.maximum_acceleration_residual,
+                    residual_resolved=certificate.residual_resolved,
+                    equivalence_resolved=equivalence.equivalence_resolved,
+                )
+            )
+        return NearCollisionScalingResult(
+            rows=tuple(rows),
+            residual_threshold=self.residual_threshold,
+            normalized_residual_threshold=self.normalized_residual_threshold,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class BenchmarkResult:
     name: str
     metric: str

@@ -12,6 +12,7 @@ from .research_checks import (
     IntegratorComparisonStudy,
     InterpretationSuite,
     KnownBenchmarkSuite,
+    NearCollisionScalingStudy,
     RegimeProbeSuite,
 )
 
@@ -97,6 +98,7 @@ class TheoremSuite:
         interpretation = InterpretationSuite().run()
         close_residual = CloseEncounterResidualStudy().run()
         close_residual_grid = CloseEncounterResidualGridStudy().run()
+        near_collision = NearCollisionScalingStudy().run()
         flyby = HierarchicalFlybySweep().run_discovery_validation(
             discovery_binary_phases=(0.0, 1.5707963267948966),
             validation_binary_phases=(
@@ -119,6 +121,7 @@ class TheoremSuite:
             interpretation,
             close_residual,
             close_residual_grid,
+            near_collision,
             flyby_summary,
         )
         candidates = _theorem_candidates(benchmark_rows)
@@ -134,6 +137,7 @@ def _paper_benchmarks(
     interpretation: object,
     close_residual: object,
     close_residual_grid: object,
+    near_collision: object,
     flyby_summary: dict[str, object],
 ) -> tuple[PaperBenchmarkResult, ...]:
     transition_counts = [row.transition_count for row in artifact_rows]
@@ -430,6 +434,17 @@ def _paper_benchmarks(
             interpretation=(
                 "The regularized chart must reconstruct inertial position, velocity, and acceleration over the "
                 "current close-encounter grid before an analytic equivalence theorem is attempted."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="levi_civita_near_collision_scaling",
+            passed=near_collision.scaling_resolved,
+            metric="maximum_normalized_residual",
+            observed=near_collision.maximum_normalized_residual,
+            threshold=near_collision.normalized_residual_threshold,
+            interpretation=(
+                "The regularized RHS residual should remain controlled as the certified binary separation "
+                "is pushed toward smaller near-collision values."
             ),
         ),
         PaperBenchmarkResult(
@@ -792,6 +807,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     levi_civita_residual_passed = benchmark_by_name["levi_civita_non_synthetic_residual"].passed
     levi_civita_grid_passed = benchmark_by_name["levi_civita_residual_grid"].passed
     levi_civita_equivalence_passed = benchmark_by_name["levi_civita_local_equivalence"].passed
+    levi_civita_near_collision_passed = benchmark_by_name["levi_civita_near_collision_scaling"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
         TheoremCandidate(
@@ -827,15 +843,17 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                             and levi_civita_residual_passed
                             and levi_civita_grid_passed
                             and levi_civita_equivalence_passed
+                            and levi_civita_near_collision_passed
                         )
                         else "open"
                     ),
                     (
                         "Levi-Civita binary chart reconstruction and perturbation-aware regularized RHS are "
                         "certified, the current integrated residual grid passes, and local inertial equivalence "
-                        "residuals are controlled. A collision manifold theorem remains open."
+                        "residuals are controlled through the current near-collision scaling grid. A collision "
+                        "manifold theorem remains open."
                     ),
-                    "Turn the local equivalence certificate into an analytic theorem and expand toward near-collision limits.",
+                    "Turn the finite near-collision scaling certificate into an analytic limiting bound.",
                 ),
             ),
         ),
