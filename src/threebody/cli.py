@@ -13,6 +13,7 @@ from .experiments import (
     ClassifierArtifactStudy,
     FigureEightStabilityProbe,
     HierarchicalFlybySweep,
+    InterpretationSuite,
     IntegratorComparisonStudy,
     KnownBenchmarkSuite,
     OrbitLibrary,
@@ -137,6 +138,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-interpret.json.",
     )
     interpret.set_defaults(func=run_interpret_command)
+    interpretation_suite = subparsers.add_parser(
+        "interpretation-suite",
+        help="Run representative regimes through chart-local interpretation certificates.",
+    )
+    interpretation_suite.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-interpretation-suite.json.",
+    )
+    interpretation_suite.set_defaults(func=run_interpretation_suite_command)
     return parser
 
 
@@ -348,6 +360,25 @@ def run_interpret_command(args: argparse.Namespace) -> int:
     print(f"segments={len(interpretation.segments)} transitions={len(interpretation.transitions)}")
     print(f"regime_status={interpretation.certificate.regime_status}")
     print(f"unresolved_obligations={len(interpretation.unresolved_obligations)}")
+    return 0
+
+
+def run_interpretation_suite_command(args: argparse.Namespace) -> int:
+    result = InterpretationSuite().run()
+    output = args.output or _default_output_path("interpretation-suite")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "metadata": {
+            "created_at": datetime.now(UTC).isoformat(),
+            "kind": "interpretation-suite",
+        },
+        "summary": result.as_dict(),
+    }
+    output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"wrote {output}")
+    print(f"cases={len(result.rows)} local_interpretation_rate={result.local_interpretation_rate:.3f}")
+    print(f"covered_chart_types={','.join(result.covered_chart_types)}")
+    print(f"unresolved_blockers={len(result.unresolved_blockers)}")
     return 0
 
 

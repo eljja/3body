@@ -4,6 +4,7 @@ from threebody.experiments import (
     ClassifierArtifactStudy,
     FigureEightStabilityProbe,
     GrammarBranchArtifactStudy,
+    InterpretationSuite,
     IntegratorComparisonStudy,
     KnownBenchmarkSuite,
     RegimeProbeSuite,
@@ -16,6 +17,16 @@ def test_classifier_artifact_study_varies_classifier_settings() -> None:
     assert len(rows) >= 4
     assert {row.label for row in rows} >= {"baseline", "strict_hierarchy", "loose_hierarchy"}
     assert all(row.transition_count >= 0 for row in rows)
+
+
+def test_interpretation_suite_covers_certificate_regimes() -> None:
+    result = InterpretationSuite().run()
+
+    assert result.rows
+    assert result.local_interpretation_rate == 1.0
+    assert {"escape_transport", "close_encounter", "restricted_lagrange"}.issubset(result.covered_chart_types)
+    assert result.resolved_obligations
+    assert result.unresolved_blockers
 
 
 def test_grammar_branch_artifact_study_varies_classifier_settings() -> None:

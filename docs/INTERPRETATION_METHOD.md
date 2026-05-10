@@ -22,6 +22,14 @@ The command-line entry point is:
 threebody interpret --scenario hierarchical-flyby --periods 8.0 --samples 600 --stride 20
 ```
 
+The representative certificate suite is:
+
+```powershell
+threebody interpretation-suite
+```
+
+It currently runs hierarchical flyby, restricted L4, synthetic escape scattering, and close-encounter probes through the same certificate pipeline. The intended role is a coverage dashboard: it reports which chart types are locally interpretable, which numerical obligations are resolved, and which blockers still prevent theorem-level promotion.
+
 ## Chart Families
 
 - `two_body_hierarchy`: osculating Kepler binary plus tidal perturbation.
@@ -78,3 +86,5 @@ Restricted Lagrange and gateway segments now include a CR3BP certificate: neares
 This is the current honest answer to "is the three-body problem interpreted?":
 
 > Individual trajectories can now be interpreted locally by an explicit atlas. A general theorem requires completing the certificate obligations.
+
+The `InterpretationSuite` result is the current regression target for that statement. It should stay at full local-interpretation coverage while the unresolved blocker count decreases over time.

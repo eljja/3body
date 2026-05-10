@@ -59,3 +59,16 @@ def test_interpret_cli_writes_chart_local_segments(tmp_path) -> None:
     assert payload["summary"]["certificate"]["theorem_ready"] is False
     assert payload["summary"]["segments"]
     assert payload["summary"]["unresolved_obligations"]
+
+
+def test_interpretation_suite_cli_writes_certificate_coverage(tmp_path) -> None:
+    output = tmp_path / "interpretation-suite.json"
+
+    exit_code = main(["interpretation-suite", "--output", str(output)])
+
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert payload["metadata"]["kind"] == "interpretation-suite"
+    assert payload["summary"]["local_interpretation_rate"] == 1.0
+    assert "close_encounter" in payload["summary"]["covered_chart_types"]
+    assert payload["summary"]["unresolved_blockers"]

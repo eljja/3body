@@ -19,6 +19,7 @@ Current proof status:
 - `ReducedThreeBodyState` exists.
 - Hierarchy, collision, gateway, escape, and scattering diagnostics exist.
 - `ThreeBodyInterpreter` now converts a trajectory into chart-local interpretation segments with model families, validity statements, and unresolved proof obligations.
+- `InterpretationSuite` now aggregates representative hierarchy, restricted Lagrange, escape, and close-encounter cases into one reproducible coverage certificate.
 - Hierarchy interpretation now emits a numerical inner-action drift certificate against a tidal perturbation budget. The analytic drift theorem is still open.
 - Hierarchy interpretation also emits a resonance-detuning certificate against small-denominator rational ratios. Stability of the resonant/nonresonant split is still open.
 - Periodic-neighborhood interpretation now emits a finite-difference monodromy/shadowing proxy. Full Floquet promotion still requires a certified full-period return.
@@ -140,6 +141,7 @@ Run:
 
 ```powershell
 threebody theorem-suite
+threebody interpretation-suite
 ```
 
 The suite reports which obligations are partial, failing, or open.

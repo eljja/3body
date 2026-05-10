@@ -7,6 +7,7 @@ import numpy as np
 from ..analysis import (
     AnalysisAtlas,
     ChartClassifier,
+    ThreeBodyInterpreter,
     chart_validity_bound,
     gateway_transit_estimate,
     local_linearization,
@@ -16,6 +17,7 @@ from ..analysis import (
 from ..diagnostics import InvariantMonitor, StabilityAnalyzer
 from ..solvers import AdaptiveIntegrator, StructureAwareIntegrator
 from ..systems import GeneralThreeBodySystem
+from ..types import TrajectoryResult
 from .orbit_library import OrbitLibrary
 from .flyby_sweep import HierarchicalFlybySweep
 
@@ -82,6 +84,143 @@ class ClassifierArtifactStudy:
                 )
             )
         return tuple(rows)
+
+
+@dataclass(frozen=True, slots=True)
+class InterpretationSuiteRow:
+    name: str
+    segment_count: int
+    transition_count: int
+    regime_status: str
+    local_interpretation_available: bool
+    theorem_ready: bool
+    chart_types: tuple[str, ...]
+    resolved_obligation_count: int
+    blocker_count: int
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "segment_count": self.segment_count,
+            "transition_count": self.transition_count,
+            "regime_status": self.regime_status,
+            "local_interpretation_available": self.local_interpretation_available,
+            "theorem_ready": self.theorem_ready,
+            "chart_types": list(self.chart_types),
+            "resolved_obligation_count": self.resolved_obligation_count,
+            "blocker_count": self.blocker_count,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class InterpretationSuiteResult:
+    rows: tuple[InterpretationSuiteRow, ...]
+    covered_chart_types: tuple[str, ...]
+    unresolved_blockers: tuple[str, ...]
+    resolved_obligations: tuple[str, ...]
+
+    @property
+    def local_interpretation_rate(self) -> float:
+        if not self.rows:
+            return 0.0
+        return float(sum(row.local_interpretation_available for row in self.rows) / len(self.rows))
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "rows": [row.as_dict() for row in self.rows],
+            "covered_chart_types": list(self.covered_chart_types),
+            "unresolved_blockers": list(self.unresolved_blockers),
+            "resolved_obligations": list(self.resolved_obligations),
+            "local_interpretation_rate": self.local_interpretation_rate,
+        }
+
+
+@dataclass(slots=True)
+class InterpretationSuite:
+    """Run representative regimes through the chart-local interpretation certificate pipeline."""
+
+    library: OrbitLibrary = field(default_factory=OrbitLibrary)
+    integrator: AdaptiveIntegrator = field(default_factory=lambda: AdaptiveIntegrator(rtol=1.0e-8, atol=1.0e-10))
+    interpreter: ThreeBodyInterpreter = field(default_factory=ThreeBodyInterpreter)
+
+    def run(self) -> InterpretationSuiteResult:
+        scenarios = (
+            ("hierarchical_flyby", *self._hierarchical_flyby()),
+            ("restricted_l4", *self._restricted_l4()),
+            ("escape_scattering", *self._escape_scattering()),
+            ("close_encounter", *self._close_encounter()),
+        )
+        rows = []
+        covered: list[str] = []
+        blockers: list[str] = []
+        resolved: list[str] = []
+        for name, system, trajectory, stride in scenarios:
+            interpretation = self.interpreter.interpret(system, trajectory, stride=stride)
+            chart_types = tuple(dict.fromkeys(segment.chart.value for segment in interpretation.segments))
+            covered.extend(chart_types)
+            blockers.extend(interpretation.unresolved_obligations)
+            resolved.extend(interpretation.resolved_obligations)
+            rows.append(
+                InterpretationSuiteRow(
+                    name=name,
+                    segment_count=len(interpretation.segments),
+                    transition_count=len(interpretation.transitions),
+                    regime_status=interpretation.certificate.regime_status,
+                    local_interpretation_available=interpretation.certificate.local_interpretation_available,
+                    theorem_ready=interpretation.certificate.theorem_ready,
+                    chart_types=chart_types,
+                    resolved_obligation_count=len(interpretation.resolved_obligations),
+                    blocker_count=len(interpretation.unresolved_obligations),
+                )
+            )
+        return InterpretationSuiteResult(
+            rows=tuple(rows),
+            covered_chart_types=tuple(sorted(set(covered))),
+            unresolved_blockers=tuple(dict.fromkeys(blockers)),
+            resolved_obligations=tuple(dict.fromkeys(resolved)),
+        )
+
+    def _hierarchical_flyby(self) -> tuple[object, TrajectoryResult, int]:
+        scenario = self.library.general_hierarchical_flyby(duration=2.0, samples=120)
+        trajectory = self.integrator.integrate(
+            scenario.system,
+            scenario.t_span,
+            scenario.initial_state,
+            t_eval=scenario.t_eval,
+        )
+        return scenario.system, trajectory, 10
+
+    def _restricted_l4(self) -> tuple[object, TrajectoryResult, int]:
+        scenario = self.library.restricted_l4(periods=0.2, samples=160)
+        trajectory = self.integrator.integrate(
+            scenario.system,
+            scenario.t_span,
+            scenario.initial_state,
+            t_eval=scenario.t_eval,
+        )
+        return scenario.system, trajectory, 10
+
+    def _escape_scattering(self) -> tuple[object, TrajectoryResult, int]:
+        system = GeneralThreeBodySystem(masses=(1.0, 1.0, 0.1), dimension=2)
+        times = np.linspace(0.0, 1.0, 40)
+        states = []
+        for time in times:
+            positions = np.array([[-0.1, 0.0], [0.1, 0.0], [8.0 + 4.0 * time, 0.0]], dtype=float)
+            velocities = np.array([[0.0, 0.4], [0.0, -0.4], [4.0, 0.0]], dtype=float)
+            states.append(system.flatten_state(positions, velocities))
+        return system, TrajectoryResult(t=times, y=np.asarray(states), success=True, message="synthetic escape"), 5
+
+    def _close_encounter(self) -> tuple[object, TrajectoryResult, int]:
+        system = GeneralThreeBodySystem(masses=(1.0, 1.0, 1.0), dimension=2)
+        state = system.flatten_state(
+            np.array([[0.0, 0.0], [0.005, 0.0], [1.0, 0.0]], dtype=float),
+            np.zeros((3, 2), dtype=float),
+        )
+        return (
+            system,
+            TrajectoryResult(t=np.array([0.0, 1.0]), y=np.vstack([state, state]), success=True, message="synthetic close"),
+            1,
+        )
 
 
 @dataclass(frozen=True, slots=True)
