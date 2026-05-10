@@ -9,6 +9,7 @@ from .atlas import AnalysisAtlas
 from .collision import collision_regularization_certificate
 from .coordinates import general_three_body_features
 from .error_bounds import chart_validity_bound
+from .gateway import restricted_chart_certificate
 from .hierarchy import hierarchy_action_drift_bound, hierarchy_resonance_diagnostic
 from .scattering import escape_asymptotic_certificate
 from .types import ChartTransition, ChartType
@@ -32,7 +33,7 @@ class InterpretationSegment:
     interpretability_score: float
     confidence_min: float
     confidence_mean: float
-    diagnostics: dict[str, float | int | bool | str | tuple[int, int]] = field(default_factory=dict)
+    diagnostics: dict[str, float | int | bool | str | tuple[int, int] | None] = field(default_factory=dict)
     resolved_obligations: tuple[str, ...] = ()
     unresolved_obligations: tuple[str, ...] = ()
 
@@ -227,7 +228,7 @@ def _make_segment(
     confidences = np.asarray([report.confidence for report in reports], dtype=float)
     start_index = min(report_start * stride, len(trajectory.t) - 1)
     end_index = min(report_end * stride, len(trajectory.t) - 1)
-    diagnostics: dict[str, float | int | bool | str | tuple[int, int]] = {}
+    diagnostics: dict[str, float | int | bool | str | tuple[int, int] | None] = {}
     resolved_obligations: tuple[str, ...] = ()
     if chart == ChartType.TWO_BODY_HIERARCHY and getattr(system, "body_count", None) == 3:
         bound_start = max(0, start_index - stride)
@@ -277,6 +278,21 @@ def _make_segment(
             resolved_obligations = (
                 *resolved_obligations,
                 "numerically certify close-encounter regularization requirement",
+            )
+    if chart in {ChartType.RESTRICTED_LAGRANGE, ChartType.RESTRICTED_GATEWAY} and hasattr(system, "jacobi_constant"):
+        restricted_start = max(0, start_index - stride)
+        restricted_end = min(len(trajectory.t) - 1, max(end_index + stride, start_index + 1))
+        restricted = restricted_chart_certificate(
+            system,
+            trajectory,
+            start_index=restricted_start,
+            end_index=restricted_end,
+        )
+        diagnostics.update({f"restricted_{key}": value for key, value in restricted.as_dict().items()})
+        if restricted.numerically_resolved:
+            resolved_obligations = (
+                *resolved_obligations,
+                "numerically certify restricted-chart Jacobi control",
             )
     return InterpretationSegment(
         start_index=start_index,

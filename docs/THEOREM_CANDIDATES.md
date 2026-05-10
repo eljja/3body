@@ -24,6 +24,7 @@ Current proof status:
 - Periodic-neighborhood interpretation now emits a finite-difference monodromy/shadowing proxy. Full Floquet promotion still requires a certified full-period return.
 - Escape interpretation now emits an outgoing asymptotic convergence certificate. A finite-time escape label is no longer accepted without tail convergence evidence.
 - Close-encounter interpretation now emits a collision-regularization certificate and gives collision charts priority inside the hard close-pair scale. Regularized flow implementation remains open.
+- Restricted Lagrange/gateway interpretation now emits a Jacobi-control and neck-transit certificate. Normal-form remainders and invariant-manifold proofs remain open.
 - Held-out and artifact guardrails exist.
 - No theorem-level covering proof exists.
 

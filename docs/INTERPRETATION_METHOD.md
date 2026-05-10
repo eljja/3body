@@ -73,6 +73,8 @@ Escape segments now include an asymptotic convergence certificate: outgoing two-
 
 Close-encounter segments now include a collision-regularization certificate: minimum pair distance, hyperradius, collision depth, observed collision type, inward speed, and whether regularized coordinates are required. A close-encounter law cannot be promoted while this certificate says regularization is required but no regularized flow exists.
 
+Restricted Lagrange and gateway segments now include a CR3BP certificate: nearest Lagrange point, Jacobi drift, Lagrange-neighborhood distance range, Routh stability for triangular points, and neck/transit diagnostics for collinear gateways.
+
 This is the current honest answer to "is the three-body problem interpreted?":
 
 > Individual trajectories can now be interpreted locally by an explicit atlas. A general theorem requires completing the certificate obligations.

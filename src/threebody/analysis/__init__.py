@@ -12,7 +12,7 @@ from .coordinates import GeneralThreeBodyFeatures, RestrictedThreeBodyFeatures
 from .ensembles import PerturbationEnsemble, PerturbationMember
 from .events import TransitionEventEvidence, transition_event_evidence, transition_event_rows
 from .error_bounds import ChartValidityBound, chart_validity_bound
-from .gateway import GatewayTransitEstimate, gateway_transit_estimate
+from .gateway import GatewayTransitEstimate, RestrictedChartCertificate, gateway_transit_estimate, restricted_chart_certificate
 from .exchange import EncounterExchangeMetrics, encounter_exchange_metrics
 from .hierarchy import (
     HierarchicalElements,
@@ -95,6 +95,7 @@ __all__ = [
     "ResearchRunResult",
     "ResearchValidationResult",
     "ReducedThreeBodyState",
+    "RestrictedChartCertificate",
     "RestrictedThreeBodyFeatures",
     "TransitionPrediction",
     "TransitionEventEvidence",
@@ -129,6 +130,7 @@ __all__ = [
     "local_linearization",
     "periodic_monodromy_certificate",
     "gateway_transit_estimate",
+    "restricted_chart_certificate",
     "mcgehee_collision_diagnostic",
     "periapsis_scattering_map",
     "refined_chart_symbol",

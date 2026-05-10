@@ -86,3 +86,22 @@ def test_three_body_interpreter_attaches_collision_regularization_certificate() 
     assert close_segments
     assert "collision_minimum_pair_distance" in close_segments[0].diagnostics
     assert close_segments[0].diagnostics["collision_regularization_required"] is True
+
+
+def test_three_body_interpreter_attaches_restricted_lagrange_certificate() -> None:
+    scenario = OrbitLibrary().restricted_l4(periods=0.1, samples=80)
+    trajectory = AdaptiveIntegrator(rtol=1.0e-10, atol=1.0e-12).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    interpretation = ThreeBodyInterpreter().interpret(scenario.system, trajectory, stride=10)
+    restricted_segments = [
+        segment for segment in interpretation.segments if segment.chart.value == "restricted_lagrange"
+    ]
+
+    assert restricted_segments
+    assert "restricted_max_abs_jacobi_drift" in restricted_segments[0].diagnostics
+    assert "restricted_routh_stable_triangular" in restricted_segments[0].diagnostics
