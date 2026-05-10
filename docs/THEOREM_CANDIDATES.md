@@ -24,7 +24,7 @@ Current proof status:
 - Hierarchy interpretation also emits a resonance-detuning certificate against small-denominator rational ratios. Stability of the resonant/nonresonant split is still open.
 - Periodic-neighborhood interpretation now emits a finite-difference monodromy/shadowing proxy. Full Floquet promotion still requires a certified full-period return.
 - Escape interpretation now emits an outgoing asymptotic convergence certificate. A finite-time escape label is no longer accepted without tail convergence evidence.
-- Close-encounter interpretation now emits a collision-regularization certificate, gives collision charts priority inside the hard close-pair scale, and certifies a planar Levi-Civita binary chart lift when applicable. Perturbation-aware regularized time flow remains open.
+- Close-encounter interpretation now emits a collision-regularization certificate, gives collision charts priority inside the hard close-pair scale, certifies a planar Levi-Civita binary chart lift when applicable, and constructs a perturbation-aware regularized-time RHS. Residual validation and equivalence proof remain open.
 - Restricted Lagrange/gateway interpretation now emits a Jacobi-control and neck-transit certificate. Normal-form remainders and invariant-manifold proofs remain open.
 - Held-out and artifact guardrails exist.
 - No theorem-level covering proof exists.
@@ -33,7 +33,7 @@ Open proof obligations:
 
 - Prove that the reduced coordinates separate the declared chart regimes under explicit inequalities.
 - Prove local error bounds for each chart.
-- Upgrade the Levi-Civita chart lift into perturbation-aware regularized flow with an equivalence proof.
+- Validate the Levi-Civita regularized RHS on non-synthetic close trajectories and prove equivalence with inertial flow away from collision.
 - Replace gateway linearization with invariant-manifold transit certificates.
 
 ## Candidate 2: Hierarchy Exit Scattering Coordinate Conjecture

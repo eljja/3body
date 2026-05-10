@@ -79,7 +79,7 @@ Periodic-neighborhood segments now include a finite-difference flow-map monodrom
 
 Escape segments now include an asymptotic convergence certificate: outgoing two-body energy, tail energy drift, radius growth, deflection drift, and escape speed at infinity. A finite trajectory is only promoted to escape support when the outgoing tail is energetically positive and numerically convergent.
 
-Close-encounter segments now include a collision-regularization certificate: minimum pair distance, hyperradius, collision depth, observed collision type, inward speed, whether regularized coordinates are required, and whether a planar Levi-Civita binary chart reconstructs the inertial relative coordinate over the interval. This resolves the chart-lift step, but not the perturbation-aware regularized time flow or the equivalence proof.
+Close-encounter segments now include a collision-regularization certificate: minimum pair distance, hyperradius, collision depth, observed collision type, inward speed, whether regularized coordinates are required, whether a planar Levi-Civita binary chart reconstructs the inertial relative coordinate over the interval, and whether a perturbation-aware regularized-time RHS is defined. This resolves the chart-lift and RHS-construction steps, but not finite residual validation on non-synthetic close trajectories or the equivalence proof.
 
 Restricted Lagrange and gateway segments now include a CR3BP certificate: nearest Lagrange point, Jacobi drift, Lagrange-neighborhood distance range, Routh stability for triangular points, and neck/transit diagnostics for collinear gateways.
 

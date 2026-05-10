@@ -7,6 +7,8 @@ from threebody.analysis import (
     gateway_transit_estimate,
     levi_civita_binary_chart,
     levi_civita_chart_certificate,
+    levi_civita_flow_certificate,
+    levi_civita_regularized_flow_state,
     mcgehee_collision_diagnostic,
     restricted_chart_certificate,
 )
@@ -46,6 +48,7 @@ def test_collision_regularization_certificate_aggregates_interval() -> None:
     assert certificate.regularization_required is True
     assert certificate.levi_civita_chart_resolved is True
     assert certificate.levi_civita_pair == (0, 1)
+    assert certificate.levi_civita_flow_defined is True
     assert certificate.minimum_pair_distance > 0.0
     assert "binary_collision_candidate" in certificate.collision_types
 
@@ -105,6 +108,45 @@ def test_levi_civita_chart_certificate_selects_continuous_branch() -> None:
 
     assert certificate.chart_resolved is True
     assert certificate.maximum_branch_jump < 1.0e-3
+
+
+def test_levi_civita_regularized_flow_state_is_finite() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 2.0, 0.5), dimension=2)
+    state = system.flatten_state(
+        np.array([[0.0, 0.0], [0.005, 0.0], [1.0, 0.1]], dtype=float),
+        np.array([[0.0, 0.0], [0.0, 0.2], [0.0, -0.1]], dtype=float),
+    )
+
+    flow = levi_civita_regularized_flow_state(system, state, (0, 1))
+
+    assert np.all(np.isfinite(flow.u_double_prime))
+    assert flow.relative_acceleration_norm > 0.0
+    assert flow.perturbation_acceleration_norm > 0.0
+
+
+def test_levi_civita_flow_certificate_reports_defined_rhs() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 1.0, 1.0), dimension=2)
+    states = []
+    for offset in (0.0, 1.0e-4, 2.0e-4):
+        states.append(
+            system.flatten_state(
+                np.array([[0.0, 0.0], [0.005 + offset, 0.0], [1.0, 0.0]], dtype=float),
+                np.zeros((3, 2), dtype=float),
+            )
+        )
+    trajectory = TrajectoryResult(
+        t=np.array([0.0, 0.5, 1.0]),
+        y=np.vstack(states),
+        success=True,
+        message="synthetic flow",
+    )
+
+    certificate = levi_civita_flow_certificate(system, trajectory, pair=(0, 1))
+
+    assert certificate.flow_defined is True
+    assert certificate.maximum_rhs_norm > 0.0
+    assert certificate.maximum_perturbation_acceleration_norm > 0.0
+    assert certificate.maximum_finite_difference_residual is not None
 
 
 def test_gateway_transit_estimate_reports_neck_openness() -> None:

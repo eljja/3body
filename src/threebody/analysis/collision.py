@@ -95,6 +95,57 @@ class LeviCivitaChartCertificate:
 
 
 @dataclass(frozen=True, slots=True)
+class LeviCivitaRegularizedFlowState:
+    """Regularized-time second-order state for one binary pair."""
+
+    pair: tuple[int, int]
+    u: np.ndarray
+    u_prime: np.ndarray
+    u_double_prime: np.ndarray
+    radius: float
+    perturbation_acceleration_norm: float
+    relative_acceleration_norm: float
+
+    def as_dict(self) -> dict[str, float | tuple[int, int]]:
+        return {
+            "pair": self.pair,
+            "u0": float(self.u[0]),
+            "u1": float(self.u[1]),
+            "u_prime0": float(self.u_prime[0]),
+            "u_prime1": float(self.u_prime[1]),
+            "u_double_prime0": float(self.u_double_prime[0]),
+            "u_double_prime1": float(self.u_double_prime[1]),
+            "radius": self.radius,
+            "perturbation_acceleration_norm": self.perturbation_acceleration_norm,
+            "relative_acceleration_norm": self.relative_acceleration_norm,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class LeviCivitaFlowCertificate:
+    """Check that the regularized binary RHS is defined and optionally residual-tested."""
+
+    sample_count: int
+    pair: tuple[int, int]
+    flow_defined: bool
+    maximum_rhs_norm: float
+    maximum_perturbation_acceleration_norm: float
+    maximum_finite_difference_residual: float | None
+    residual_resolved: bool
+
+    def as_dict(self) -> dict[str, float | int | bool | tuple[int, int] | None]:
+        return {
+            "sample_count": self.sample_count,
+            "pair": self.pair,
+            "flow_defined": self.flow_defined,
+            "maximum_rhs_norm": self.maximum_rhs_norm,
+            "maximum_perturbation_acceleration_norm": self.maximum_perturbation_acceleration_norm,
+            "maximum_finite_difference_residual": self.maximum_finite_difference_residual,
+            "residual_resolved": self.residual_resolved,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class CollisionRegularizationCertificate:
     """Interval-level certificate that raw coordinates should be replaced near collision."""
 
@@ -108,6 +159,8 @@ class CollisionRegularizationCertificate:
     levi_civita_pair: tuple[int, int] | None
     levi_civita_chart_resolved: bool
     levi_civita_max_reconstruction_error: float | None
+    levi_civita_flow_defined: bool
+    levi_civita_flow_residual: float | None
     warning: str
 
     def as_dict(self) -> dict[str, float | int | bool | str | tuple[int, int] | None]:
@@ -122,6 +175,8 @@ class CollisionRegularizationCertificate:
             "levi_civita_pair": self.levi_civita_pair,
             "levi_civita_chart_resolved": self.levi_civita_chart_resolved,
             "levi_civita_max_reconstruction_error": self.levi_civita_max_reconstruction_error,
+            "levi_civita_flow_defined": self.levi_civita_flow_defined,
+            "levi_civita_flow_residual": self.levi_civita_flow_residual,
             "warning": self.warning,
         }
 
@@ -237,6 +292,83 @@ def levi_civita_chart_certificate(
     )
 
 
+def levi_civita_regularized_flow_state(
+    system: object,
+    state: np.ndarray,
+    pair: tuple[int, int],
+) -> LeviCivitaRegularizedFlowState:
+    """Evaluate the perturbation-aware Levi-Civita regularized RHS.
+
+    The inertial relative equation is split as
+    r_ddot = -G(m_i+m_j) r/|r|^3 + third-body perturbation.
+    With r = u^2 and dt/ds = |r|, this function returns u'' in regularized
+    time s.
+    """
+
+    chart = levi_civita_binary_chart(system, state, pair)
+    positions, _velocities = system.split_state(state)
+    i, j = pair
+    masses = np.asarray(system.masses, dtype=float)
+    accelerations = system.acceleration_field(positions)
+    relative_acceleration = np.asarray(accelerations[j] - accelerations[i], dtype=float)
+    mu = float(system.gravitational_constant * (masses[i] + masses[j]))
+    kepler_acceleration = -mu * chart.relative_position / max(chart.radius**3, 1.0e-18)
+    perturbation = relative_acceleration - kepler_acceleration
+    u_double_prime = _levi_civita_u_double_prime(
+        chart.u,
+        chart.u_prime,
+        chart.relative_velocity,
+        relative_acceleration,
+    )
+    return LeviCivitaRegularizedFlowState(
+        pair=pair,
+        u=chart.u,
+        u_prime=chart.u_prime,
+        u_double_prime=u_double_prime,
+        radius=chart.radius,
+        perturbation_acceleration_norm=float(np.linalg.norm(perturbation)),
+        relative_acceleration_norm=float(np.linalg.norm(relative_acceleration)),
+    )
+
+
+def levi_civita_flow_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    start_index: int = 0,
+    end_index: int | None = None,
+    pair: tuple[int, int] | None = None,
+    residual_tolerance: float = 1.0e-4,
+) -> LeviCivitaFlowCertificate:
+    """Evaluate regularized RHS consistency over an interval."""
+
+    if getattr(system, "body_count", None) != 3:
+        raise TypeError("levi_civita_flow_certificate requires a general three-body system.")
+    if getattr(system, "dimension", None) != 2:
+        raise ValueError("levi_civita_flow_certificate is only implemented for planar systems.")
+    end = len(trajectory.t) - 1 if end_index is None else min(end_index, len(trajectory.t) - 1)
+    start = max(0, min(start_index, end))
+    if pair is None:
+        pair = _dominant_close_pair(system, trajectory, start, end)
+    flow_states = tuple(levi_civita_regularized_flow_state(system, state, pair) for state in trajectory.y[start : end + 1])
+    flow_defined = all(
+        np.all(np.isfinite(flow.u_double_prime)) and np.all(np.isfinite(flow.u_prime))
+        for flow in flow_states
+    )
+    residual = _regularized_flow_residual(system, trajectory, start, end, pair, flow_states)
+    residual_resolved = residual is not None and residual <= residual_tolerance
+    return LeviCivitaFlowCertificate(
+        sample_count=len(flow_states),
+        pair=pair,
+        flow_defined=flow_defined,
+        maximum_rhs_norm=float(max(np.linalg.norm(flow.u_double_prime) for flow in flow_states)),
+        maximum_perturbation_acceleration_norm=float(
+            max(flow.perturbation_acceleration_norm for flow in flow_states)
+        ),
+        maximum_finite_difference_residual=residual,
+        residual_resolved=residual_resolved,
+    )
+
+
 def collision_regularization_certificate(
     system: object,
     trajectory: TrajectoryResult,
@@ -267,12 +399,22 @@ def collision_regularization_certificate(
     collision_types = tuple(dict.fromkeys(diagnostic.collision_type for diagnostic in diagnostics))
     regularization_required = any(diagnostic.regularization_required for diagnostic in diagnostics)
     levi_civita: LeviCivitaChartCertificate | None = None
+    flow: LeviCivitaFlowCertificate | None = None
     if regularization_required and getattr(system, "dimension", None) == 2:
         levi_civita = levi_civita_chart_certificate(system, trajectory, start_index=start, end_index=end)
+        flow = levi_civita_flow_certificate(
+            system,
+            trajectory,
+            start_index=start,
+            end_index=end,
+            pair=levi_civita.pair,
+        )
     warning = ""
     if regularization_required:
-        if levi_civita is not None and levi_civita.chart_resolved:
-            warning = "Levi-Civita chart is resolved; regularized time-flow equivalence remains unproved"
+        if flow is not None and flow.flow_defined:
+            warning = "Levi-Civita regularized RHS is defined; inertial equivalence proof remains unproved"
+        elif levi_civita is not None and levi_civita.chart_resolved:
+            warning = "Levi-Civita chart is resolved; regularized time-flow construction remains incomplete"
         else:
             warning = "regularized collision coordinates are required before promoting a close-encounter law"
     return CollisionRegularizationCertificate(
@@ -286,8 +428,55 @@ def collision_regularization_certificate(
         levi_civita_pair=None if levi_civita is None else levi_civita.pair,
         levi_civita_chart_resolved=False if levi_civita is None else levi_civita.chart_resolved,
         levi_civita_max_reconstruction_error=None if levi_civita is None else levi_civita.maximum_reconstruction_error,
+        levi_civita_flow_defined=False if flow is None else flow.flow_defined,
+        levi_civita_flow_residual=None if flow is None else flow.maximum_finite_difference_residual,
         warning=warning,
     )
+
+
+def _levi_civita_u_double_prime(
+    u: np.ndarray,
+    u_prime: np.ndarray,
+    relative_velocity: np.ndarray,
+    relative_acceleration: np.ndarray,
+) -> np.ndarray:
+    radius = float(np.dot(u, u))
+    radius_prime = float(2.0 * np.dot(u, u_prime))
+    relative_position_double_prime_s = radius**2 * relative_acceleration + radius_prime * relative_velocity
+    u_prime_square = _levi_civita_square(u_prime)
+    multiplication = np.array([[u[0], -u[1]], [u[1], u[0]]], dtype=float)
+    return 0.5 * multiplication.T @ (relative_position_double_prime_s - 2.0 * u_prime_square) / max(radius, 1.0e-18)
+
+
+def _regularized_flow_residual(
+    system: object,
+    trajectory: TrajectoryResult,
+    start: int,
+    end: int,
+    pair: tuple[int, int],
+    flow_states: tuple[LeviCivitaRegularizedFlowState, ...],
+) -> float | None:
+    if len(flow_states) < 3:
+        return None
+    times = trajectory.t[start : end + 1]
+    radii = np.asarray([flow.radius for flow in flow_states], dtype=float)
+    s = np.zeros(len(times), dtype=float)
+    for index in range(1, len(times)):
+        dt = float(times[index] - times[index - 1])
+        mean_radius = max(0.5 * (radii[index] + radii[index - 1]), 1.0e-18)
+        s[index] = s[index - 1] + dt / mean_radius
+    residuals = []
+    charts = _continuous_levi_civita_charts(
+        tuple(levi_civita_binary_chart(system, state, pair) for state in trajectory.y[start : end + 1])
+    )
+    u_primes = np.asarray([chart.u_prime for chart in charts], dtype=float)
+    for index in range(1, len(flow_states) - 1):
+        denominator = float(s[index + 1] - s[index - 1])
+        if denominator <= 0.0:
+            continue
+        finite_difference = (u_primes[index + 1] - u_primes[index - 1]) / denominator
+        residuals.append(float(np.linalg.norm(finite_difference - flow_states[index].u_double_prime)))
+    return None if not residuals else float(max(residuals))
 
 
 def _dominant_close_pair(system: object, trajectory: TrajectoryResult, start: int, end: int) -> tuple[int, int]:

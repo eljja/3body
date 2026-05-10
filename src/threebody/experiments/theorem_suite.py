@@ -194,6 +194,9 @@ def _paper_benchmarks(
     levi_civita_chart_resolved = "numerically construct Levi-Civita binary collision chart" in set(
         interpretation.resolved_obligations
     )
+    levi_civita_flow_defined = "construct perturbation-aware Levi-Civita regularized RHS" in set(
+        interpretation.resolved_obligations
+    )
     best_models = flyby_summary["best_validation_models"]
     grammar_outcomes = flyby_summary["grammar_outcome_validations"]
     low_best = next((row for row in best_models if str(row["target"]).startswith("low_")), None)
@@ -372,6 +375,17 @@ def _paper_benchmarks(
             interpretation=(
                 "Close-encounter promotion now requires a Levi-Civita binary chart that reconstructs the inertial "
                 "relative state over the certified interval."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="levi_civita_regularized_rhs_certificate",
+            passed=levi_civita_flow_defined,
+            metric="resolved_certificate_indicator",
+            observed=1.0 if levi_civita_flow_defined else 0.0,
+            threshold=1.0,
+            interpretation=(
+                "The close-encounter chart must expose a perturbation-aware regularized-time RHS before "
+                "finite residual and equivalence proofs can be attempted."
             ),
         ),
         PaperBenchmarkResult(
@@ -730,6 +744,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     )
     coverage_passed = benchmark_by_name["regime_coverage_smoke"].passed
     levi_civita_passed = benchmark_by_name["levi_civita_collision_chart_certificate"].passed
+    levi_civita_flow_passed = benchmark_by_name["levi_civita_regularized_rhs_certificate"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
         TheoremCandidate(
@@ -757,12 +772,12 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
                 ProofObligation(
                     "regularized_collision_flow",
-                    "partial" if levi_civita_passed else "open",
+                    "partial" if levi_civita_passed and levi_civita_flow_passed else "open",
                     (
-                        "Levi-Civita binary chart reconstruction is certified, but no perturbation-aware "
-                        "regularized time flow or collision manifold theorem is implemented."
+                        "Levi-Civita binary chart reconstruction and perturbation-aware regularized RHS are "
+                        "certified, but finite residual validation and a collision manifold theorem remain open."
                     ),
-                    "Implement regularized dynamics and prove coordinate equivalence.",
+                    "Validate regularized residuals on non-synthetic close trajectories and prove coordinate equivalence.",
                 ),
             ),
         ),
