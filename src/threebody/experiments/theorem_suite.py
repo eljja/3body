@@ -6,6 +6,7 @@ from ..analysis import word_distance
 from .flyby_sweep import GRAMMAR_BRANCH_SCORE_THRESHOLD, HierarchicalFlybySweep
 from .research_checks import (
     ClassifierArtifactStudy,
+    CloseEncounterResidualGridStudy,
     CloseEncounterResidualStudy,
     GrammarBranchArtifactStudy,
     IntegratorComparisonStudy,
@@ -95,6 +96,7 @@ class TheoremSuite:
         regimes = RegimeProbeSuite().run()
         interpretation = InterpretationSuite().run()
         close_residual = CloseEncounterResidualStudy().run()
+        close_residual_grid = CloseEncounterResidualGridStudy().run()
         flyby = HierarchicalFlybySweep().run_discovery_validation(
             discovery_binary_phases=(0.0, 1.5707963267948966),
             validation_binary_phases=(
@@ -116,6 +118,7 @@ class TheoremSuite:
             regimes,
             interpretation,
             close_residual,
+            close_residual_grid,
             flyby_summary,
         )
         candidates = _theorem_candidates(benchmark_rows)
@@ -130,6 +133,7 @@ def _paper_benchmarks(
     regimes: object,
     interpretation: object,
     close_residual: object,
+    close_residual_grid: object,
     flyby_summary: dict[str, object],
 ) -> tuple[PaperBenchmarkResult, ...]:
     transition_counts = [row.transition_count for row in artifact_rows]
@@ -401,6 +405,17 @@ def _paper_benchmarks(
             interpretation=(
                 "The regularized RHS must match finite-difference du'/ds on an integrated close-encounter "
                 "trajectory, not only on synthetic static states."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="levi_civita_residual_grid",
+            passed=close_residual_grid.pass_rate == 1.0,
+            metric="maximum_grid_residual",
+            observed=close_residual_grid.maximum_residual,
+            threshold=close_residual_grid.residual_threshold,
+            interpretation=(
+                "The regularized RHS residual must remain below threshold over a predeclared grid of "
+                "integrated close-encounter probes."
             ),
         ),
         PaperBenchmarkResult(
@@ -761,6 +776,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     levi_civita_passed = benchmark_by_name["levi_civita_collision_chart_certificate"].passed
     levi_civita_flow_passed = benchmark_by_name["levi_civita_regularized_rhs_certificate"].passed
     levi_civita_residual_passed = benchmark_by_name["levi_civita_non_synthetic_residual"].passed
+    levi_civita_grid_passed = benchmark_by_name["levi_civita_residual_grid"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
         TheoremCandidate(
@@ -788,12 +804,21 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
                 ProofObligation(
                     "regularized_collision_flow",
-                    "partial" if levi_civita_passed and levi_civita_flow_passed and levi_civita_residual_passed else "open",
+                    (
+                        "partial"
+                        if (
+                            levi_civita_passed
+                            and levi_civita_flow_passed
+                            and levi_civita_residual_passed
+                            and levi_civita_grid_passed
+                        )
+                        else "open"
+                    ),
                     (
                         "Levi-Civita binary chart reconstruction and perturbation-aware regularized RHS are "
-                        "certified, and a non-synthetic residual smoke test passes. A collision manifold theorem remains open."
+                        "certified, and the current integrated residual grid passes. A collision manifold theorem remains open."
                     ),
-                    "Prove coordinate equivalence and expand residual validation across a close-encounter grid.",
+                    "Prove coordinate equivalence and expand the residual grid toward near-collision limits.",
                 ),
             ),
         ),

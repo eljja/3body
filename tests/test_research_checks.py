@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from threebody.experiments import (
     ClassifierArtifactStudy,
+    CloseEncounterResidualGridStudy,
     CloseEncounterResidualStudy,
     FigureEightStabilityProbe,
     GrammarBranchArtifactStudy,
@@ -55,6 +56,16 @@ def test_close_encounter_residual_study_validates_integrated_probe() -> None:
     assert result.residual_resolved is True
     assert result.maximum_finite_difference_residual is not None
     assert result.maximum_finite_difference_residual <= result.residual_threshold
+
+
+def test_close_encounter_residual_grid_validates_declared_cases() -> None:
+    result = CloseEncounterResidualGridStudy().run()
+
+    assert len(result.rows) >= 4
+    assert result.pass_rate == 1.0
+    assert result.maximum_residual is not None
+    assert result.maximum_residual <= result.residual_threshold
+    assert all(row.flow_defined for row in result.rows)
 
 
 def test_known_benchmarks_and_regime_probes_return_rows() -> None:

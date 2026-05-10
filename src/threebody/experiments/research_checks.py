@@ -463,6 +463,148 @@ class CloseEncounterResidualStudy:
 
 
 @dataclass(frozen=True, slots=True)
+class CloseEncounterResidualGridRow:
+    label: str
+    binary_separation: float
+    intruder_mass: float
+    sample_count: int
+    minimum_pair_distance: float
+    maximum_finite_difference_residual: float | None
+    residual_resolved: bool
+    flow_defined: bool
+
+    def as_dict(self) -> dict[str, float | int | bool | str | None]:
+        return {
+            "label": self.label,
+            "binary_separation": self.binary_separation,
+            "intruder_mass": self.intruder_mass,
+            "sample_count": self.sample_count,
+            "minimum_pair_distance": self.minimum_pair_distance,
+            "maximum_finite_difference_residual": self.maximum_finite_difference_residual,
+            "residual_resolved": self.residual_resolved,
+            "flow_defined": self.flow_defined,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class CloseEncounterResidualGridResult:
+    rows: tuple[CloseEncounterResidualGridRow, ...]
+    residual_threshold: float
+
+    @property
+    def pass_rate(self) -> float:
+        if not self.rows:
+            return 0.0
+        return float(sum(row.residual_resolved for row in self.rows) / len(self.rows))
+
+    @property
+    def maximum_residual(self) -> float | None:
+        residuals = [
+            row.maximum_finite_difference_residual
+            for row in self.rows
+            if row.maximum_finite_difference_residual is not None
+        ]
+        return None if not residuals else float(max(residuals))
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "rows": [row.as_dict() for row in self.rows],
+            "residual_threshold": self.residual_threshold,
+            "pass_rate": self.pass_rate,
+            "maximum_residual": self.maximum_residual,
+        }
+
+
+@dataclass(slots=True)
+class CloseEncounterResidualGridStudy:
+    """Validate Levi-Civita regularized RHS over a small integrated close-encounter grid."""
+
+    library: OrbitLibrary = field(default_factory=OrbitLibrary)
+    integrator: AdaptiveIntegrator = field(
+        default_factory=lambda: AdaptiveIntegrator(rtol=1.0e-11, atol=1.0e-13, max_step=1.0e-4)
+    )
+    residual_threshold: float = 2.0e-4
+
+    def run(self) -> CloseEncounterResidualGridResult:
+        rows = []
+        for label, parameters in self._cases():
+            scenario = self.library.general_close_encounter_probe(**parameters)
+            trajectory = self.integrator.integrate(
+                scenario.system,
+                scenario.t_span,
+                scenario.initial_state,
+                t_eval=scenario.t_eval,
+            )
+            certificate = levi_civita_flow_certificate(
+                scenario.system,
+                trajectory,
+                pair=(0, 1),
+                residual_tolerance=self.residual_threshold,
+            )
+            rows.append(
+                CloseEncounterResidualGridRow(
+                    label=label,
+                    binary_separation=float(parameters["binary_separation"]),
+                    intruder_mass=float(parameters["intruder_mass"]),
+                    sample_count=certificate.sample_count,
+                    minimum_pair_distance=certificate.minimum_radius,
+                    maximum_finite_difference_residual=certificate.maximum_finite_difference_residual,
+                    residual_resolved=certificate.residual_resolved,
+                    flow_defined=certificate.flow_defined,
+                )
+            )
+        return CloseEncounterResidualGridResult(rows=tuple(rows), residual_threshold=self.residual_threshold)
+
+    def _cases(self) -> tuple[tuple[str, dict[str, object]], ...]:
+        return (
+            (
+                "baseline_close_binary",
+                {
+                    "binary_separation": 0.02,
+                    "intruder_mass": 0.05,
+                    "intruder_position": (1.0, 0.2),
+                    "intruder_velocity": (0.0, -0.1),
+                    "duration": 0.02,
+                    "samples": 401,
+                },
+            ),
+            (
+                "light_offaxis_intruder",
+                {
+                    "binary_separation": 0.022,
+                    "intruder_mass": 0.03,
+                    "intruder_position": (1.2, -0.1),
+                    "intruder_velocity": (-0.05, 0.08),
+                    "duration": 0.02,
+                    "samples": 401,
+                },
+            ),
+            (
+                "strong_oblique_intruder",
+                {
+                    "binary_separation": 0.024,
+                    "intruder_mass": 0.08,
+                    "intruder_position": (0.9, 0.35),
+                    "intruder_velocity": (0.03, -0.06),
+                    "duration": 0.018,
+                    "samples": 361,
+                },
+            ),
+            (
+                "heavy_collinear_intruder",
+                {
+                    "binary_separation": 0.026,
+                    "intruder_mass": 0.1,
+                    "intruder_position": (1.1, 0.0),
+                    "intruder_velocity": (0.0, 0.05),
+                    "duration": 0.018,
+                    "samples": 361,
+                },
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class BenchmarkResult:
     name: str
     metric: str
