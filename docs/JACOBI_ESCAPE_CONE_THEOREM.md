@@ -101,6 +101,26 @@ The declared envelope must dominate this acceleration on the certified tail:
 This is still a sampled certificate, not a formal symbolic proof of the constant.
 It is nevertheless a necessary paper guardrail: the theorem candidate is rejected if the `C_Q` used in the future-tail integral does not dominate the actual perturbation on the benchmark tail.
 
+## Parameter-Box Version
+
+The theorem suite now requires the certificate to survive a predeclared parameter box:
+
+```text
+m3 in {0.18, 0.22}
+incoming vy in {1.55, 1.65}
+binary phase in {0.0, 0.2}
+```
+
+Every sampled corner must satisfy:
+
+- positive open-cone radius;
+- self-consistent radial floor;
+- inflated positive margin;
+- quadrupole perturbation envelope.
+
+This is still not a continuum proof over the whole box.
+It is a stronger falsification target than a single trajectory and is the current bridge from a point certificate toward an open parameter-regime theorem.
+
 ## Proof Sketch
 
 The Jacobi split is exact after removing center-of-mass kinetic energy.
@@ -151,6 +171,7 @@ Implemented checks:
 - `jacobi_self_consistent_escape_cone`
 - `jacobi_open_escape_cone_certificate`
 - `jacobi_quadrupole_acceleration_certificate`
+- parameter-box theorem-suite benchmark over mass, incoming speed, and binary phase
 
 The theorem suite reports:
 
@@ -162,10 +183,13 @@ The theorem suite reports:
 - `jacobi_self_consistent_radial_floor`
 - `jacobi_open_cone_radius`
 - `jacobi_quadrupole_acceleration_envelope`
+- `jacobi_parameter_box_open_regime`
+- `jacobi_parameter_box_quadrupole_ratio`
 
 ## Remaining Proof Obligations
 
 - Replace sampled floating trajectories with interval-enclosed trajectories.
+- Replace the sampled parameter-box corners with interval boxes in mass, velocity, phase, and tail state.
 - Prove the declared `C_Q` bound sharply for planar and spatial dimensions.
 - Replace the scalar open-cone sensitivity with an interval or automatic-differentiation Lipschitz bound.
 - Replace the remaining tail extrema assumptions with invariant inequalities that propagate for all future time.

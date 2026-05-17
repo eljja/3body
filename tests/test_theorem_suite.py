@@ -21,6 +21,8 @@ def test_theorem_suite_reports_candidates_and_benchmarks() -> None:
     assert any(benchmark["name"] == "jacobi_self_consistent_radial_floor" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "jacobi_open_cone_radius" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "jacobi_quadrupole_acceleration_envelope" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "jacobi_parameter_box_open_regime" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "jacobi_parameter_box_quadrupole_ratio" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "low_crossing_scattering_map_score" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "levi_civita_collision_chart_certificate" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "levi_civita_regularized_rhs_certificate" for benchmark in summary["benchmarks"])
