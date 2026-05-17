@@ -36,7 +36,8 @@ Current proof status:
   the perturbing acceleration is treated as a quadrupole-order `O(R^-4)` tail under explicit assumptions on `|r|`, `|Rdot|`, and outward radial velocity.
 - `jacobi_inflated_margin_certificate` requires the asymptotic margin to stay positive after predeclared scalar roundoff and state-scale inflation.
 - `jacobi_self_consistent_escape_cone` checks that the outward radial floor used by the future-tail integral is supported by the validated energy margin.
-- The theorem suite now includes `jacobi_energy_split_residual`, `jacobi_escape_sufficient_condition`, `jacobi_future_tail_exchange_bound`, `jacobi_quadrupole_tail_assumptions`, `jacobi_inflated_margin_lower_bound`, and `jacobi_self_consistent_radial_floor` as paper-facing benchmarks.
+- `jacobi_open_escape_cone_certificate` computes a positive tail-data neighborhood radius, so the claim is not a single-trajectory certificate.
+- The theorem suite now includes `jacobi_energy_split_residual`, `jacobi_escape_sufficient_condition`, `jacobi_future_tail_exchange_bound`, `jacobi_quadrupole_tail_assumptions`, `jacobi_inflated_margin_lower_bound`, `jacobi_self_consistent_radial_floor`, and `jacobi_open_cone_radius` as paper-facing benchmarks.
 - A fast hierarchical flyby passes this certificate in the current smoke benchmark.
 - The detailed theorem/proof note is in `docs/JACOBI_ESCAPE_CONE_THEOREM.md`.
 
@@ -44,6 +45,7 @@ Open proof obligations:
 
 - Replace scalar margin inflation with full interval-enclosed trajectory integration.
 - Prove the quadrupole acceleration constant rigorously in the declared norm and dimension.
+- Replace the scalar open-cone sensitivity radius with a true interval-Lipschitz bound.
 - State the exact hierarchy domain: minimum `R / |r|`, noncollision distance, positive radial velocity, bounded inner radius, bounded outer speed, and positive asymptotic margin.
 - Extend from a single certified fast-flyby benchmark to a parameter region with explicit inequalities.
 

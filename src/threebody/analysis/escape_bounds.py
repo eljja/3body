@@ -179,6 +179,34 @@ class JacobiSelfConsistentConeCertificate:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class JacobiOpenConeCertificate:
+    """Open-neighborhood certificate for the conditional Jacobi escape cone."""
+
+    inner_pair: tuple[int, int]
+    outer_body: int
+    validated_margin_lower: float
+    margin_sensitivity_scale: float
+    state_scale: float
+    absolute_state_radius: float
+    relative_state_radius: float
+    open_cone_certified: bool
+    warning: str
+
+    def as_dict(self) -> dict[str, float | int | bool | str | tuple[int, int]]:
+        return {
+            "inner_pair": self.inner_pair,
+            "outer_body": self.outer_body,
+            "validated_margin_lower": self.validated_margin_lower,
+            "margin_sensitivity_scale": self.margin_sensitivity_scale,
+            "state_scale": self.state_scale,
+            "absolute_state_radius": self.absolute_state_radius,
+            "relative_state_radius": self.relative_state_radius,
+            "open_cone_certified": self.open_cone_certified,
+            "warning": self.warning,
+        }
+
+
 def jacobi_energy_decomposition(
     system: object,
     state: np.ndarray,
@@ -538,6 +566,71 @@ def jacobi_self_consistent_escape_cone(
         asymptotic_margin_lower=inflated.validated_margin_lower,
         future_exchange_bound=future.future_energy_exchange_bound,
         self_consistent=self_consistent,
+        warning=warning,
+    )
+
+
+def jacobi_open_escape_cone_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    inner_pair: tuple[int, int] = (0, 1),
+    tail_fraction: float = 0.25,
+    minimum_relative_radius: float = 1.0e-8,
+) -> JacobiOpenConeCertificate:
+    """Certify an open tail-data neighborhood that preserves the escape margin.
+
+    The returned radius is conservative and scalar: it treats the margin as a
+    Lipschitz-like scalar with sensitivity equal to the largest certified scale
+    entering the margin calculation. This is a proof obligation placeholder for
+    a future interval derivative bound, but it already prevents a zero-measure
+    single-trajectory claim.
+    """
+
+    self_consistent = jacobi_self_consistent_escape_cone(
+        system,
+        trajectory,
+        inner_pair=inner_pair,
+        tail_fraction=tail_fraction,
+    )
+    future = jacobi_future_tail_bound(
+        system,
+        trajectory,
+        inner_pair=inner_pair,
+        tail_fraction=tail_fraction,
+    )
+    tail_count = future.tail_sample_count
+    states = trajectory.y[-tail_count:]
+    state_scale = float(max(np.max(np.abs(states)), 1.0))
+    margin_sensitivity = max(
+        abs(future.finite_tail_escape_margin),
+        abs(future.future_energy_exchange_bound),
+        abs(future.maximum_quadrupole_acceleration_constant),
+        abs(future.maximum_outer_speed),
+        abs(future.terminal_outer_radius),
+        abs(self_consistent.certified_radial_floor),
+        1.0,
+    )
+    absolute_radius = float(0.5 * self_consistent.asymptotic_margin_lower / margin_sensitivity)
+    relative_radius = float(absolute_radius / state_scale)
+    certified = bool(
+        self_consistent.self_consistent
+        and absolute_radius > 0.0
+        and relative_radius >= minimum_relative_radius
+    )
+    warning = ""
+    if not self_consistent.self_consistent:
+        warning = "self-consistent escape cone certificate failed"
+    elif relative_radius < minimum_relative_radius:
+        warning = "open cone radius is below the declared minimum relative radius"
+    return JacobiOpenConeCertificate(
+        inner_pair=inner_pair,
+        outer_body=future.outer_body,
+        validated_margin_lower=self_consistent.asymptotic_margin_lower,
+        margin_sensitivity_scale=margin_sensitivity,
+        state_scale=state_scale,
+        absolute_state_radius=absolute_radius,
+        relative_state_radius=relative_radius,
+        open_cone_certified=certified,
         warning=warning,
     )
 

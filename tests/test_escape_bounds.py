@@ -5,6 +5,7 @@ from threebody.analysis import (
     jacobi_escape_sufficient_condition,
     jacobi_future_tail_bound,
     jacobi_inflated_margin_certificate,
+    jacobi_open_escape_cone_certificate,
     jacobi_self_consistent_escape_cone,
 )
 from threebody.experiments import OrbitLibrary
@@ -107,6 +108,27 @@ def test_jacobi_self_consistent_escape_cone_has_radial_floor() -> None:
     assert certificate.certified_radial_floor > 0.0
     assert certificate.energy_radial_floor > 0.0
     assert certificate.future_exchange_bound < certificate.asymptotic_margin_lower
+
+
+def test_jacobi_open_escape_cone_certificate_has_positive_radius() -> None:
+    scenario = OrbitLibrary().general_hierarchical_flyby(
+        intruder_velocity=(0.8, 1.6),
+        duration=8.0,
+        samples=500,
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    certificate = jacobi_open_escape_cone_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+
+    assert certificate.open_cone_certified is True
+    assert certificate.absolute_state_radius > 0.0
+    assert certificate.relative_state_radius > 1.0e-8
+    assert certificate.validated_margin_lower > 0.0
 
 
 def test_jacobi_escape_sufficient_condition_rejects_uncertain_bound_tail() -> None:

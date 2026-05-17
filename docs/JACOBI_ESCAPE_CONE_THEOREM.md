@@ -69,6 +69,21 @@ future_exchange_bound < M.
 This does not yet remove every future-tail hypothesis.
 It does remove the weakest version of the argument: the outward radial floor can no longer be an arbitrary parameter disconnected from the certified energy lower bound.
 
+## Open Cone Version
+
+The theorem candidate is not meant to certify only one sampled trajectory.
+The current implementation therefore computes a conservative open-neighborhood radius.
+Let `M` be the validated lower margin and let `L_M` be a scalar sensitivity scale built from the largest certified quantities in the margin calculation.
+The implemented open-cone radius is:
+
+```text
+rho = M / (2 L_M).
+```
+
+For tail data perturbations whose scalar effect on the margin is bounded by `L_M rho`, the margin remains positive by construction.
+This is not yet a sharp Fréchet derivative or interval-Lipschitz proof.
+It is a concrete nonzero-radius obligation that prevents the theorem candidate from being a zero-measure numerical coincidence.
+
 ## Proof Sketch
 
 The Jacobi split is exact after removing center-of-mass kinetic energy.
@@ -117,6 +132,7 @@ Implemented checks:
 - `jacobi_future_tail_bound`
 - `jacobi_inflated_margin_certificate`
 - `jacobi_self_consistent_escape_cone`
+- `jacobi_open_escape_cone_certificate`
 
 The theorem suite reports:
 
@@ -126,10 +142,12 @@ The theorem suite reports:
 - `jacobi_quadrupole_tail_assumptions`
 - `jacobi_inflated_margin_lower_bound`
 - `jacobi_self_consistent_radial_floor`
+- `jacobi_open_cone_radius`
 
 ## Remaining Proof Obligations
 
 - Replace sampled floating trajectories with interval-enclosed trajectories.
 - Prove the declared `C_Q` bound sharply for planar and spatial dimensions.
+- Replace the scalar open-cone sensitivity with an interval or automatic-differentiation Lipschitz bound.
 - Replace the remaining tail extrema assumptions with invariant inequalities that propagate for all future time.
 - Compare the accepted cone directly against Marchal/Standish/Szebehely-Zare style criteria on the same benchmark family.
