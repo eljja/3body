@@ -75,6 +75,8 @@ General three-body certificates now include a center-of-mass reduction guardrail
 
 General three-body trajectories also include a Lagrange-Jacobi identity guardrail where applicable: the sampled trajectory must satisfy `I'' = 4E + 2U` in the center-of-mass frame. This checks the global scale/virial structure imposed by the Newtonian `1/r` potential.
 
+General three-body trajectories also include Sundman's inequality guardrail where applicable: sampled states must satisfy `|L|^2 <= 2 I T` in the center-of-mass frame. This constrains the physically admissible region of reduced scale-angular-momentum space.
+
 Hierarchy segments now include a numerical action-drift certificate: the inner Kepler action and angular momentum drift are compared against a tidal perturbation budget. This resolves a numerical certification task, but it does not replace the remaining analytic proof obligation.
 
 Hierarchy segments also include a resonance-detuning certificate: the median inner/outer frequency ratio is compared with small-denominator rational resonances. This numerically separates near-resonant and nonresonant intervals, but the stability of that split still needs a proof.

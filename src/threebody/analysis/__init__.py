@@ -43,10 +43,12 @@ from .reduced_state import (
     CenterOfMassReductionCertificate,
     LagrangeJacobiIdentityCertificate,
     ReducedThreeBodyState,
+    SundmanInequalityCertificate,
     center_of_mass_reduction_certificate,
     lagrange_jacobi_identity_certificate,
     reduced_state_series,
     reduced_three_body_state,
+    sundman_inequality_certificate,
 )
 from .shape import ShapeSpaceCoordinates, shape_space_coordinates
 from .symmetry import ChoreographySymmetryCertificate, choreography_symmetry_certificate
@@ -103,6 +105,7 @@ __all__ = [
     "ChoreographySymmetryCertificate",
     "CenterOfMassReductionCertificate",
     "LagrangeJacobiIdentityCertificate",
+    "SundmanInequalityCertificate",
     "CollisionRegularizationCertificate",
     "ChartType",
     "CandidateTransitionLaw",
@@ -193,6 +196,7 @@ __all__ = [
     "reduced_state_series",
     "reduced_three_body_state",
     "shape_space_coordinates",
+    "sundman_inequality_certificate",
     "transition_boundary_rows",
     "transition_event_evidence",
     "transition_event_rows",

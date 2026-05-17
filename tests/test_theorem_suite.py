@@ -25,6 +25,7 @@ def test_theorem_suite_reports_candidates_and_benchmarks() -> None:
     assert any(benchmark["name"] == "levi_civita_tidal_lipschitz_bound" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "figure_eight_center_of_mass_reduction" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "figure_eight_lagrange_jacobi_identity" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "figure_eight_sundman_inequality" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "figure_eight_variational_linear_stability" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "figure_eight_variational_symplectic_residual" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "figure_eight_hamiltonian_jacobian_structure" for benchmark in summary["benchmarks"])

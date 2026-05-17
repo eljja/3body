@@ -54,6 +54,28 @@ class LagrangeJacobiIdentityCertificate:
 
 
 @dataclass(frozen=True, slots=True)
+class SundmanInequalityCertificate:
+    """Certificate for the Newtonian three-body inequality |L|^2 <= 2 I T."""
+
+    sample_count: int
+    maximum_ratio: float
+    minimum_margin: float
+    maximum_violation: float
+    tolerance: float
+    inequality_resolved: bool
+
+    def as_dict(self) -> dict[str, float | int | bool]:
+        return {
+            "sample_count": self.sample_count,
+            "maximum_ratio": self.maximum_ratio,
+            "minimum_margin": self.minimum_margin,
+            "maximum_violation": self.maximum_violation,
+            "tolerance": self.tolerance,
+            "inequality_resolved": self.inequality_resolved,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ReducedThreeBodyState:
     """Symmetry-reduced scale/shape/invariant state for a Newtonian three-body configuration."""
 
@@ -241,6 +263,49 @@ def lagrange_jacobi_identity_certificate(
     )
 
 
+def sundman_inequality_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    *,
+    stride: int = 1,
+    tolerance: float = 1.0e-12,
+) -> SundmanInequalityCertificate:
+    """Check |L|^2 <= 2 I T over sampled center-of-mass states."""
+
+    if stride < 1:
+        raise ValueError("stride must be >= 1.")
+    if not hasattr(system, "split_state") or not hasattr(system, "masses"):
+        raise TypeError("sundman_inequality_certificate requires a massive body system.")
+
+    ratios = []
+    for state in trajectory.y[::stride]:
+        ratio = _sundman_ratio(system, state)
+        ratios.append(ratio)
+
+    if not ratios:
+        return SundmanInequalityCertificate(
+            sample_count=0,
+            maximum_ratio=np.inf,
+            minimum_margin=-np.inf,
+            maximum_violation=np.inf,
+            tolerance=tolerance,
+            inequality_resolved=False,
+        )
+
+    ratio_array = np.asarray(ratios, dtype=float)
+    maximum_ratio = float(np.max(ratio_array))
+    minimum_margin = float(np.min(1.0 - ratio_array))
+    maximum_violation = float(max(0.0, maximum_ratio - 1.0))
+    return SundmanInequalityCertificate(
+        sample_count=int(ratio_array.size),
+        maximum_ratio=maximum_ratio,
+        minimum_margin=minimum_margin,
+        maximum_violation=maximum_violation,
+        tolerance=tolerance,
+        inequality_resolved=bool(np.all(np.isfinite(ratio_array)) and maximum_violation <= tolerance),
+    )
+
+
 def reduced_state_series(
     system: object,
     trajectory: TrajectoryResult,
@@ -287,6 +352,31 @@ def _lagrange_jacobi_terms(system: object, state: np.ndarray) -> tuple[float, fl
         2.0 * np.sum(masses[:, None] * (centered_velocities**2 + centered_positions * accelerations))
     )
     return inertia_second_derivative, float(4.0 * internal_energy + 2.0 * potential_magnitude)
+
+
+def _sundman_ratio(system: object, state: np.ndarray) -> float:
+    positions, velocities = system.split_state(state)
+    masses = np.asarray(system.masses, dtype=float)
+    total_mass = float(np.sum(masses))
+    center = np.sum(masses[:, None] * positions, axis=0) / total_mass
+    center_velocity = np.sum(masses[:, None] * velocities, axis=0) / total_mass
+    centered_positions = positions - center
+    centered_velocities = velocities - center_velocity
+    inertia = float(np.sum(masses[:, None] * centered_positions**2))
+    kinetic = float(0.5 * np.sum(masses[:, None] * centered_velocities**2))
+    angular_momentum_norm = _centered_angular_momentum_norm(masses, centered_positions, centered_velocities)
+    denominator = 2.0 * inertia * kinetic
+    if denominator <= 0.0:
+        return 0.0 if angular_momentum_norm <= 1.0e-15 else np.inf
+    return float(angular_momentum_norm**2 / denominator)
+
+
+def _centered_angular_momentum_norm(masses: np.ndarray, positions: np.ndarray, velocities: np.ndarray) -> float:
+    if positions.shape[1] == 2:
+        angular = np.sum(masses * (positions[:, 0] * velocities[:, 1] - positions[:, 1] * velocities[:, 0]))
+        return float(abs(angular))
+    angular_vector = np.sum(masses[:, None] * np.cross(positions, velocities), axis=0)
+    return float(np.linalg.norm(angular_vector))
 
 
 def _newtonian_potential_magnitude(system: object, positions: np.ndarray, masses: np.ndarray) -> float:

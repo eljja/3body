@@ -201,6 +201,7 @@ def _paper_benchmarks(
     figure_eight_com_position = known_by_name["figure_eight_center_of_mass_position"]
     figure_eight_com_momentum = known_by_name["figure_eight_center_of_mass_momentum"]
     figure_eight_lagrange_jacobi = known_by_name["figure_eight_lagrange_jacobi_identity"]
+    figure_eight_sundman = known_by_name["figure_eight_sundman_inequality"]
     figure_eight_variational = known_by_name["figure_eight_variational_linear_stability"]
     figure_eight_symplectic = known_by_name["figure_eight_variational_symplectic_residual"]
     figure_eight_hamiltonian = known_by_name["figure_eight_hamiltonian_jacobian_structure"]
@@ -386,6 +387,17 @@ def _paper_benchmarks(
             interpretation=(
                 "The sampled figure-eight trajectory must satisfy the Newtonian Lagrange-Jacobi "
                 "identity I'' = 4E + 2U in the center-of-mass frame."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="figure_eight_sundman_inequality",
+            passed=figure_eight_sundman.passed,
+            metric=figure_eight_sundman.metric,
+            observed=figure_eight_sundman.observed,
+            threshold=1.0e-12,
+            interpretation=(
+                "The sampled figure-eight trajectory must satisfy Sundman's inequality |L|^2 <= 2 I T "
+                "in the center-of-mass frame, constraining the admissible scale-angular-momentum state."
             ),
         ),
         PaperBenchmarkResult(

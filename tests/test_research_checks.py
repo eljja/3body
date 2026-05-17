@@ -109,6 +109,7 @@ def test_known_benchmarks_and_regime_probes_return_rows() -> None:
     assert any(row.name == "figure_eight_center_of_mass_position" and row.passed for row in benchmarks)
     assert any(row.name == "figure_eight_center_of_mass_momentum" and row.passed for row in benchmarks)
     assert any(row.name == "figure_eight_lagrange_jacobi_identity" and row.passed for row in benchmarks)
+    assert any(row.name == "figure_eight_sundman_inequality" and row.passed for row in benchmarks)
     assert any(row.name == "figure_eight_variational_linear_stability" and row.passed for row in benchmarks)
     assert any(row.name == "figure_eight_variational_symplectic_residual" and row.passed for row in benchmarks)
     assert any(row.name == "figure_eight_hamiltonian_jacobian_structure" and row.passed for row in benchmarks)
