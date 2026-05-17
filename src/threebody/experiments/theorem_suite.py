@@ -106,8 +106,10 @@ class JacobiParameterBoxResult:
     case_count: int
     pass_rate: float
     minimum_relative_open_radius: float
+    minimum_grid_margin_lower: float
     maximum_quadrupole_bound_ratio: float
     box_certified: bool
+    grid_margin_certified: bool
 
 
 @dataclass(slots=True)
@@ -658,6 +660,17 @@ def _paper_benchmarks(
             ),
         ),
         PaperBenchmarkResult(
+            name="jacobi_parameter_grid_margin",
+            passed=jacobi_parameter_box.grid_margin_certified,
+            metric="minimum_grid_margin_lower",
+            observed=jacobi_parameter_box.minimum_grid_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "A refined 3x3x3 grid inside the declared parameter box must keep a positive inflated "
+                "Jacobi escape margin."
+            ),
+        ),
+        PaperBenchmarkResult(
             name="levi_civita_collision_chart_certificate",
             passed=levi_civita_chart_resolved,
             metric="resolved_certificate_indicator",
@@ -1189,9 +1202,9 @@ def _jacobi_parameter_box_benchmark() -> JacobiParameterBoxResult:
     library = OrbitLibrary()
     integrator = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11)
     rows = []
-    for intruder_mass in (0.18, 0.22):
-        for intruder_speed_y in (1.55, 1.65):
-            for binary_phase in (0.0, 0.2):
+    for intruder_mass in (0.18, 0.20, 0.22):
+        for intruder_speed_y in (1.55, 1.60, 1.65):
+            for binary_phase in (0.0, 0.1, 0.2):
                 scenario = library.general_hierarchical_flyby(
                     intruder_mass=intruder_mass,
                     intruder_velocity=(0.8, intruder_speed_y),
@@ -1207,16 +1220,24 @@ def _jacobi_parameter_box_benchmark() -> JacobiParameterBoxResult:
                 )
                 open_cone = jacobi_open_escape_cone_certificate(scenario.system, trajectory, inner_pair=(0, 1))
                 quadrupole = jacobi_quadrupole_acceleration_certificate(scenario.system, trajectory, inner_pair=(0, 1))
-                rows.append((open_cone, quadrupole))
-    pass_count = sum(1 for open_cone, quadrupole in rows if open_cone.open_cone_certified and quadrupole.quadrupole_bound_resolved)
-    minimum_radius = min(open_cone.relative_state_radius for open_cone, _quadrupole in rows)
-    maximum_ratio = max(quadrupole.maximum_bound_ratio for _open_cone, quadrupole in rows)
+                inflated = jacobi_inflated_margin_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+                rows.append((open_cone, quadrupole, inflated))
+    pass_count = sum(
+        1
+        for open_cone, quadrupole, inflated in rows
+        if open_cone.open_cone_certified and quadrupole.quadrupole_bound_resolved and inflated.validated_positive
+    )
+    minimum_radius = min(open_cone.relative_state_radius for open_cone, _quadrupole, _inflated in rows)
+    minimum_margin = min(inflated.validated_margin_lower for _open_cone, _quadrupole, inflated in rows)
+    maximum_ratio = max(quadrupole.maximum_bound_ratio for _open_cone, quadrupole, _inflated in rows)
     return JacobiParameterBoxResult(
         case_count=len(rows),
         pass_rate=float(pass_count / len(rows)),
         minimum_relative_open_radius=float(minimum_radius),
+        minimum_grid_margin_lower=float(minimum_margin),
         maximum_quadrupole_bound_ratio=float(maximum_ratio),
         box_certified=pass_count == len(rows) and minimum_radius >= 1.0e-8 and maximum_ratio <= 1.0,
+        grid_margin_certified=minimum_margin > 0.0,
     )
 
 
@@ -1233,6 +1254,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     jacobi_parameter_box_passed = (
         benchmark_by_name["jacobi_parameter_box_open_regime"].passed
         and benchmark_by_name["jacobi_parameter_box_quadrupole_ratio"].passed
+        and benchmark_by_name["jacobi_parameter_grid_margin"].passed
     )
     scattering_score_passed = benchmark_by_name["low_crossing_scattering_map_score"].passed
     scattering_selection_passed = benchmark_by_name["low_crossing_scattering_map_selection"].passed

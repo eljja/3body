@@ -106,12 +106,12 @@ It is nevertheless a necessary paper guardrail: the theorem candidate is rejecte
 The theorem suite now requires the certificate to survive a predeclared parameter box:
 
 ```text
-m3 in {0.18, 0.22}
-incoming vy in {1.55, 1.65}
-binary phase in {0.0, 0.2}
+m3 in {0.18, 0.20, 0.22}
+incoming vy in {1.55, 1.60, 1.65}
+binary phase in {0.0, 0.1, 0.2}
 ```
 
-Every sampled corner must satisfy:
+Every sampled grid point must satisfy:
 
 - positive open-cone radius;
 - self-consistent radial floor;
@@ -119,7 +119,7 @@ Every sampled corner must satisfy:
 - quadrupole perturbation envelope.
 
 This is still not a continuum proof over the whole box.
-It is a stronger falsification target than a single trajectory and is the current bridge from a point certificate toward an open parameter-regime theorem.
+It is a stronger falsification target than a single trajectory or corner-only test and is the current bridge from a point certificate toward an open parameter-regime theorem.
 
 ## Proof Sketch
 
@@ -185,6 +185,7 @@ The theorem suite reports:
 - `jacobi_quadrupole_acceleration_envelope`
 - `jacobi_parameter_box_open_regime`
 - `jacobi_parameter_box_quadrupole_ratio`
+- `jacobi_parameter_grid_margin`
 
 ## Remaining Proof Obligations
 
