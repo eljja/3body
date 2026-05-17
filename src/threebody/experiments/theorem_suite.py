@@ -199,6 +199,7 @@ def _paper_benchmarks(
     known_pass_rate = sum(1 for row in known_benchmarks if row.passed) / len(known_benchmarks)
     known_by_name = {row.name: row for row in known_benchmarks}
     figure_eight_variational = known_by_name["figure_eight_variational_linear_stability"]
+    figure_eight_symplectic = known_by_name["figure_eight_variational_symplectic_residual"]
     figure_eight_variational_convergence = known_by_name["figure_eight_variational_step_convergence"]
     regime_names = {row.name for row in regimes}
     reduced_regime_hints = {
@@ -369,6 +370,17 @@ def _paper_benchmarks(
                 "Figure-eight periodic-chart promotion now requires a variational monodromy certificate: "
                 "orbit closure, volume preservation, reciprocal Floquet-multiplier pairing, and bounded "
                 "nontrivial multiplier radius."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="figure_eight_variational_symplectic_residual",
+            passed=figure_eight_symplectic.passed,
+            metric=figure_eight_symplectic.metric,
+            observed=figure_eight_symplectic.observed,
+            threshold=1.0e-4,
+            interpretation=(
+                "The figure-eight variational state-transition matrix must preserve the mass-weighted "
+                "symplectic form in q,v coordinates before Floquet multipliers are promoted."
             ),
         ),
         PaperBenchmarkResult(

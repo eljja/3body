@@ -68,6 +68,7 @@ class VariationalMonodromyCertificate:
     determinant: float
     determinant_error: float
     reciprocal_pair_error: float
+    symplectic_residual: float
     spectral_radius: float
     nontrivial_spectral_radius: float
     neutral_multiplier_count: int
@@ -75,6 +76,7 @@ class VariationalMonodromyCertificate:
     full_period_candidate: bool
     volume_preserving_proxy: bool
     reciprocal_pair_proxy: bool
+    symplectic_proxy: bool
     linearly_stable_proxy: bool
     numerically_resolved: bool
     warning: str
@@ -89,6 +91,7 @@ class VariationalMonodromyCertificate:
             "determinant": self.determinant,
             "determinant_error": self.determinant_error,
             "reciprocal_pair_error": self.reciprocal_pair_error,
+            "symplectic_residual": self.symplectic_residual,
             "spectral_radius": self.spectral_radius,
             "nontrivial_spectral_radius": self.nontrivial_spectral_radius,
             "neutral_multiplier_count": self.neutral_multiplier_count,
@@ -96,6 +99,7 @@ class VariationalMonodromyCertificate:
             "full_period_candidate": self.full_period_candidate,
             "volume_preserving_proxy": self.volume_preserving_proxy,
             "reciprocal_pair_proxy": self.reciprocal_pair_proxy,
+            "symplectic_proxy": self.symplectic_proxy,
             "linearly_stable_proxy": self.linearly_stable_proxy,
             "numerically_resolved": self.numerically_resolved,
             "warning": self.warning,
@@ -111,6 +115,7 @@ class VariationalMonodromyConvergenceCertificate:
     maximum_closure_ratio: float
     maximum_determinant_error: float
     maximum_reciprocal_pair_error: float
+    maximum_symplectic_residual: float
     all_linearly_stable: bool
     convergence_resolved: bool
     warning: str
@@ -126,6 +131,7 @@ class VariationalMonodromyConvergenceCertificate:
             "maximum_closure_ratio": self.maximum_closure_ratio,
             "maximum_determinant_error": self.maximum_determinant_error,
             "maximum_reciprocal_pair_error": self.maximum_reciprocal_pair_error,
+            "maximum_symplectic_residual": self.maximum_symplectic_residual,
             "all_linearly_stable": self.all_linearly_stable,
             "convergence_resolved": self.convergence_resolved,
             "warning": self.warning,
@@ -267,6 +273,7 @@ def variational_monodromy_certificate(
     closure_tolerance: float = 5.0e-3,
     determinant_tolerance: float = 1.0e-4,
     reciprocal_tolerance: float = 1.0e-4,
+    symplectic_tolerance: float = 1.0e-4,
     neutral_tolerance: float = 5.0e-2,
     stability_tolerance: float = 2.0e-3,
 ) -> VariationalMonodromyCertificate:
@@ -322,6 +329,7 @@ def variational_monodromy_certificate(
     determinant = float(np.linalg.det(transition))
     determinant_error = float(abs(determinant - 1.0))
     reciprocal_pair_error = _reciprocal_pair_error(magnitudes)
+    symplectic_residual = _symplectic_residual(system, transition, state_dimension)
     spectral_radius = float(max(magnitudes))
     nontrivial = [value for value in magnitudes if abs(value - 1.0) > neutral_tolerance]
     nontrivial_spectral_radius = float(max(nontrivial)) if nontrivial else 1.0
@@ -332,10 +340,12 @@ def variational_monodromy_certificate(
     full_period_candidate = closure_ratio <= closure_tolerance
     volume_preserving_proxy = determinant_error <= determinant_tolerance
     reciprocal_pair_proxy = reciprocal_pair_error <= reciprocal_tolerance
+    symplectic_proxy = symplectic_residual <= symplectic_tolerance
     linearly_stable_proxy = (
         full_period_candidate
         and volume_preserving_proxy
         and reciprocal_pair_proxy
+        and symplectic_proxy
         and nontrivial_spectral_radius <= 1.0 + stability_tolerance
     )
     numerically_resolved = bool(np.all(np.isfinite(magnitudes)) and np.isfinite(determinant))
@@ -346,6 +356,8 @@ def variational_monodromy_certificate(
         warning = "state-transition determinant is outside the volume-preserving tolerance"
     elif not reciprocal_pair_proxy:
         warning = "multiplier magnitudes do not pass the reciprocal-pair tolerance"
+    elif not symplectic_proxy:
+        warning = "state-transition matrix is outside the symplectic residual tolerance"
     elif not linearly_stable_proxy:
         warning = "nontrivial Floquet multiplier magnitude exceeds the stability tolerance"
 
@@ -358,6 +370,7 @@ def variational_monodromy_certificate(
         determinant=determinant,
         determinant_error=determinant_error,
         reciprocal_pair_error=reciprocal_pair_error,
+        symplectic_residual=symplectic_residual,
         spectral_radius=spectral_radius,
         nontrivial_spectral_radius=nontrivial_spectral_radius,
         neutral_multiplier_count=neutral_multiplier_count,
@@ -365,6 +378,7 @@ def variational_monodromy_certificate(
         full_period_candidate=full_period_candidate,
         volume_preserving_proxy=volume_preserving_proxy,
         reciprocal_pair_proxy=reciprocal_pair_proxy,
+        symplectic_proxy=symplectic_proxy,
         linearly_stable_proxy=linearly_stable_proxy,
         numerically_resolved=numerically_resolved,
         warning=warning,
@@ -401,6 +415,7 @@ def variational_monodromy_convergence_certificate(
             maximum_closure_ratio=np.inf,
             maximum_determinant_error=np.inf,
             maximum_reciprocal_pair_error=np.inf,
+            maximum_symplectic_residual=np.inf,
             all_linearly_stable=False,
             convergence_resolved=False,
             warning="no jacobian steps were supplied",
@@ -411,6 +426,7 @@ def variational_monodromy_convergence_certificate(
     maximum_closure_ratio = float(max(certificate.closure_ratio for certificate in certificates))
     maximum_determinant_error = float(max(certificate.determinant_error for certificate in certificates))
     maximum_reciprocal_pair_error = float(max(certificate.reciprocal_pair_error for certificate in certificates))
+    maximum_symplectic_residual = float(max(certificate.symplectic_residual for certificate in certificates))
     all_linearly_stable = all(certificate.linearly_stable_proxy for certificate in certificates)
     convergence_resolved = bool(
         all_linearly_stable
@@ -429,6 +445,7 @@ def variational_monodromy_convergence_certificate(
         maximum_closure_ratio=maximum_closure_ratio,
         maximum_determinant_error=maximum_determinant_error,
         maximum_reciprocal_pair_error=maximum_reciprocal_pair_error,
+        maximum_symplectic_residual=maximum_symplectic_residual,
         all_linearly_stable=all_linearly_stable,
         convergence_resolved=convergence_resolved,
         warning=warning,
@@ -463,6 +480,33 @@ def _reciprocal_pair_error(magnitudes: tuple[float, ...]) -> float:
     return float(max(abs(magnitudes[index] * magnitudes[-1 - index] - 1.0) for index in range(len(magnitudes))))
 
 
+def _symplectic_residual(system: object, transition: np.ndarray, state_dimension: int) -> float:
+    form = _velocity_state_symplectic_form(system, state_dimension)
+    residual = transition.T @ form @ transition - form
+    return float(np.linalg.norm(residual, ord="fro") / max(np.linalg.norm(form, ord="fro"), 1.0e-12))
+
+
+def _velocity_state_symplectic_form(system: object, state_dimension: int) -> np.ndarray:
+    half_dimension = state_dimension // 2
+    if state_dimension % 2:
+        return np.full((state_dimension, state_dimension), np.nan, dtype=float)
+
+    if hasattr(system, "masses") and hasattr(system, "body_count") and hasattr(system, "dimension"):
+        masses = np.asarray(getattr(system, "masses"), dtype=float)
+        body_count = int(getattr(system, "body_count"))
+        dimension = int(getattr(system, "dimension"))
+        if body_count * dimension == half_dimension and masses.size == body_count:
+            mass_entries = np.repeat(masses, dimension)
+            mass_matrix = np.diag(mass_entries)
+        else:
+            mass_matrix = np.eye(half_dimension, dtype=float)
+    else:
+        mass_matrix = np.eye(half_dimension, dtype=float)
+
+    zero = np.zeros((half_dimension, half_dimension), dtype=float)
+    return np.block([[zero, mass_matrix], [-mass_matrix, zero]])
+
+
 def _failed_variational_certificate(
     *,
     duration: float,
@@ -479,6 +523,7 @@ def _failed_variational_certificate(
         determinant=np.nan,
         determinant_error=np.inf,
         reciprocal_pair_error=np.inf,
+        symplectic_residual=np.inf,
         spectral_radius=np.inf,
         nontrivial_spectral_radius=np.inf,
         neutral_multiplier_count=0,
@@ -486,6 +531,7 @@ def _failed_variational_certificate(
         full_period_candidate=False,
         volume_preserving_proxy=False,
         reciprocal_pair_proxy=False,
+        symplectic_proxy=False,
         linearly_stable_proxy=False,
         numerically_resolved=False,
         warning=warning,

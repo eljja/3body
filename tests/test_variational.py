@@ -67,6 +67,8 @@ def test_variational_monodromy_certificate_resolves_figure_eight_period() -> Non
     assert certificate.closure_ratio < 5.0e-3
     assert certificate.determinant_error < 1.0e-4
     assert certificate.reciprocal_pair_error < 1.0e-4
+    assert certificate.symplectic_proxy is True
+    assert certificate.symplectic_residual < 1.0e-4
 
 
 def test_variational_monodromy_convergence_certificate_rejects_step_artifacts() -> None:
@@ -82,4 +84,5 @@ def test_variational_monodromy_convergence_certificate_rejects_step_artifacts() 
     assert certificate.all_linearly_stable is True
     assert certificate.convergence_resolved is True
     assert certificate.maximum_multiplier_spread < 2.0e-3
+    assert certificate.maximum_symplectic_residual < 1.0e-4
     assert certificate.reference.linearly_stable_proxy is True

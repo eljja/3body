@@ -936,6 +936,7 @@ class KnownBenchmarkSuite:
             _benchmark("figure_eight_variational_closure", "closure_ratio", monodromy.closure_ratio, 0.0, 5.0e-3),
             _benchmark("figure_eight_variational_volume", "determinant_error", monodromy.determinant_error, 0.0, 1.0e-4),
             _benchmark("figure_eight_variational_reciprocal_pairs", "reciprocal_pair_error", monodromy.reciprocal_pair_error, 0.0, 1.0e-4),
+            _benchmark("figure_eight_variational_symplectic_residual", "symplectic_residual", monodromy.symplectic_residual, 0.0, 1.0e-4),
             BenchmarkResult(
                 name="figure_eight_variational_linear_stability",
                 metric="nontrivial_spectral_radius",
