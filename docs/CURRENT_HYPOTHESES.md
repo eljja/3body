@@ -165,3 +165,42 @@ Current smoke observations:
 - L4/L5 geometry and the figure-eight period-return benchmark pass the current smoke tolerances.
 - The current Lagrange-neck probe can now be evaluated with a linearized `gateway_transit_estimate`, but this remains weaker than a full invariant-manifold computation.
 - Close/triple collision states now produce a McGehee-style scale/shape diagnostic, but the project still lacks a regularized integrator.
+
+## H3: Jacobi Escape Cone
+
+The broad regime selected for theorem-level work is now a hierarchical escape tail:
+one tight inner binary plus one outer body moving outward after an encounter.
+
+The current theorem-shaped claim is deliberately one-sided.
+In Jacobi coordinates the Hamiltonian is split as:
+
+```text
+H - T_cm = E_inner + E_outer + W
+```
+
+The code now certifies escape only when:
+
+- the split residual is below tolerance;
+- the outer radius grows on the certified tail;
+- the radial velocity stays positive;
+- `min(E_outer)` is larger than the interaction-remainder bound plus numerical residual.
+
+This is stronger than a classifier label because it exposes a physical escape margin.
+It is still weaker than a full theorem because the future tail after the sampled interval is not interval-bounded yet.
+
+Next proof step:
+
+Derive and implement a future-tail bound of the form:
+
+```text
+|Delta E_outer_future| <= integral_T^infinity mu_outer |Rdot| |a_perturb| dt
+```
+
+Then the escape condition becomes theorem-shaped:
+
+```text
+min(E_outer_tail) > interaction_bound_tail + future_exchange_bound + numerical_bound
+```
+
+If this can be stated with explicit inequalities on `R / |r|`, outward radial velocity, and binary action drift,
+it becomes a publishable local escape theorem candidate for a genuinely large hierarchy/escape regime.

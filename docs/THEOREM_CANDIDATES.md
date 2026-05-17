@@ -3,7 +3,44 @@
 These are not proven theorems.
 They are the current smallest claims that could become publishable if their proof obligations are completed.
 
-## Candidate 1: Reduced Shape-Scattering Atlas Conjecture
+## Candidate 1: Jacobi Escape Cone Theorem Candidate
+
+Claim:
+
+For a declared hierarchical three-body tail, if the exact Jacobi-coordinate Hamiltonian split is resolved,
+the outer Kepler energy has a positive margin over a rigorous interaction-remainder bound,
+and the outer radius is moving outward throughout the certified tail, then the trajectory lies inside a one-sided escape/scattering cone for that hierarchy.
+
+The split is:
+
+```text
+H - T_cm = E_inner(r, rdot) + E_outer(R, Rdot) + W(r, R)
+```
+
+where `r` is the inner-binary separation, `R` is the outer body relative to the inner-binary center of mass, and `W` is the difference between the true third-body potential and the binary monopole approximation.
+
+Why this is the current most theorem-shaped target:
+
+It is not a fitted classifier and not a visual escape label.
+It is a one-sided sufficient condition built from the Hamiltonian itself.
+A failure does not imply bounded motion; it only means the finite tail does not yet prove escape.
+
+Current proof status:
+
+- `jacobi_energy_decomposition` gives an exact floating-point Jacobi split for a chosen hierarchy.
+- `jacobi_escape_sufficient_condition` certifies a positive finite-tail escape margin:
+  `min(E_outer) - max(interaction_bound) - max(split_residual) > 0`.
+- The theorem suite now includes `jacobi_energy_split_residual` and `jacobi_escape_sufficient_condition` as paper-facing benchmarks.
+- A fast hierarchical flyby passes this certificate in the current smoke benchmark.
+
+Open proof obligations:
+
+- Replace floating-point evaluation with interval arithmetic on the certified tail.
+- Prove a future-tail interaction-force integral bound after the certified radius.
+- State the exact hierarchy domain: minimum `R / |r|`, noncollision distance, positive radial velocity, and energy margin.
+- Extend from a single certified fast-flyby benchmark to a parameter region with explicit inequalities.
+
+## Candidate 2: Reduced Shape-Scattering Atlas Conjecture
 
 Claim:
 
@@ -41,7 +78,7 @@ Open proof obligations:
 - Replace gateway linearization with invariant-manifold transit certificates.
 - Turn the figure-eight variational monodromy certificate into an interval-arithmetic Floquet proof with symmetry-reduced neutral directions.
 
-## Candidate 2: Hierarchy Exit Scattering Coordinate Conjecture
+## Candidate 3: Hierarchy Exit Scattering Coordinate Conjecture
 
 Claim:
 
@@ -62,7 +99,7 @@ Open proof obligations:
 - Derive perturbative bounds linking tidal impulse and measured scattering coordinates.
 - Test against independent implementations and stricter integrator comparisons.
 
-## Candidate 3: Impulse-Exchange Hierarchy Boundary Conjecture
+## Candidate 4: Impulse-Exchange Hierarchy Boundary Conjecture
 
 Claim:
 
@@ -83,7 +120,7 @@ Open proof obligations:
 - Separate low-boundary exit behavior from high-boundary re-entry memory.
 - Test whether the selected model changes under longer integrations, smaller tolerances, and independent implementation.
 
-## Candidate 4: Chart-Word Grammar Conjecture
+## Candidate 5: Chart-Word Grammar Conjecture
 
 Claim:
 
@@ -121,7 +158,7 @@ Open proof obligations:
 - Replace the current binary branch classifier with a multi-branch return-map partition and prove its error bound.
 - Prove a lower bound on branch margin under allowed classifier and trajectory perturbations.
 
-## Candidate 5: Split Branch Explanation Conjecture
+## Candidate 6: Split Branch Explanation Conjecture
 
 Claim:
 

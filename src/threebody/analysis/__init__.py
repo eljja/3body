@@ -24,6 +24,12 @@ from .coordinates import GeneralThreeBodyFeatures, RestrictedThreeBodyFeatures
 from .ensembles import PerturbationEnsemble, PerturbationMember
 from .events import TransitionEventEvidence, transition_event_evidence, transition_event_rows
 from .error_bounds import ChartValidityBound, chart_validity_bound
+from .escape_bounds import (
+    JacobiEnergyDecomposition,
+    JacobiEscapeCertificate,
+    jacobi_energy_decomposition,
+    jacobi_escape_sufficient_condition,
+)
 from .gateway import GatewayTransitEstimate, RestrictedChartCertificate, gateway_transit_estimate, restricted_chart_certificate
 from .exchange import EncounterExchangeMetrics, encounter_exchange_metrics
 from .hierarchy import (
@@ -114,6 +120,8 @@ __all__ = [
     "FeatureConditionedTransitionModel",
     "GatewayTransitEstimate",
     "GeneralThreeBodyFeatures",
+    "JacobiEnergyDecomposition",
+    "JacobiEscapeCertificate",
     "HierarchicalElements",
     "HierarchyActionDriftBound",
     "HierarchyResonanceDiagnostic",
@@ -172,6 +180,8 @@ __all__ = [
     "hierarchy_action_drift_bound",
     "hierarchy_resonance_diagnostic",
     "hysteresis_loop_rows",
+    "jacobi_energy_decomposition",
+    "jacobi_escape_sufficient_condition",
     "lagrange_jacobi_identity_certificate",
     "local_linearization",
     "levi_civita_binary_chart",

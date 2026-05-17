@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..analysis import word_distance
+from ..analysis import JacobiEscapeCertificate, jacobi_escape_sufficient_condition, word_distance
+from ..solvers import AdaptiveIntegrator
 from .flyby_sweep import GRAMMAR_BRANCH_SCORE_THRESHOLD, HierarchicalFlybySweep
+from .orbit_library import OrbitLibrary
 from .research_checks import (
     ClassifierArtifactStudy,
     CloseEncounterResidualGridStudy,
@@ -99,6 +101,7 @@ class TheoremSuite:
         close_residual = CloseEncounterResidualStudy().run()
         close_residual_grid = CloseEncounterResidualGridStudy().run()
         near_collision = NearCollisionScalingStudy().run()
+        jacobi_escape = _jacobi_escape_benchmark()
         flyby = HierarchicalFlybySweep().run_discovery_validation(
             discovery_binary_phases=(0.0, 1.5707963267948966),
             validation_binary_phases=(
@@ -122,6 +125,7 @@ class TheoremSuite:
             close_residual,
             close_residual_grid,
             near_collision,
+            jacobi_escape,
             flyby_summary,
         )
         candidates = _theorem_candidates(benchmark_rows)
@@ -138,6 +142,7 @@ def _paper_benchmarks(
     close_residual: object,
     close_residual_grid: object,
     near_collision: object,
+    jacobi_escape: JacobiEscapeCertificate,
     flyby_summary: dict[str, object],
 ) -> tuple[PaperBenchmarkResult, ...]:
     transition_counts = [row.transition_count for row in artifact_rows]
@@ -500,6 +505,28 @@ def _paper_benchmarks(
             observed=float(len(regime_names)),
             threshold=4.0,
             interpretation="The atlas must exercise non-flyby regimes before making broad claims.",
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_energy_split_residual",
+            passed=jacobi_escape.decomposition_resolved,
+            metric="maximum_closure_residual",
+            observed=jacobi_escape.maximum_closure_residual,
+            threshold=1.0e-9,
+            interpretation=(
+                "The hierarchy escape claim must first pass the exact Jacobi Hamiltonian split "
+                "H - T_cm = E_inner + E_outer + W on the outgoing tail."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_escape_sufficient_condition",
+            passed=jacobi_escape.sufficient_escape,
+            metric="escape_margin",
+            observed=jacobi_escape.escape_margin,
+            threshold=0.0,
+            interpretation=(
+                "A hierarchy escape chart is promoted only when the minimum outer Kepler energy "
+                "exceeds the interaction-remainder bound and numerical closure residual on an outward tail."
+            ),
         ),
         PaperBenchmarkResult(
             name="levi_civita_collision_chart_certificate",
@@ -933,8 +960,26 @@ def _branch_explanation_selection(row: dict[str, object] | None) -> tuple[str, f
     return selected_model, float(selected_score), gap
 
 
+def _jacobi_escape_benchmark() -> JacobiEscapeCertificate:
+    library = OrbitLibrary()
+    scenario = library.general_hierarchical_flyby(
+        intruder_velocity=(0.8, 1.6),
+        duration=8.0,
+        samples=360,
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+    return jacobi_escape_sufficient_condition(scenario.system, trajectory, inner_pair=(0, 1))
+
+
 def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[TheoremCandidate, ...]:
     benchmark_by_name = {benchmark.name: benchmark for benchmark in benchmarks}
+    jacobi_split_passed = benchmark_by_name["jacobi_energy_split_residual"].passed
+    jacobi_escape_passed = benchmark_by_name["jacobi_escape_sufficient_condition"].passed
     scattering_score_passed = benchmark_by_name["low_crossing_scattering_map_score"].passed
     scattering_selection_passed = benchmark_by_name["low_crossing_scattering_map_selection"].passed
     low_best_passed = benchmark_by_name["best_low_crossing_model_validation"].passed
@@ -984,6 +1029,53 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     levi_civita_lipschitz_bound_passed = benchmark_by_name["levi_civita_tidal_lipschitz_bound"].passed
     artifact_passed = benchmark_by_name["classifier_artifact_bound"].passed
     return (
+        TheoremCandidate(
+            name="Jacobi Escape Cone Theorem Candidate",
+            claim=(
+                "For a declared hierarchical three-body tail, if the exact Jacobi energy split is resolved, "
+                "the outer Kepler energy has a positive margin over a rigorous interaction-remainder bound, "
+                "and the outer radius is moving outward throughout the certified tail, then the trajectory lies "
+                "inside a one-sided escape/scattering cone for that hierarchy."
+            ),
+            scope=(
+                "Newtonian three-body states with one chosen inner binary, no collision on the certified tail, "
+                "and outer separation larger than the binary scale; currently a finite-time certificate."
+            ),
+            novelty_target=(
+                "Replace visual escape labels and fitted escape classifiers with a Hamiltonian split plus "
+                "explicit remainder margin that can be upgraded into an interval or asymptotic proof."
+            ),
+            proven=False,
+            obligations=(
+                ProofObligation(
+                    "exact_jacobi_hamiltonian_split",
+                    "partial" if jacobi_split_passed else "failing",
+                    benchmark_by_name["jacobi_energy_split_residual"].interpretation,
+                    None if jacobi_split_passed else "Energy split residual blocks the claimed coordinate chart.",
+                ),
+                ProofObligation(
+                    "finite_tail_escape_margin",
+                    "partial" if jacobi_escape_passed else "failing",
+                    benchmark_by_name["jacobi_escape_sufficient_condition"].interpretation,
+                    None if jacobi_escape_passed else "The tested escape tail lacks a positive certified margin.",
+                ),
+                ProofObligation(
+                    "asymptotic_escape_extension",
+                    "open",
+                    (
+                        "The current certificate is finite-time and one-sided; it does not yet prove that all "
+                        "future exchange remains below the positive margin."
+                    ),
+                    "Bound the future tail integral of the interaction force after the certified radius.",
+                ),
+                ProofObligation(
+                    "interval_arithmetic_remainder",
+                    "open",
+                    "The interaction bound is analytic but evaluated in floating point.",
+                    "Recompute the margin with interval arithmetic over the certified tail.",
+                ),
+            ),
+        ),
         TheoremCandidate(
             name="Reduced Shape-Scattering Atlas Conjecture",
             claim=(
