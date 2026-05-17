@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
+
 from ..analysis import (
     JacobiEscapeCertificate,
     JacobiFutureTailBound,
@@ -107,9 +109,13 @@ class JacobiParameterBoxResult:
     pass_rate: float
     minimum_relative_open_radius: float
     minimum_grid_margin_lower: float
+    finite_difference_lipschitz_bound: float
+    normalized_cell_radius: float
+    interval_box_margin_lower: float
     maximum_quadrupole_bound_ratio: float
     box_certified: bool
     grid_margin_certified: bool
+    interval_box_certified: bool
 
 
 @dataclass(slots=True)
@@ -671,6 +677,17 @@ def _paper_benchmarks(
             ),
         ),
         PaperBenchmarkResult(
+            name="jacobi_parameter_interval_box_margin",
+            passed=jacobi_parameter_box.interval_box_certified,
+            metric="interval_box_margin_lower",
+            observed=jacobi_parameter_box.interval_box_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "A finite-difference Lipschitz reserve over normalized parameter cells must leave a positive "
+                "lower margin, moving the claim from grid points toward a continuum box certificate."
+            ),
+        ),
+        PaperBenchmarkResult(
             name="levi_civita_collision_chart_certificate",
             passed=levi_civita_chart_resolved,
             metric="resolved_certificate_indicator",
@@ -1202,9 +1219,13 @@ def _jacobi_parameter_box_benchmark() -> JacobiParameterBoxResult:
     library = OrbitLibrary()
     integrator = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11)
     rows = []
-    for intruder_mass in (0.18, 0.20, 0.22):
-        for intruder_speed_y in (1.55, 1.60, 1.65):
-            for binary_phase in (0.0, 0.1, 0.2):
+    margins_by_index = {}
+    masses = (0.18, 0.20, 0.22)
+    speeds = (1.55, 1.60, 1.65)
+    phases = (0.0, 0.1, 0.2)
+    for mass_index, intruder_mass in enumerate(masses):
+        for speed_index, intruder_speed_y in enumerate(speeds):
+            for phase_index, binary_phase in enumerate(phases):
                 scenario = library.general_hierarchical_flyby(
                     intruder_mass=intruder_mass,
                     intruder_velocity=(0.8, intruder_speed_y),
@@ -1222,6 +1243,7 @@ def _jacobi_parameter_box_benchmark() -> JacobiParameterBoxResult:
                 quadrupole = jacobi_quadrupole_acceleration_certificate(scenario.system, trajectory, inner_pair=(0, 1))
                 inflated = jacobi_inflated_margin_certificate(scenario.system, trajectory, inner_pair=(0, 1))
                 rows.append((open_cone, quadrupole, inflated))
+                margins_by_index[(mass_index, speed_index, phase_index)] = inflated.validated_margin_lower
     pass_count = sum(
         1
         for open_cone, quadrupole, inflated in rows
@@ -1230,15 +1252,36 @@ def _jacobi_parameter_box_benchmark() -> JacobiParameterBoxResult:
     minimum_radius = min(open_cone.relative_state_radius for open_cone, _quadrupole, _inflated in rows)
     minimum_margin = min(inflated.validated_margin_lower for _open_cone, _quadrupole, inflated in rows)
     maximum_ratio = max(quadrupole.maximum_bound_ratio for _open_cone, quadrupole, _inflated in rows)
+    lipschitz_bound = _normalized_parameter_lipschitz_bound(margins_by_index)
+    normalized_cell_radius = float(np.sqrt(3.0) * 0.5)
+    interval_box_margin = float(minimum_margin - lipschitz_bound * normalized_cell_radius)
     return JacobiParameterBoxResult(
         case_count=len(rows),
         pass_rate=float(pass_count / len(rows)),
         minimum_relative_open_radius=float(minimum_radius),
         minimum_grid_margin_lower=float(minimum_margin),
+        finite_difference_lipschitz_bound=float(lipschitz_bound),
+        normalized_cell_radius=normalized_cell_radius,
+        interval_box_margin_lower=interval_box_margin,
         maximum_quadrupole_bound_ratio=float(maximum_ratio),
         box_certified=pass_count == len(rows) and minimum_radius >= 1.0e-8 and maximum_ratio <= 1.0,
         grid_margin_certified=minimum_margin > 0.0,
+        interval_box_certified=interval_box_margin > 0.0,
     )
+
+
+def _normalized_parameter_lipschitz_bound(margins_by_index: dict[tuple[int, int, int], float]) -> float:
+    axis_slopes = []
+    for axis in range(3):
+        maximum_axis_slope = 0.0
+        for index, margin in margins_by_index.items():
+            neighbor = list(index)
+            neighbor[axis] += 1
+            neighbor_key = tuple(neighbor)
+            if neighbor_key in margins_by_index:
+                maximum_axis_slope = max(maximum_axis_slope, abs(margins_by_index[neighbor_key] - margin))
+        axis_slopes.append(maximum_axis_slope)
+    return float(1.25 * np.linalg.norm(axis_slopes))
 
 
 def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[TheoremCandidate, ...]:
@@ -1255,6 +1298,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
         benchmark_by_name["jacobi_parameter_box_open_regime"].passed
         and benchmark_by_name["jacobi_parameter_box_quadrupole_ratio"].passed
         and benchmark_by_name["jacobi_parameter_grid_margin"].passed
+        and benchmark_by_name["jacobi_parameter_interval_box_margin"].passed
     )
     scattering_score_passed = benchmark_by_name["low_crossing_scattering_map_score"].passed
     scattering_selection_passed = benchmark_by_name["low_crossing_scattering_map_selection"].passed

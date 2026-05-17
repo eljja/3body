@@ -121,6 +121,24 @@ Every sampled grid point must satisfy:
 This is still not a continuum proof over the whole box.
 It is a stronger falsification target than a single trajectory or corner-only test and is the current bridge from a point certificate toward an open parameter-regime theorem.
 
+## Interval-Box Reserve
+
+To move beyond grid positivity, the theorem suite computes a finite-difference Lipschitz reserve on normalized parameter cells.
+For each margin value `M(i,j,k)` on the 3x3x3 grid, it estimates the maximum coordinate slopes, forms:
+
+```text
+L_box = 1.25 * ||(max |Delta_m M|, max |Delta_v M|, max |Delta_phase M|)||_2
+```
+
+and subtracts the cell reserve:
+
+```text
+M_box = min_grid M - L_box * sqrt(3)/2.
+```
+
+The interval-box candidate is accepted only if `M_box > 0`.
+This is not yet a rigorous interval derivative bound, but it is the first continuum-style certificate: grid positivity alone is no longer enough.
+
 ## Proof Sketch
 
 The Jacobi split is exact after removing center-of-mass kinetic energy.
@@ -186,11 +204,12 @@ The theorem suite reports:
 - `jacobi_parameter_box_open_regime`
 - `jacobi_parameter_box_quadrupole_ratio`
 - `jacobi_parameter_grid_margin`
+- `jacobi_parameter_interval_box_margin`
 
 ## Remaining Proof Obligations
 
 - Replace sampled floating trajectories with interval-enclosed trajectories.
-- Replace the sampled parameter-box corners with interval boxes in mass, velocity, phase, and tail state.
+- Replace the finite-difference parameter-box reserve with a rigorous interval derivative bound over mass, velocity, phase, and tail state.
 - Prove the declared `C_Q` bound sharply for planar and spatial dimensions.
 - Replace the scalar open-cone sensitivity with an interval or automatic-differentiation Lipschitz bound.
 - Replace the remaining tail extrema assumptions with invariant inequalities that propagate for all future time.
