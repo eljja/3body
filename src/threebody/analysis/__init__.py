@@ -41,8 +41,10 @@ from .scattering import EscapeAsymptoticCertificate, PeriapsisScatteringMap, esc
 from .pipeline import ResearchPipeline, ResearchRunResult, ResearchValidationResult
 from .reduced_state import (
     CenterOfMassReductionCertificate,
+    LagrangeJacobiIdentityCertificate,
     ReducedThreeBodyState,
     center_of_mass_reduction_certificate,
+    lagrange_jacobi_identity_certificate,
     reduced_state_series,
     reduced_three_body_state,
 )
@@ -100,6 +102,7 @@ __all__ = [
     "ChartValidityBound",
     "ChoreographySymmetryCertificate",
     "CenterOfMassReductionCertificate",
+    "LagrangeJacobiIdentityCertificate",
     "CollisionRegularizationCertificate",
     "ChartType",
     "CandidateTransitionLaw",
@@ -166,6 +169,7 @@ __all__ = [
     "hierarchy_action_drift_bound",
     "hierarchy_resonance_diagnostic",
     "hysteresis_loop_rows",
+    "lagrange_jacobi_identity_certificate",
     "local_linearization",
     "levi_civita_binary_chart",
     "levi_civita_chart_certificate",

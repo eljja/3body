@@ -13,6 +13,7 @@ from ..analysis import (
     choreography_symmetry_certificate,
     gateway_transit_estimate,
     hamiltonian_jacobian_structure_certificate,
+    lagrange_jacobi_identity_certificate,
     levi_civita_equivalence_certificate,
     levi_civita_flow_certificate,
     levi_civita_tidal_bound_certificate,
@@ -927,6 +928,11 @@ class KnownBenchmarkSuite:
             trajectory,
             stride=max(1, len(trajectory.t) // 12),
         )
+        lagrange_jacobi = lagrange_jacobi_identity_certificate(
+            figure.system,
+            trajectory,
+            stride=max(1, len(trajectory.t) // 12),
+        )
         monodromy = variational_monodromy_certificate(
             figure.system,
             figure.initial_state,
@@ -953,6 +959,7 @@ class KnownBenchmarkSuite:
             _benchmark("figure_eight_return", "state_return_error", float(np.linalg.norm(trajectory.y[-1] - trajectory.y[0])), 0.0, 5.0e-3),
             _benchmark("figure_eight_center_of_mass_position", "maximum_center_norm", center_of_mass.maximum_center_norm, 0.0, center_of_mass.tolerance),
             _benchmark("figure_eight_center_of_mass_momentum", "maximum_linear_momentum_norm", center_of_mass.maximum_linear_momentum_norm, 0.0, center_of_mass.tolerance),
+            _benchmark("figure_eight_lagrange_jacobi_identity", "maximum_relative_residual", lagrange_jacobi.maximum_relative_residual, 0.0, lagrange_jacobi.tolerance),
             _benchmark("figure_eight_variational_closure", "closure_ratio", monodromy.closure_ratio, 0.0, 5.0e-3),
             _benchmark("figure_eight_variational_volume", "determinant_error", monodromy.determinant_error, 0.0, 1.0e-4),
             _benchmark("figure_eight_variational_reciprocal_pairs", "reciprocal_pair_error", monodromy.reciprocal_pair_error, 0.0, 1.0e-4),

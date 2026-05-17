@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from threebody.analysis import center_of_mass_reduction_certificate, reduced_state_series, reduced_three_body_state
+from threebody.analysis import (
+    center_of_mass_reduction_certificate,
+    lagrange_jacobi_identity_certificate,
+    reduced_state_series,
+    reduced_three_body_state,
+)
 from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
 
@@ -53,3 +58,19 @@ def test_center_of_mass_reduction_certificate_resolves_recentered_figure_eight()
     assert certificate.reduction_resolved is True
     assert certificate.maximum_center_norm < certificate.tolerance
     assert certificate.maximum_linear_momentum_norm < certificate.tolerance
+
+
+def test_lagrange_jacobi_identity_certificate_resolves_newtonian_trajectory() -> None:
+    scenario = OrbitLibrary().general_hierarchical_flyby(duration=0.5, samples=120)
+    trajectory = AdaptiveIntegrator(rtol=1.0e-10, atol=1.0e-12).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    certificate = lagrange_jacobi_identity_certificate(scenario.system, trajectory, stride=12)
+
+    assert certificate.sample_count == 10
+    assert certificate.identity_resolved is True
+    assert certificate.maximum_relative_residual < certificate.tolerance

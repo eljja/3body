@@ -18,6 +18,7 @@ Current proof status:
 
 - `ReducedThreeBodyState` exists.
 - Center-of-mass reduction is now checked as a theorem-suite guardrail: periodic/Floquet/choreography claims are interpreted only after the translational quotient frame is numerically certified.
+- The theorem suite now checks the Newtonian Lagrange-Jacobi identity `I'' = 4E + 2U` in the center-of-mass frame, so scale/virial diagnostics are tied to the homogeneous gravitational potential rather than ad hoc trajectory features.
 - Hierarchy, collision, gateway, escape, and scattering diagnostics exist.
 - `ThreeBodyInterpreter` now converts a trajectory into chart-local interpretation segments with model families, validity statements, and unresolved proof obligations.
 - `InterpretationSuite` now aggregates representative hierarchy, restricted Lagrange, escape, and close-encounter cases into one reproducible coverage certificate.

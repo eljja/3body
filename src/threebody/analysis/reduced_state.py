@@ -32,6 +32,28 @@ class CenterOfMassReductionCertificate:
 
 
 @dataclass(frozen=True, slots=True)
+class LagrangeJacobiIdentityCertificate:
+    """Certificate for the Newtonian homogeneous-potential identity I'' = 4E + 2U."""
+
+    sample_count: int
+    maximum_absolute_residual: float
+    maximum_relative_residual: float
+    rms_relative_residual: float
+    tolerance: float
+    identity_resolved: bool
+
+    def as_dict(self) -> dict[str, float | int | bool]:
+        return {
+            "sample_count": self.sample_count,
+            "maximum_absolute_residual": self.maximum_absolute_residual,
+            "maximum_relative_residual": self.maximum_relative_residual,
+            "rms_relative_residual": self.rms_relative_residual,
+            "tolerance": self.tolerance,
+            "identity_resolved": self.identity_resolved,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ReducedThreeBodyState:
     """Symmetry-reduced scale/shape/invariant state for a Newtonian three-body configuration."""
 
@@ -173,6 +195,52 @@ def center_of_mass_reduction_certificate(
     )
 
 
+def lagrange_jacobi_identity_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    *,
+    stride: int = 1,
+    tolerance: float = 1.0e-9,
+) -> LagrangeJacobiIdentityCertificate:
+    """Check the Lagrange-Jacobi identity along sampled Newtonian states."""
+
+    if stride < 1:
+        raise ValueError("stride must be >= 1.")
+    if not hasattr(system, "split_state") or not hasattr(system, "masses") or not hasattr(system, "acceleration_field"):
+        raise TypeError("lagrange_jacobi_identity_certificate requires a Newtonian massive-body system.")
+
+    absolute_residuals = []
+    relative_residuals = []
+    for state in trajectory.y[::stride]:
+        lhs, rhs = _lagrange_jacobi_terms(system, state)
+        residual = float(lhs - rhs)
+        scale = max(abs(lhs), abs(rhs), 1.0)
+        absolute_residuals.append(abs(residual))
+        relative_residuals.append(abs(residual) / scale)
+
+    if not absolute_residuals:
+        return LagrangeJacobiIdentityCertificate(
+            sample_count=0,
+            maximum_absolute_residual=np.inf,
+            maximum_relative_residual=np.inf,
+            rms_relative_residual=np.inf,
+            tolerance=tolerance,
+            identity_resolved=False,
+        )
+
+    absolute = np.asarray(absolute_residuals, dtype=float)
+    relative = np.asarray(relative_residuals, dtype=float)
+    maximum_relative = float(np.max(relative))
+    return LagrangeJacobiIdentityCertificate(
+        sample_count=int(relative.size),
+        maximum_absolute_residual=float(np.max(absolute)),
+        maximum_relative_residual=maximum_relative,
+        rms_relative_residual=float(np.sqrt(np.mean(relative**2))),
+        tolerance=tolerance,
+        identity_resolved=bool(np.all(np.isfinite(relative)) and maximum_relative <= tolerance),
+    )
+
+
 def reduced_state_series(
     system: object,
     trajectory: TrajectoryResult,
@@ -201,3 +269,30 @@ def _reduced_regime_hint(
     if shape_anisotropy < 0.5:
         return "democratic_shape"
     return "transition_region"
+
+
+def _lagrange_jacobi_terms(system: object, state: np.ndarray) -> tuple[float, float]:
+    positions, velocities = system.split_state(state)
+    masses = np.asarray(system.masses, dtype=float)
+    total_mass = float(np.sum(masses))
+    center = np.sum(masses[:, None] * positions, axis=0) / total_mass
+    center_velocity = np.sum(masses[:, None] * velocities, axis=0) / total_mass
+    centered_positions = positions - center
+    centered_velocities = velocities - center_velocity
+    accelerations = system.acceleration_field(positions)
+    internal_kinetic = float(0.5 * np.sum(masses[:, None] * centered_velocities**2))
+    potential_magnitude = _newtonian_potential_magnitude(system, positions, masses)
+    internal_energy = internal_kinetic - potential_magnitude
+    inertia_second_derivative = float(
+        2.0 * np.sum(masses[:, None] * (centered_velocities**2 + centered_positions * accelerations))
+    )
+    return inertia_second_derivative, float(4.0 * internal_energy + 2.0 * potential_magnitude)
+
+
+def _newtonian_potential_magnitude(system: object, positions: np.ndarray, masses: np.ndarray) -> float:
+    gravitational_constant = float(getattr(system, "gravitational_constant", 1.0))
+    total = 0.0
+    for first, second in PAIR_INDICES:
+        distance = float(np.linalg.norm(positions[second] - positions[first]))
+        total += gravitational_constant * masses[first] * masses[second] / max(distance, 1.0e-18)
+    return float(total)

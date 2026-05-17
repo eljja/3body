@@ -200,6 +200,7 @@ def _paper_benchmarks(
     known_by_name = {row.name: row for row in known_benchmarks}
     figure_eight_com_position = known_by_name["figure_eight_center_of_mass_position"]
     figure_eight_com_momentum = known_by_name["figure_eight_center_of_mass_momentum"]
+    figure_eight_lagrange_jacobi = known_by_name["figure_eight_lagrange_jacobi_identity"]
     figure_eight_variational = known_by_name["figure_eight_variational_linear_stability"]
     figure_eight_symplectic = known_by_name["figure_eight_variational_symplectic_residual"]
     figure_eight_hamiltonian = known_by_name["figure_eight_hamiltonian_jacobian_structure"]
@@ -374,6 +375,17 @@ def _paper_benchmarks(
             interpretation=(
                 "The figure-eight benchmark must be in the center-of-mass quotient frame before "
                 "periodic, Floquet, or choreography certificates are interpreted."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="figure_eight_lagrange_jacobi_identity",
+            passed=figure_eight_lagrange_jacobi.passed,
+            metric=figure_eight_lagrange_jacobi.metric,
+            observed=figure_eight_lagrange_jacobi.observed,
+            threshold=1.0e-9,
+            interpretation=(
+                "The sampled figure-eight trajectory must satisfy the Newtonian Lagrange-Jacobi "
+                "identity I'' = 4E + 2U in the center-of-mass frame."
             ),
         ),
         PaperBenchmarkResult(

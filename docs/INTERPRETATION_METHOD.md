@@ -73,6 +73,8 @@ Only after those conditions are met can this be called an accepted interpretatio
 
 General three-body certificates now include a center-of-mass reduction guardrail where applicable. The translational quotient frame must keep center position, center velocity, and total linear momentum below tolerance before periodic/Floquet/choreography claims are interpreted.
 
+General three-body trajectories also include a Lagrange-Jacobi identity guardrail where applicable: the sampled trajectory must satisfy `I'' = 4E + 2U` in the center-of-mass frame. This checks the global scale/virial structure imposed by the Newtonian `1/r` potential.
+
 Hierarchy segments now include a numerical action-drift certificate: the inner Kepler action and angular momentum drift are compared against a tidal perturbation budget. This resolves a numerical certification task, but it does not replace the remaining analytic proof obligation.
 
 Hierarchy segments also include a resonance-detuning certificate: the median inner/outer frequency ratio is compared with small-denominator rational resonances. This numerically separates near-resonant and nonresonant intervals, but the stability of that split still needs a proof.
