@@ -109,6 +109,8 @@ def test_known_benchmarks_and_regime_probes_return_rows() -> None:
     assert any(row.name == "figure_eight_variational_linear_stability" and row.passed for row in benchmarks)
     assert any(row.name == "figure_eight_variational_symplectic_residual" and row.passed for row in benchmarks)
     assert any(row.name == "figure_eight_hamiltonian_jacobian_structure" and row.passed for row in benchmarks)
+    assert any(row.name == "figure_eight_choreography_position" and row.passed for row in benchmarks)
+    assert any(row.name == "figure_eight_choreography_velocity" and row.passed for row in benchmarks)
     assert any(row.name == "figure_eight_variational_step_convergence" and row.passed for row in benchmarks)
     assert {row.name for row in regimes} >= {"lagrange_neck", "shape_close_encounter", "escape_scattering"}
     assert stability.spectral_radius > 0.0

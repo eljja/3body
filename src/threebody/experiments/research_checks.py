@@ -9,6 +9,7 @@ from ..analysis import (
     ChartClassifier,
     ThreeBodyInterpreter,
     chart_validity_bound,
+    choreography_symmetry_certificate,
     gateway_transit_estimate,
     hamiltonian_jacobian_structure_certificate,
     levi_civita_equivalence_certificate,
@@ -935,6 +936,11 @@ class KnownBenchmarkSuite:
             trajectory,
             stride=max(1, len(trajectory.t) // 12),
         )
+        choreography = choreography_symmetry_certificate(
+            figure.system,
+            trajectory,
+            period=float(figure.metadata["period"]),
+        )
         return (
             _benchmark("restricted_l4", "position_error", float(np.linalg.norm(lagrange["L4"] - l4_reference)), 0.0, 1.0e-12),
             _benchmark("restricted_l5", "position_error", float(np.linalg.norm(lagrange["L5"] - l5_reference)), 0.0, 1.0e-12),
@@ -944,6 +950,8 @@ class KnownBenchmarkSuite:
             _benchmark("figure_eight_variational_reciprocal_pairs", "reciprocal_pair_error", monodromy.reciprocal_pair_error, 0.0, 1.0e-4),
             _benchmark("figure_eight_variational_symplectic_residual", "symplectic_residual", monodromy.symplectic_residual, 0.0, 1.0e-4),
             _benchmark("figure_eight_hamiltonian_jacobian_structure", "maximum_residual", hamiltonian_structure.maximum_residual, 0.0, hamiltonian_structure.tolerance),
+            _benchmark("figure_eight_choreography_position", "maximum_position_error", choreography.maximum_position_error, 0.0, choreography.tolerance),
+            _benchmark("figure_eight_choreography_velocity", "maximum_velocity_error", choreography.maximum_velocity_error, 0.0, choreography.tolerance),
             BenchmarkResult(
                 name="figure_eight_variational_linear_stability",
                 metric="nontrivial_spectral_radius",

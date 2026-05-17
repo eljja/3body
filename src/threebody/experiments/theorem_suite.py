@@ -201,6 +201,8 @@ def _paper_benchmarks(
     figure_eight_variational = known_by_name["figure_eight_variational_linear_stability"]
     figure_eight_symplectic = known_by_name["figure_eight_variational_symplectic_residual"]
     figure_eight_hamiltonian = known_by_name["figure_eight_hamiltonian_jacobian_structure"]
+    figure_eight_choreography_position = known_by_name["figure_eight_choreography_position"]
+    figure_eight_choreography_velocity = known_by_name["figure_eight_choreography_velocity"]
     figure_eight_variational_convergence = known_by_name["figure_eight_variational_step_convergence"]
     regime_names = {row.name for row in regimes}
     reduced_regime_hints = {
@@ -393,6 +395,17 @@ def _paper_benchmarks(
             interpretation=(
                 "The sampled figure-eight Jacobians must satisfy A^T Omega + Omega A ~= 0, "
                 "so the variational equation is tied to Hamiltonian structure rather than only fitted multipliers."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="figure_eight_choreography_symmetry",
+            passed=figure_eight_choreography_position.passed and figure_eight_choreography_velocity.passed,
+            metric="max_position_velocity_error",
+            observed=max(figure_eight_choreography_position.observed, figure_eight_choreography_velocity.observed),
+            threshold=1.0e-4,
+            interpretation=(
+                "The figure-eight benchmark must satisfy the T/3 choreography body-permutation symmetry, "
+                "not only return close to its initial state."
             ),
         ),
         PaperBenchmarkResult(

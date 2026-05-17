@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from threebody.analysis import (
+    choreography_symmetry_certificate,
     finite_difference_jacobian,
     hamiltonian_jacobian_structure_certificate,
     local_linearization,
@@ -103,3 +104,24 @@ def test_hamiltonian_jacobian_structure_certificate_resolves_figure_eight_sample
     assert certificate.sample_count == 6
     assert certificate.structure_resolved is True
     assert certificate.maximum_residual < certificate.tolerance
+
+
+def test_choreography_symmetry_certificate_resolves_figure_eight_shift() -> None:
+    scenario = OrbitLibrary().general_figure_eight(periods=1.0, samples=900)
+    trajectory = AdaptiveIntegrator(rtol=1.0e-10, atol=1.0e-12).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    certificate = choreography_symmetry_certificate(
+        scenario.system,
+        trajectory,
+        period=float(scenario.metadata["period"]),
+    )
+
+    assert certificate.symmetry_resolved is True
+    assert certificate.best_permutation == (2, 0, 1)
+    assert certificate.maximum_position_error < certificate.tolerance
+    assert certificate.maximum_velocity_error < certificate.tolerance

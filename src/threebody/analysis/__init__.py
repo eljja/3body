@@ -41,6 +41,7 @@ from .scattering import EscapeAsymptoticCertificate, PeriapsisScatteringMap, esc
 from .pipeline import ResearchPipeline, ResearchRunResult, ResearchValidationResult
 from .reduced_state import ReducedThreeBodyState, reduced_state_series, reduced_three_body_state
 from .shape import ShapeSpaceCoordinates, shape_space_coordinates
+from .symmetry import ChoreographySymmetryCertificate, choreography_symmetry_certificate
 from .survey import TransitionSurvey, TransitionSurveyResult
 from .transition_model import (
     FeatureConditionedTransitionModel,
@@ -91,6 +92,7 @@ __all__ = [
     "ChartWord",
     "ChartWordSignature",
     "ChartValidityBound",
+    "ChoreographySymmetryCertificate",
     "CollisionRegularizationCertificate",
     "ChartType",
     "CandidateTransitionLaw",
@@ -145,6 +147,7 @@ __all__ = [
     "chart_word_from_reports",
     "collision_regularization_certificate",
     "chart_word_signature",
+    "choreography_symmetry_certificate",
     "estimate_transition_boundaries",
     "fit_power_law_boundary_collapse",
     "validate_power_law_boundary_collapse",
