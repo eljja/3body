@@ -29,10 +29,12 @@ from .escape_bounds import (
     JacobiEscapeCertificate,
     JacobiFutureTailBound,
     JacobiInflatedMarginCertificate,
+    JacobiSelfConsistentConeCertificate,
     jacobi_energy_decomposition,
     jacobi_escape_sufficient_condition,
     jacobi_future_tail_bound,
     jacobi_inflated_margin_certificate,
+    jacobi_self_consistent_escape_cone,
 )
 from .gateway import GatewayTransitEstimate, RestrictedChartCertificate, gateway_transit_estimate, restricted_chart_certificate
 from .exchange import EncounterExchangeMetrics, encounter_exchange_metrics
@@ -128,6 +130,7 @@ __all__ = [
     "JacobiEscapeCertificate",
     "JacobiFutureTailBound",
     "JacobiInflatedMarginCertificate",
+    "JacobiSelfConsistentConeCertificate",
     "HierarchicalElements",
     "HierarchyActionDriftBound",
     "HierarchyResonanceDiagnostic",
@@ -190,6 +193,7 @@ __all__ = [
     "jacobi_escape_sufficient_condition",
     "jacobi_future_tail_bound",
     "jacobi_inflated_margin_certificate",
+    "jacobi_self_consistent_escape_cone",
     "lagrange_jacobi_identity_certificate",
     "local_linearization",
     "levi_civita_binary_chart",

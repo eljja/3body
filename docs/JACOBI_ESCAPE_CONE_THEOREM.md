@@ -25,7 +25,7 @@ where `E_r` is the inner Kepler energy and `W` is the difference between the tru
 
 ## Theorem Candidate
 
-Assume that for all `t >= T`:
+Assume first that for all `t >= T`:
 
 1. no collision occurs;
 2. `|R(t)| > r_* / 2`;
@@ -46,6 +46,28 @@ E_R(T) > |W(T)| + mu_R V_* C_Q / (3 v_* (|R(T)| - r_* / 2)^3),
 
 then `E_R(t) > 0` for all future time allowed by the hypotheses.
 Consequently the selected outer body remains in a hyperbolic-elliptic escape cone relative to the selected inner binary.
+
+## Strengthened Self-Consistent Version
+
+The theorem suite also checks a stronger self-consistency condition.
+Let `M` be the validated lower margin after subtracting the interaction remainder, the future exchange bound, and numerical inflation.
+Define:
+
+```text
+v_E = sqrt(2 M / mu_R).
+```
+
+The candidate is promoted only when:
+
+```text
+min_tail d|R|/dt > 0,
+v_E > 0,
+min(min_tail d|R|/dt, v_E) > v_min,
+future_exchange_bound < M.
+```
+
+This does not yet remove every future-tail hypothesis.
+It does remove the weakest version of the argument: the outward radial floor can no longer be an arbitrary parameter disconnected from the certified energy lower bound.
 
 ## Proof Sketch
 
@@ -94,6 +116,7 @@ Implemented checks:
 - `jacobi_escape_sufficient_condition`
 - `jacobi_future_tail_bound`
 - `jacobi_inflated_margin_certificate`
+- `jacobi_self_consistent_escape_cone`
 
 The theorem suite reports:
 
@@ -102,10 +125,11 @@ The theorem suite reports:
 - `jacobi_future_tail_exchange_bound`
 - `jacobi_quadrupole_tail_assumptions`
 - `jacobi_inflated_margin_lower_bound`
+- `jacobi_self_consistent_radial_floor`
 
 ## Remaining Proof Obligations
 
 - Replace sampled floating trajectories with interval-enclosed trajectories.
 - Prove the declared `C_Q` bound sharply for planar and spatial dimensions.
-- Replace tail extrema assumptions with invariant inequalities that propagate for all future time.
+- Replace the remaining tail extrema assumptions with invariant inequalities that propagate for all future time.
 - Compare the accepted cone directly against Marchal/Standish/Szebehely-Zare style criteria on the same benchmark family.

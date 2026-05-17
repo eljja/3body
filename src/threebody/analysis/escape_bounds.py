@@ -149,6 +149,36 @@ class JacobiInflatedMarginCertificate:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class JacobiSelfConsistentConeCertificate:
+    """Self-consistency check tying the future-tail radial floor to the energy margin."""
+
+    inner_pair: tuple[int, int]
+    outer_body: int
+    outer_reduced_mass: float
+    observed_radial_floor: float
+    energy_radial_floor: float
+    certified_radial_floor: float
+    asymptotic_margin_lower: float
+    future_exchange_bound: float
+    self_consistent: bool
+    warning: str
+
+    def as_dict(self) -> dict[str, float | int | bool | str | tuple[int, int]]:
+        return {
+            "inner_pair": self.inner_pair,
+            "outer_body": self.outer_body,
+            "outer_reduced_mass": self.outer_reduced_mass,
+            "observed_radial_floor": self.observed_radial_floor,
+            "energy_radial_floor": self.energy_radial_floor,
+            "certified_radial_floor": self.certified_radial_floor,
+            "asymptotic_margin_lower": self.asymptotic_margin_lower,
+            "future_exchange_bound": self.future_exchange_bound,
+            "self_consistent": self.self_consistent,
+            "warning": self.warning,
+        }
+
+
 def jacobi_energy_decomposition(
     system: object,
     state: np.ndarray,
@@ -445,6 +475,69 @@ def jacobi_inflated_margin_certificate(
         state_inflation=state_inflation,
         validated_margin_lower=validated_margin,
         validated_positive=validated,
+        warning=warning,
+    )
+
+
+def jacobi_self_consistent_escape_cone(
+    system: object,
+    trajectory: TrajectoryResult,
+    inner_pair: tuple[int, int] = (0, 1),
+    tail_fraction: float = 0.25,
+    minimum_radial_floor: float = 1.0e-6,
+) -> JacobiSelfConsistentConeCertificate:
+    """Certify that the tail's outward-speed floor is compatible with the energy margin.
+
+    This promotes the escape cone from "assume an outward radial floor" to
+    "the observed outward floor is supported by the post-exchange energy lower
+    bound." It is still conditional on the hierarchy and perturbation bounds
+    used by `jacobi_future_tail_bound`.
+    """
+
+    future = jacobi_future_tail_bound(
+        system,
+        trajectory,
+        inner_pair=inner_pair,
+        tail_fraction=tail_fraction,
+    )
+    inflated = jacobi_inflated_margin_certificate(
+        system,
+        trajectory,
+        inner_pair=inner_pair,
+        tail_fraction=tail_fraction,
+    )
+    masses = np.asarray(system.masses, dtype=float)
+    outer = future.outer_body
+    pair_mass = float(sum(masses[index] for index in inner_pair))
+    total_mass = float(pair_mass + masses[outer])
+    outer_reduced_mass = float(pair_mass * masses[outer] / total_mass)
+    energy_radial_floor = float(np.sqrt(max(2.0 * inflated.validated_margin_lower / outer_reduced_mass, 0.0)))
+    certified_radial_floor = float(min(future.minimum_radial_velocity, energy_radial_floor))
+    self_consistent = bool(
+        inflated.validated_positive
+        and future.assumptions_satisfied
+        and certified_radial_floor > minimum_radial_floor
+        and future.future_energy_exchange_bound < future.finite_tail_escape_margin
+    )
+    warning = ""
+    if not inflated.validated_positive:
+        warning = "inflated asymptotic margin is not positive"
+    elif not future.assumptions_satisfied:
+        warning = "future-tail assumptions are not satisfied"
+    elif certified_radial_floor <= minimum_radial_floor:
+        warning = "energy-supported radial floor is too small"
+    elif future.future_energy_exchange_bound >= future.finite_tail_escape_margin:
+        warning = "future exchange bound does not fit inside finite escape margin"
+    return JacobiSelfConsistentConeCertificate(
+        inner_pair=inner_pair,
+        outer_body=outer,
+        outer_reduced_mass=outer_reduced_mass,
+        observed_radial_floor=future.minimum_radial_velocity,
+        energy_radial_floor=energy_radial_floor,
+        certified_radial_floor=certified_radial_floor,
+        asymptotic_margin_lower=inflated.validated_margin_lower,
+        future_exchange_bound=future.future_energy_exchange_bound,
+        self_consistent=self_consistent,
         warning=warning,
     )
 
