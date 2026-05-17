@@ -107,5 +107,6 @@ def test_known_benchmarks_and_regime_probes_return_rows() -> None:
     assert any(row.name == "restricted_l4" and row.passed for row in benchmarks)
     assert any(row.name == "figure_eight_return" for row in benchmarks)
     assert any(row.name == "figure_eight_variational_linear_stability" and row.passed for row in benchmarks)
+    assert any(row.name == "figure_eight_variational_step_convergence" and row.passed for row in benchmarks)
     assert {row.name for row in regimes} >= {"lagrange_neck", "shape_close_encounter", "escape_scattering"}
     assert stability.spectral_radius > 0.0

@@ -102,6 +102,36 @@ class VariationalMonodromyCertificate:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class VariationalMonodromyConvergenceCertificate:
+    """Step-convergence guardrail for variational monodromy certificates."""
+
+    certificates: tuple[VariationalMonodromyCertificate, ...]
+    maximum_multiplier_spread: float
+    maximum_closure_ratio: float
+    maximum_determinant_error: float
+    maximum_reciprocal_pair_error: float
+    all_linearly_stable: bool
+    convergence_resolved: bool
+    warning: str
+
+    @property
+    def reference(self) -> VariationalMonodromyCertificate:
+        return self.certificates[len(self.certificates) // 2]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "certificates": [certificate.as_dict() for certificate in self.certificates],
+            "maximum_multiplier_spread": self.maximum_multiplier_spread,
+            "maximum_closure_ratio": self.maximum_closure_ratio,
+            "maximum_determinant_error": self.maximum_determinant_error,
+            "maximum_reciprocal_pair_error": self.maximum_reciprocal_pair_error,
+            "all_linearly_stable": self.all_linearly_stable,
+            "convergence_resolved": self.convergence_resolved,
+            "warning": self.warning,
+        }
+
+
 def finite_difference_jacobian(
     system: object,
     state: np.ndarray,
@@ -337,6 +367,70 @@ def variational_monodromy_certificate(
         reciprocal_pair_proxy=reciprocal_pair_proxy,
         linearly_stable_proxy=linearly_stable_proxy,
         numerically_resolved=numerically_resolved,
+        warning=warning,
+    )
+
+
+def variational_monodromy_convergence_certificate(
+    system: object,
+    initial_state: np.ndarray,
+    period: float,
+    *,
+    jacobian_steps: tuple[float, ...] = (2.0e-6, 1.0e-6, 5.0e-7),
+    multiplier_spread_tolerance: float = 2.0e-3,
+    rtol: float = 1.0e-7,
+    atol: float = 1.0e-9,
+) -> VariationalMonodromyConvergenceCertificate:
+    """Check that a periodic monodromy certificate is not a step-size artifact."""
+
+    certificates = tuple(
+        variational_monodromy_certificate(
+            system,
+            initial_state,
+            period,
+            jacobian_step=step,
+            rtol=rtol,
+            atol=atol,
+        )
+        for step in jacobian_steps
+    )
+    if not certificates:
+        return VariationalMonodromyConvergenceCertificate(
+            certificates=(),
+            maximum_multiplier_spread=np.inf,
+            maximum_closure_ratio=np.inf,
+            maximum_determinant_error=np.inf,
+            maximum_reciprocal_pair_error=np.inf,
+            all_linearly_stable=False,
+            convergence_resolved=False,
+            warning="no jacobian steps were supplied",
+        )
+
+    multiplier_matrix = np.array([certificate.multiplier_magnitudes for certificate in certificates], dtype=float)
+    maximum_multiplier_spread = float(np.max(np.ptp(multiplier_matrix, axis=0))) if multiplier_matrix.size else np.inf
+    maximum_closure_ratio = float(max(certificate.closure_ratio for certificate in certificates))
+    maximum_determinant_error = float(max(certificate.determinant_error for certificate in certificates))
+    maximum_reciprocal_pair_error = float(max(certificate.reciprocal_pair_error for certificate in certificates))
+    all_linearly_stable = all(certificate.linearly_stable_proxy for certificate in certificates)
+    convergence_resolved = bool(
+        all_linearly_stable
+        and maximum_multiplier_spread <= multiplier_spread_tolerance
+        and all(certificate.numerically_resolved for certificate in certificates)
+    )
+    warning = ""
+    if not all_linearly_stable:
+        warning = "at least one step failed the variational stability proxy"
+    elif maximum_multiplier_spread > multiplier_spread_tolerance:
+        warning = "Floquet multiplier magnitudes vary too much across jacobian steps"
+
+    return VariationalMonodromyConvergenceCertificate(
+        certificates=certificates,
+        maximum_multiplier_spread=maximum_multiplier_spread,
+        maximum_closure_ratio=maximum_closure_ratio,
+        maximum_determinant_error=maximum_determinant_error,
+        maximum_reciprocal_pair_error=maximum_reciprocal_pair_error,
+        all_linearly_stable=all_linearly_stable,
+        convergence_resolved=convergence_resolved,
         warning=warning,
     )
 

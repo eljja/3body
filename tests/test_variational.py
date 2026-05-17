@@ -6,6 +6,7 @@ from threebody.analysis import (
     finite_difference_jacobian,
     local_linearization,
     periodic_monodromy_certificate,
+    variational_monodromy_convergence_certificate,
     variational_monodromy_certificate,
 )
 from threebody.solvers import AdaptiveIntegrator
@@ -66,3 +67,19 @@ def test_variational_monodromy_certificate_resolves_figure_eight_period() -> Non
     assert certificate.closure_ratio < 5.0e-3
     assert certificate.determinant_error < 1.0e-4
     assert certificate.reciprocal_pair_error < 1.0e-4
+
+
+def test_variational_monodromy_convergence_certificate_rejects_step_artifacts() -> None:
+    scenario = OrbitLibrary().general_figure_eight(periods=1.0, samples=10)
+
+    certificate = variational_monodromy_convergence_certificate(
+        scenario.system,
+        scenario.initial_state,
+        float(scenario.metadata["period"]),
+    )
+
+    assert len(certificate.certificates) == 3
+    assert certificate.all_linearly_stable is True
+    assert certificate.convergence_resolved is True
+    assert certificate.maximum_multiplier_spread < 2.0e-3
+    assert certificate.reference.linearly_stable_proxy is True

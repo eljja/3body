@@ -16,6 +16,7 @@ from ..analysis import (
     local_linearization,
     mcgehee_collision_diagnostic,
     reduced_three_body_state,
+    variational_monodromy_convergence_certificate,
     variational_monodromy_certificate,
 )
 from ..diagnostics import InvariantMonitor, StabilityAnalyzer
@@ -923,6 +924,11 @@ class KnownBenchmarkSuite:
             figure.initial_state,
             float(figure.metadata["period"]),
         )
+        monodromy_convergence = variational_monodromy_convergence_certificate(
+            figure.system,
+            figure.initial_state,
+            float(figure.metadata["period"]),
+        )
         return (
             _benchmark("restricted_l4", "position_error", float(np.linalg.norm(lagrange["L4"] - l4_reference)), 0.0, 1.0e-12),
             _benchmark("restricted_l5", "position_error", float(np.linalg.norm(lagrange["L5"] - l5_reference)), 0.0, 1.0e-12),
@@ -937,6 +943,14 @@ class KnownBenchmarkSuite:
                 reference=1.0,
                 absolute_error=abs(monodromy.nontrivial_spectral_radius - 1.0),
                 passed=monodromy.linearly_stable_proxy,
+            ),
+            BenchmarkResult(
+                name="figure_eight_variational_step_convergence",
+                metric="maximum_multiplier_spread",
+                observed=monodromy_convergence.maximum_multiplier_spread,
+                reference=0.0,
+                absolute_error=monodromy_convergence.maximum_multiplier_spread,
+                passed=monodromy_convergence.convergence_resolved,
             ),
         )
 
