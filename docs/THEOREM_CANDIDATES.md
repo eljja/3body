@@ -22,7 +22,7 @@ Current proof status:
 - `InterpretationSuite` now aggregates representative hierarchy, restricted Lagrange, escape, and close-encounter cases into one reproducible coverage certificate.
 - Hierarchy interpretation now emits a numerical inner-action drift certificate against a tidal perturbation budget. The analytic drift theorem is still open.
 - Hierarchy interpretation also emits a resonance-detuning certificate against small-denominator rational ratios. Stability of the resonant/nonresonant split is still open.
-- Periodic-neighborhood interpretation now emits a finite-difference monodromy/shadowing proxy. Full Floquet promotion still requires a certified full-period return.
+- Periodic-neighborhood interpretation now emits both a finite-difference flow-map monodromy/shadowing proxy and, for declared periodic candidates such as figure-eight, a variational state-transition certificate. The figure-eight benchmark now checks closure, `det(Phi) ~= 1`, reciprocal multiplier pairing, and a Floquet-style linear-stability proxy. This is stronger than visual recurrence, but still not a general periodic-orbit theorem.
 - Escape interpretation now emits an outgoing asymptotic convergence certificate. A finite-time escape label is no longer accepted without tail convergence evidence.
 - Close-encounter interpretation now emits a collision-regularization certificate, gives collision charts priority inside the hard close-pair scale, certifies a planar Levi-Civita binary chart lift when applicable, constructs a perturbation-aware regularized-time RHS, and controls local inertial-equivalence residuals. Predeclared non-synthetic residual and near-collision scaling grids now pass down to binary separation `0.008`, with a nonnegative normalized residual slope plus measured and conservative Lipschitz tidal bounds of the form `perturbation/Kepler <= C r^3`. Analytic limiting bounds remain open.
 - Restricted Lagrange/gateway interpretation now emits a Jacobi-control and neck-transit certificate. Normal-form remainders and invariant-manifold proofs remain open.
@@ -35,6 +35,7 @@ Open proof obligations:
 - Prove local error bounds for each chart.
 - Convert the finite Levi-Civita residual/equivalence certificates into near-collision analytic bounds.
 - Replace gateway linearization with invariant-manifold transit certificates.
+- Turn the figure-eight variational monodromy certificate into an interval-arithmetic Floquet proof with symmetry-reduced neutral directions.
 
 ## Candidate 2: Hierarchy Exit Scattering Coordinate Conjecture
 

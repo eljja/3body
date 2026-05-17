@@ -16,6 +16,7 @@ from ..analysis import (
     local_linearization,
     mcgehee_collision_diagnostic,
     reduced_three_body_state,
+    variational_monodromy_certificate,
 )
 from ..diagnostics import InvariantMonitor, StabilityAnalyzer
 from ..solvers import AdaptiveIntegrator, StructureAwareIntegrator
@@ -917,10 +918,26 @@ class KnownBenchmarkSuite:
         l5_reference = np.array([0.5 - restricted.system.mass_ratio, -np.sqrt(3.0) / 2.0])
         figure = self.library.general_figure_eight(periods=1.0, samples=1200)
         trajectory = self.integrator.integrate(figure.system, figure.t_span, figure.initial_state, t_eval=figure.t_eval)
+        monodromy = variational_monodromy_certificate(
+            figure.system,
+            figure.initial_state,
+            float(figure.metadata["period"]),
+        )
         return (
             _benchmark("restricted_l4", "position_error", float(np.linalg.norm(lagrange["L4"] - l4_reference)), 0.0, 1.0e-12),
             _benchmark("restricted_l5", "position_error", float(np.linalg.norm(lagrange["L5"] - l5_reference)), 0.0, 1.0e-12),
             _benchmark("figure_eight_return", "state_return_error", float(np.linalg.norm(trajectory.y[-1] - trajectory.y[0])), 0.0, 5.0e-3),
+            _benchmark("figure_eight_variational_closure", "closure_ratio", monodromy.closure_ratio, 0.0, 5.0e-3),
+            _benchmark("figure_eight_variational_volume", "determinant_error", monodromy.determinant_error, 0.0, 1.0e-4),
+            _benchmark("figure_eight_variational_reciprocal_pairs", "reciprocal_pair_error", monodromy.reciprocal_pair_error, 0.0, 1.0e-4),
+            BenchmarkResult(
+                name="figure_eight_variational_linear_stability",
+                metric="nontrivial_spectral_radius",
+                observed=monodromy.nontrivial_spectral_radius,
+                reference=1.0,
+                absolute_error=abs(monodromy.nontrivial_spectral_radius - 1.0),
+                passed=monodromy.linearly_stable_proxy,
+            ),
         )
 
 

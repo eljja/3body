@@ -197,6 +197,8 @@ def _paper_benchmarks(
         else float(min(grammar_artifact_hysteresis_negative_control_gaps))
     )
     known_pass_rate = sum(1 for row in known_benchmarks if row.passed) / len(known_benchmarks)
+    known_by_name = {row.name: row for row in known_benchmarks}
+    figure_eight_variational = known_by_name["figure_eight_variational_linear_stability"]
     regime_names = {row.name for row in regimes}
     reduced_regime_hints = {
         str(row.extra.get("reduced_regime_hint"))
@@ -355,6 +357,18 @@ def _paper_benchmarks(
             observed=known_pass_rate,
             threshold=1.0,
             interpretation="L4/L5 geometry and figure-eight return must match known reference cases.",
+        ),
+        PaperBenchmarkResult(
+            name="figure_eight_variational_linear_stability",
+            passed=figure_eight_variational.passed,
+            metric=figure_eight_variational.metric,
+            observed=figure_eight_variational.observed,
+            threshold=1.002,
+            interpretation=(
+                "Figure-eight periodic-chart promotion now requires a variational monodromy certificate: "
+                "orbit closure, volume preservation, reciprocal Floquet-multiplier pairing, and bounded "
+                "nontrivial multiplier radius."
+            ),
         ),
         PaperBenchmarkResult(
             name="classifier_artifact_bound",

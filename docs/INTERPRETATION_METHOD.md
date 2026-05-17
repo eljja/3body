@@ -75,7 +75,7 @@ Hierarchy segments now include a numerical action-drift certificate: the inner K
 
 Hierarchy segments also include a resonance-detuning certificate: the median inner/outer frequency ratio is compared with small-denominator rational resonances. This numerically separates near-resonant and nonresonant intervals, but the stability of that split still needs a proof.
 
-Periodic-neighborhood segments now include a finite-difference flow-map monodromy certificate: spectral radius, condition number, endpoint error, closure ratio, and a shadowing-radius proxy. The certificate explicitly marks whether the segment is a full-period candidate; otherwise it remains a local flow-map proxy, not a Floquet theorem.
+Periodic-neighborhood segments now include a finite-difference flow-map monodromy certificate: spectral radius, condition number, endpoint error, closure ratio, and a shadowing-radius proxy. For declared periodic candidates, the research checks also include a variational monodromy certificate by integrating `dPhi/dt = J(t) Phi`. The figure-eight benchmark now checks orbit closure, volume preservation through `det(Phi)`, reciprocal Floquet-multiplier pairing, and a linear-stability proxy. This is a theorem candidate certificate, not yet an interval-arithmetic proof.
 
 Escape segments now include an asymptotic convergence certificate: outgoing two-body energy, tail energy drift, radius growth, deflection drift, and escape speed at infinity. A finite trajectory is only promoted to escape support when the outgoing tail is energetically positive and numerically convergent.
 

@@ -55,9 +55,11 @@ from .validation import TransitionLawValidation, TransitionLawValidator
 from .variational import (
     LocalLinearization,
     PeriodicMonodromyCertificate,
+    VariationalMonodromyCertificate,
     finite_difference_jacobian,
     local_linearization,
     periodic_monodromy_certificate,
+    variational_monodromy_certificate,
 )
 from .word_algebra import (
     ChartWord,
@@ -105,6 +107,7 @@ __all__ = [
     "LeviCivitaTidalBoundCertificate",
     "LocalLinearization",
     "PeriodicMonodromyCertificate",
+    "VariationalMonodromyCertificate",
     "McGeheeCollisionDiagnostic",
     "PerturbationEnsemble",
     "PerturbationMember",
@@ -153,6 +156,7 @@ __all__ = [
     "levi_civita_regularized_flow_state",
     "levi_civita_tidal_bound_certificate",
     "periodic_monodromy_certificate",
+    "variational_monodromy_certificate",
     "gateway_transit_estimate",
     "restricted_chart_certificate",
     "mcgehee_collision_diagnostic",

@@ -56,6 +56,52 @@ class PeriodicMonodromyCertificate:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class VariationalMonodromyCertificate:
+    """State-transition-matrix certificate for a candidate periodic orbit."""
+
+    duration: float
+    state_dimension: int
+    jacobian_step: float
+    closure_error: float
+    closure_ratio: float
+    determinant: float
+    determinant_error: float
+    reciprocal_pair_error: float
+    spectral_radius: float
+    nontrivial_spectral_radius: float
+    neutral_multiplier_count: int
+    multiplier_magnitudes: tuple[float, ...]
+    full_period_candidate: bool
+    volume_preserving_proxy: bool
+    reciprocal_pair_proxy: bool
+    linearly_stable_proxy: bool
+    numerically_resolved: bool
+    warning: str
+
+    def as_dict(self) -> dict[str, float | int | bool | str | list[float]]:
+        return {
+            "duration": self.duration,
+            "state_dimension": self.state_dimension,
+            "jacobian_step": self.jacobian_step,
+            "closure_error": self.closure_error,
+            "closure_ratio": self.closure_ratio,
+            "determinant": self.determinant,
+            "determinant_error": self.determinant_error,
+            "reciprocal_pair_error": self.reciprocal_pair_error,
+            "spectral_radius": self.spectral_radius,
+            "nontrivial_spectral_radius": self.nontrivial_spectral_radius,
+            "neutral_multiplier_count": self.neutral_multiplier_count,
+            "multiplier_magnitudes": list(self.multiplier_magnitudes),
+            "full_period_candidate": self.full_period_candidate,
+            "volume_preserving_proxy": self.volume_preserving_proxy,
+            "reciprocal_pair_proxy": self.reciprocal_pair_proxy,
+            "linearly_stable_proxy": self.linearly_stable_proxy,
+            "numerically_resolved": self.numerically_resolved,
+            "warning": self.warning,
+        }
+
+
 def finite_difference_jacobian(
     system: object,
     state: np.ndarray,
@@ -180,6 +226,121 @@ def periodic_monodromy_certificate(
     )
 
 
+def variational_monodromy_certificate(
+    system: object,
+    initial_state: np.ndarray,
+    period: float,
+    *,
+    jacobian_step: float = 1.0e-6,
+    rtol: float = 1.0e-7,
+    atol: float = 1.0e-9,
+    closure_tolerance: float = 5.0e-3,
+    determinant_tolerance: float = 1.0e-4,
+    reciprocal_tolerance: float = 1.0e-4,
+    neutral_tolerance: float = 5.0e-2,
+    stability_tolerance: float = 2.0e-3,
+) -> VariationalMonodromyCertificate:
+    """Integrate the variational equation and report Floquet-style diagnostics.
+
+    The certificate is intentionally conservative: it promotes a periodic chart only
+    when the orbit closes, the state-transition matrix is volume-preserving to the
+    declared tolerance, and multiplier magnitudes are reciprocal-paired.
+    """
+
+    state = np.asarray(initial_state, dtype=float)
+    state_dimension = int(state.size)
+    if period <= 0.0:
+        return _failed_variational_certificate(
+            duration=float(period),
+            state_dimension=state_dimension,
+            jacobian_step=jacobian_step,
+            warning="non-positive period; variational monodromy is undefined",
+        )
+
+    identity = np.eye(state_dimension, dtype=float)
+    combined_initial = np.concatenate([state, identity.reshape(-1)])
+
+    def combined_rhs(time: float, combined_state: np.ndarray) -> np.ndarray:
+        current_state = combined_state[:state_dimension]
+        transition = combined_state[state_dimension:].reshape(state_dimension, state_dimension)
+        jacobian = finite_difference_jacobian(system, current_state, time=time, step=jacobian_step)
+        transition_dot = jacobian @ transition
+        return np.concatenate([system.rhs(time, current_state), transition_dot.reshape(-1)])
+
+    solution = solve_ivp(
+        fun=combined_rhs,
+        t_span=(0.0, float(period)),
+        y0=combined_initial,
+        method="DOP853",
+        rtol=rtol,
+        atol=atol,
+        t_eval=(float(period),),
+    )
+    if not solution.success or solution.y.size == 0:
+        return _failed_variational_certificate(
+            duration=float(period),
+            state_dimension=state_dimension,
+            jacobian_step=jacobian_step,
+            warning="combined state/variational integration failed",
+        )
+
+    final = np.asarray(solution.y[:, -1], dtype=float)
+    final_state = final[:state_dimension]
+    transition = final[state_dimension:].reshape(state_dimension, state_dimension)
+    multipliers = np.linalg.eigvals(transition)
+    magnitudes = tuple(float(value) for value in sorted(np.abs(multipliers)))
+    determinant = float(np.linalg.det(transition))
+    determinant_error = float(abs(determinant - 1.0))
+    reciprocal_pair_error = _reciprocal_pair_error(magnitudes)
+    spectral_radius = float(max(magnitudes))
+    nontrivial = [value for value in magnitudes if abs(value - 1.0) > neutral_tolerance]
+    nontrivial_spectral_radius = float(max(nontrivial)) if nontrivial else 1.0
+    neutral_multiplier_count = len(magnitudes) - len(nontrivial)
+    closure_error = float(np.linalg.norm(final_state - state))
+    closure_ratio = float(closure_error / max(float(np.linalg.norm(state)), 1.0e-12))
+
+    full_period_candidate = closure_ratio <= closure_tolerance
+    volume_preserving_proxy = determinant_error <= determinant_tolerance
+    reciprocal_pair_proxy = reciprocal_pair_error <= reciprocal_tolerance
+    linearly_stable_proxy = (
+        full_period_candidate
+        and volume_preserving_proxy
+        and reciprocal_pair_proxy
+        and nontrivial_spectral_radius <= 1.0 + stability_tolerance
+    )
+    numerically_resolved = bool(np.all(np.isfinite(magnitudes)) and np.isfinite(determinant))
+    warning = ""
+    if not full_period_candidate:
+        warning = "orbit does not close tightly enough for periodic-chart promotion"
+    elif not volume_preserving_proxy:
+        warning = "state-transition determinant is outside the volume-preserving tolerance"
+    elif not reciprocal_pair_proxy:
+        warning = "multiplier magnitudes do not pass the reciprocal-pair tolerance"
+    elif not linearly_stable_proxy:
+        warning = "nontrivial Floquet multiplier magnitude exceeds the stability tolerance"
+
+    return VariationalMonodromyCertificate(
+        duration=float(period),
+        state_dimension=state_dimension,
+        jacobian_step=jacobian_step,
+        closure_error=closure_error,
+        closure_ratio=closure_ratio,
+        determinant=determinant,
+        determinant_error=determinant_error,
+        reciprocal_pair_error=reciprocal_pair_error,
+        spectral_radius=spectral_radius,
+        nontrivial_spectral_radius=nontrivial_spectral_radius,
+        neutral_multiplier_count=neutral_multiplier_count,
+        multiplier_magnitudes=magnitudes,
+        full_period_candidate=full_period_candidate,
+        volume_preserving_proxy=volume_preserving_proxy,
+        reciprocal_pair_proxy=reciprocal_pair_proxy,
+        linearly_stable_proxy=linearly_stable_proxy,
+        numerically_resolved=numerically_resolved,
+        warning=warning,
+    )
+
+
 def _flow_endpoint(
     system: object,
     t_span: tuple[float, float],
@@ -200,3 +361,38 @@ def _flow_endpoint(
     if solution.y.size == 0:
         return np.full_like(state, np.nan, dtype=float), False
     return np.asarray(solution.y[:, -1], dtype=float), bool(solution.success)
+
+
+def _reciprocal_pair_error(magnitudes: tuple[float, ...]) -> float:
+    if not magnitudes:
+        return np.inf
+    return float(max(abs(magnitudes[index] * magnitudes[-1 - index] - 1.0) for index in range(len(magnitudes))))
+
+
+def _failed_variational_certificate(
+    *,
+    duration: float,
+    state_dimension: int,
+    jacobian_step: float,
+    warning: str,
+) -> VariationalMonodromyCertificate:
+    return VariationalMonodromyCertificate(
+        duration=duration,
+        state_dimension=state_dimension,
+        jacobian_step=jacobian_step,
+        closure_error=np.inf,
+        closure_ratio=np.inf,
+        determinant=np.nan,
+        determinant_error=np.inf,
+        reciprocal_pair_error=np.inf,
+        spectral_radius=np.inf,
+        nontrivial_spectral_radius=np.inf,
+        neutral_multiplier_count=0,
+        multiplier_magnitudes=(),
+        full_period_candidate=False,
+        volume_preserving_proxy=False,
+        reciprocal_pair_proxy=False,
+        linearly_stable_proxy=False,
+        numerically_resolved=False,
+        warning=warning,
+    )
