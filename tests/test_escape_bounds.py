@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from threebody.analysis import jacobi_energy_decomposition, jacobi_escape_sufficient_condition
+from threebody.analysis import (
+    jacobi_energy_decomposition,
+    jacobi_escape_sufficient_condition,
+    jacobi_future_tail_bound,
+)
 from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
 
@@ -14,6 +18,8 @@ def test_jacobi_energy_decomposition_closes_hamiltonian_split() -> None:
     assert decomposition.outer_body == 2
     assert decomposition.closure_residual < 1.0e-12
     assert decomposition.interaction_bound >= abs(decomposition.interaction_remainder)
+    assert decomposition.quadrupole_interaction_bound >= abs(decomposition.interaction_remainder)
+    assert decomposition.quadrupole_interaction_bound < decomposition.interaction_bound
     assert decomposition.hierarchy_ratio > 1.0
 
 
@@ -37,6 +43,27 @@ def test_jacobi_escape_sufficient_condition_certifies_fast_outgoing_flyby() -> N
     assert certificate.escape_margin > 0.0
     assert certificate.radius_growth_fraction == 1.0
     assert certificate.minimum_radial_velocity > 0.0
+
+
+def test_jacobi_future_tail_bound_certifies_conditional_asymptotic_escape() -> None:
+    scenario = OrbitLibrary().general_hierarchical_flyby(
+        intruder_velocity=(0.8, 1.6),
+        duration=8.0,
+        samples=500,
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    certificate = jacobi_future_tail_bound(scenario.system, trajectory, inner_pair=(0, 1))
+
+    assert certificate.assumptions_satisfied is True
+    assert certificate.conditional_asymptotic_escape is True
+    assert certificate.future_energy_exchange_bound > 0.0
+    assert certificate.asymptotic_escape_margin > 0.0
 
 
 def test_jacobi_escape_sufficient_condition_rejects_uncertain_bound_tail() -> None:

@@ -27,8 +27,10 @@ from .error_bounds import ChartValidityBound, chart_validity_bound
 from .escape_bounds import (
     JacobiEnergyDecomposition,
     JacobiEscapeCertificate,
+    JacobiFutureTailBound,
     jacobi_energy_decomposition,
     jacobi_escape_sufficient_condition,
+    jacobi_future_tail_bound,
 )
 from .gateway import GatewayTransitEstimate, RestrictedChartCertificate, gateway_transit_estimate, restricted_chart_certificate
 from .exchange import EncounterExchangeMetrics, encounter_exchange_metrics
@@ -122,6 +124,7 @@ __all__ = [
     "GeneralThreeBodyFeatures",
     "JacobiEnergyDecomposition",
     "JacobiEscapeCertificate",
+    "JacobiFutureTailBound",
     "HierarchicalElements",
     "HierarchyActionDriftBound",
     "HierarchyResonanceDiagnostic",
@@ -182,6 +185,7 @@ __all__ = [
     "hysteresis_loop_rows",
     "jacobi_energy_decomposition",
     "jacobi_escape_sufficient_condition",
+    "jacobi_future_tail_bound",
     "lagrange_jacobi_identity_certificate",
     "local_linearization",
     "levi_civita_binary_chart",

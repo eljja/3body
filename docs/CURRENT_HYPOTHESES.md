@@ -186,21 +186,23 @@ The code now certifies escape only when:
 - `min(E_outer)` is larger than the interaction-remainder bound plus numerical residual.
 
 This is stronger than a classifier label because it exposes a physical escape margin.
-It is still weaker than a full theorem because the future tail after the sampled interval is not interval-bounded yet.
+The next implementation now adds a conditional future-tail exchange bound, so the current object is no longer only a finite-time label.
+It is still not a fully published theorem because the hypotheses are checked numerically and not yet interval-certified.
 
 Next proof step:
 
-Derive and implement a future-tail bound of the form:
+The implemented future-tail bound has the form:
 
 ```text
 |Delta E_outer_future| <= integral_T^infinity mu_outer |Rdot| |a_perturb| dt
+                              <= mu_outer V_* C_Q / (3 v_* (R_T - r_*/2)^3)
 ```
 
-Then the escape condition becomes theorem-shaped:
+The escape condition is now theorem-shaped:
 
 ```text
 min(E_outer_tail) > interaction_bound_tail + future_exchange_bound + numerical_bound
 ```
 
-If this can be stated with explicit inequalities on `R / |r|`, outward radial velocity, and binary action drift,
+If the quadrupole constant and the future-tail hypotheses are interval-certified with explicit inequalities on `R / |r|`, outward radial velocity, bounded binary scale, and binary action drift,
 it becomes a publishable local escape theorem candidate for a genuinely large hierarchy/escape regime.

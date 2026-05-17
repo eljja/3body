@@ -15,6 +15,8 @@ def test_theorem_suite_reports_candidates_and_benchmarks() -> None:
     assert any(candidate["name"] == "Jacobi Escape Cone Theorem Candidate" for candidate in summary["theorem_candidates"])
     assert any(benchmark["name"] == "jacobi_energy_split_residual" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "jacobi_escape_sufficient_condition" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "jacobi_future_tail_exchange_bound" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "jacobi_quadrupole_tail_assumptions" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "low_crossing_scattering_map_score" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "levi_civita_collision_chart_certificate" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "levi_civita_regularized_rhs_certificate" for benchmark in summary["benchmarks"])

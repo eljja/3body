@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..analysis import JacobiEscapeCertificate, jacobi_escape_sufficient_condition, word_distance
+from ..analysis import (
+    JacobiEscapeCertificate,
+    JacobiFutureTailBound,
+    jacobi_escape_sufficient_condition,
+    jacobi_future_tail_bound,
+    word_distance,
+)
 from ..solvers import AdaptiveIntegrator
 from .flyby_sweep import GRAMMAR_BRANCH_SCORE_THRESHOLD, HierarchicalFlybySweep
 from .orbit_library import OrbitLibrary
@@ -102,6 +108,7 @@ class TheoremSuite:
         close_residual_grid = CloseEncounterResidualGridStudy().run()
         near_collision = NearCollisionScalingStudy().run()
         jacobi_escape = _jacobi_escape_benchmark()
+        jacobi_future_tail = _jacobi_future_tail_benchmark()
         flyby = HierarchicalFlybySweep().run_discovery_validation(
             discovery_binary_phases=(0.0, 1.5707963267948966),
             validation_binary_phases=(
@@ -126,6 +133,7 @@ class TheoremSuite:
             close_residual_grid,
             near_collision,
             jacobi_escape,
+            jacobi_future_tail,
             flyby_summary,
         )
         candidates = _theorem_candidates(benchmark_rows)
@@ -143,6 +151,7 @@ def _paper_benchmarks(
     close_residual_grid: object,
     near_collision: object,
     jacobi_escape: JacobiEscapeCertificate,
+    jacobi_future_tail: JacobiFutureTailBound,
     flyby_summary: dict[str, object],
 ) -> tuple[PaperBenchmarkResult, ...]:
     transition_counts = [row.transition_count for row in artifact_rows]
@@ -526,6 +535,28 @@ def _paper_benchmarks(
             interpretation=(
                 "A hierarchy escape chart is promoted only when the minimum outer Kepler energy "
                 "exceeds the interaction-remainder bound and numerical closure residual on an outward tail."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_future_tail_exchange_bound",
+            passed=jacobi_future_tail.conditional_asymptotic_escape,
+            metric="asymptotic_escape_margin",
+            observed=jacobi_future_tail.asymptotic_escape_margin,
+            threshold=0.0,
+            interpretation=(
+                "The finite hierarchy escape margin must dominate the declared future-tail quadrupole exchange "
+                "integral before the escape cone is promoted to a conditional asymptotic theorem candidate."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_quadrupole_tail_assumptions",
+            passed=jacobi_future_tail.assumptions_satisfied,
+            metric="minimum_radial_velocity",
+            observed=jacobi_future_tail.minimum_radial_velocity,
+            threshold=0.0,
+            interpretation=(
+                "The future-tail theorem domain requires outward radial motion, sufficient hierarchy ratio, "
+                "and resolved Jacobi splitting on the certified tail."
             ),
         ),
         PaperBenchmarkResult(
@@ -976,10 +1007,28 @@ def _jacobi_escape_benchmark() -> JacobiEscapeCertificate:
     return jacobi_escape_sufficient_condition(scenario.system, trajectory, inner_pair=(0, 1))
 
 
+def _jacobi_future_tail_benchmark() -> JacobiFutureTailBound:
+    library = OrbitLibrary()
+    scenario = library.general_hierarchical_flyby(
+        intruder_velocity=(0.8, 1.6),
+        duration=8.0,
+        samples=360,
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+    return jacobi_future_tail_bound(scenario.system, trajectory, inner_pair=(0, 1))
+
+
 def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[TheoremCandidate, ...]:
     benchmark_by_name = {benchmark.name: benchmark for benchmark in benchmarks}
     jacobi_split_passed = benchmark_by_name["jacobi_energy_split_residual"].passed
     jacobi_escape_passed = benchmark_by_name["jacobi_escape_sufficient_condition"].passed
+    jacobi_future_tail_passed = benchmark_by_name["jacobi_future_tail_exchange_bound"].passed
+    jacobi_tail_assumptions_passed = benchmark_by_name["jacobi_quadrupole_tail_assumptions"].passed
     scattering_score_passed = benchmark_by_name["low_crossing_scattering_map_score"].passed
     scattering_selection_passed = benchmark_by_name["low_crossing_scattering_map_selection"].passed
     low_best_passed = benchmark_by_name["best_low_crossing_model_validation"].passed
@@ -1061,12 +1110,14 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
                 ProofObligation(
                     "asymptotic_escape_extension",
-                    "open",
+                    "partial" if jacobi_future_tail_passed and jacobi_tail_assumptions_passed else "failing",
                     (
-                        "The current certificate is finite-time and one-sided; it does not yet prove that all "
-                        "future exchange remains below the positive margin."
+                        "A quadrupole-cancelled future-tail exchange integral is now bounded under explicit "
+                        "tail hypotheses, and the benchmark requires the asymptotic margin to remain positive."
                     ),
-                    "Bound the future tail integral of the interaction force after the certified radius.",
+                    None
+                    if jacobi_future_tail_passed and jacobi_tail_assumptions_passed
+                    else "The future-tail bound or its declared assumptions do not yet pass the benchmark.",
                 ),
                 ProofObligation(
                     "interval_arithmetic_remainder",

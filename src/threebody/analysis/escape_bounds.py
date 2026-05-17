@@ -20,6 +20,7 @@ class JacobiEnergyDecomposition:
     outer_kepler_energy: float
     interaction_remainder: float
     interaction_bound: float
+    quadrupole_interaction_bound: float
     closure_residual: float
     inner_radius: float
     outer_radius: float
@@ -37,6 +38,7 @@ class JacobiEnergyDecomposition:
             "outer_kepler_energy": self.outer_kepler_energy,
             "interaction_remainder": self.interaction_remainder,
             "interaction_bound": self.interaction_bound,
+            "quadrupole_interaction_bound": self.quadrupole_interaction_bound,
             "closure_residual": self.closure_residual,
             "inner_radius": self.inner_radius,
             "outer_radius": self.outer_radius,
@@ -79,6 +81,44 @@ class JacobiEscapeCertificate:
             "escape_margin": self.escape_margin,
             "decomposition_resolved": self.decomposition_resolved,
             "sufficient_escape": self.sufficient_escape,
+            "warning": self.warning,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class JacobiFutureTailBound:
+    """Conditional asymptotic bound for energy exchange after a certified tail."""
+
+    inner_pair: tuple[int, int]
+    outer_body: int
+    tail_sample_count: int
+    terminal_outer_radius: float
+    maximum_inner_radius: float
+    maximum_outer_speed: float
+    minimum_radial_velocity: float
+    maximum_quadrupole_acceleration_constant: float
+    finite_tail_escape_margin: float
+    future_energy_exchange_bound: float
+    asymptotic_escape_margin: float
+    assumptions_satisfied: bool
+    conditional_asymptotic_escape: bool
+    warning: str
+
+    def as_dict(self) -> dict[str, float | int | bool | str | tuple[int, int]]:
+        return {
+            "inner_pair": self.inner_pair,
+            "outer_body": self.outer_body,
+            "tail_sample_count": self.tail_sample_count,
+            "terminal_outer_radius": self.terminal_outer_radius,
+            "maximum_inner_radius": self.maximum_inner_radius,
+            "maximum_outer_speed": self.maximum_outer_speed,
+            "minimum_radial_velocity": self.minimum_radial_velocity,
+            "maximum_quadrupole_acceleration_constant": self.maximum_quadrupole_acceleration_constant,
+            "finite_tail_escape_margin": self.finite_tail_escape_margin,
+            "future_energy_exchange_bound": self.future_energy_exchange_bound,
+            "asymptotic_escape_margin": self.asymptotic_escape_margin,
+            "assumptions_satisfied": self.assumptions_satisfied,
+            "conditional_asymptotic_escape": self.conditional_asymptotic_escape,
             "warning": self.warning,
         }
 
@@ -150,6 +190,15 @@ def jacobi_energy_decomposition(
         outer_kepler_energy=float(outer_kepler),
         interaction_remainder=interaction,
         interaction_bound=_interaction_remainder_bound(
+            gravitational_constant,
+            masses,
+            positions,
+            pair_center,
+            outer_position,
+            inner_pair,
+            outer,
+        ),
+        quadrupole_interaction_bound=_quadrupole_interaction_remainder_bound(
             gravitational_constant,
             masses,
             positions,
@@ -235,6 +284,92 @@ def jacobi_escape_sufficient_condition(
     )
 
 
+def jacobi_future_tail_bound(
+    system: object,
+    trajectory: TrajectoryResult,
+    inner_pair: tuple[int, int] = (0, 1),
+    tail_fraction: float = 0.25,
+    closure_tolerance: float = 1.0e-9,
+    minimum_hierarchy_ratio: float = 4.0,
+) -> JacobiFutureTailBound:
+    """Bound future outer-energy exchange under explicit hierarchy-tail assumptions.
+
+    The bound is conditional: after the sampled tail it assumes the inner binary
+    radius, outer relative speed, and outward radial velocity remain within the
+    certified tail extrema. Under those hypotheses, the quadrupole-cancelled
+    perturbing acceleration is integrable as `O(R^-4)`.
+    """
+
+    escape = jacobi_escape_sufficient_condition(
+        system,
+        trajectory,
+        inner_pair=inner_pair,
+        tail_fraction=tail_fraction,
+        closure_tolerance=closure_tolerance,
+    )
+    tail_count = escape.tail_sample_count
+    states = trajectory.y[-tail_count:]
+    decompositions = tuple(jacobi_energy_decomposition(system, state, inner_pair=inner_pair) for state in states)
+    masses = np.asarray(system.masses, dtype=float)
+    i, j = inner_pair
+    outer = decompositions[-1].outer_body
+    pair_mass = float(masses[i] + masses[j])
+    total_mass = float(pair_mass + masses[outer])
+    outer_reduced_mass = float(pair_mass * masses[outer] / total_mass)
+
+    maximum_inner_radius = float(max(row.inner_radius for row in decompositions))
+    terminal_outer_radius = float(decompositions[-1].outer_radius)
+    minimum_radial_velocity = float(min(row.radial_velocity for row in decompositions))
+    maximum_outer_speed = _maximum_outer_relative_speed(system, states, inner_pair, outer)
+    maximum_acceleration_constant = max(
+        _quadrupole_acceleration_constant(system, state, inner_pair, outer) for state in states
+    )
+    denominator_radius = terminal_outer_radius - 0.5 * maximum_inner_radius
+    if denominator_radius <= 0.0 or minimum_radial_velocity <= 0.0:
+        future_exchange = float("inf")
+    else:
+        future_exchange = float(
+            outer_reduced_mass
+            * maximum_outer_speed
+            * maximum_acceleration_constant
+            / (3.0 * minimum_radial_velocity * denominator_radius**3)
+        )
+    assumptions_satisfied = (
+        escape.decomposition_resolved
+        and np.isfinite(future_exchange)
+        and escape.minimum_hierarchy_ratio >= minimum_hierarchy_ratio
+        and minimum_radial_velocity > 0.0
+    )
+    asymptotic_margin = float(escape.escape_margin - future_exchange)
+    conditional_escape = bool(assumptions_satisfied and asymptotic_margin > 0.0)
+    warning = ""
+    if not escape.decomposition_resolved:
+        warning = "Jacobi split is not resolved on the certified tail"
+    elif escape.minimum_hierarchy_ratio < minimum_hierarchy_ratio:
+        warning = "tail hierarchy ratio is below the declared theorem domain"
+    elif minimum_radial_velocity <= 0.0:
+        warning = "outer radial velocity is not outward on the certified tail"
+    elif asymptotic_margin <= 0.0:
+        warning = "future exchange bound consumes the finite escape margin"
+
+    return JacobiFutureTailBound(
+        inner_pair=inner_pair,
+        outer_body=outer,
+        tail_sample_count=tail_count,
+        terminal_outer_radius=terminal_outer_radius,
+        maximum_inner_radius=maximum_inner_radius,
+        maximum_outer_speed=maximum_outer_speed,
+        minimum_radial_velocity=minimum_radial_velocity,
+        maximum_quadrupole_acceleration_constant=float(maximum_acceleration_constant),
+        finite_tail_escape_margin=escape.escape_margin,
+        future_energy_exchange_bound=future_exchange,
+        asymptotic_escape_margin=asymptotic_margin,
+        assumptions_satisfied=assumptions_satisfied,
+        conditional_asymptotic_escape=conditional_escape,
+        warning=warning,
+    )
+
+
 def _interaction_remainder_bound(
     gravitational_constant: float,
     masses: np.ndarray,
@@ -254,6 +389,56 @@ def _interaction_remainder_bound(
     for index, offset in zip(inner_pair, offsets, strict=True):
         total += float(masses[index] * _safe_norm(offset))
     return float(gravitational_constant * masses[outer] * total / denominator)
+
+
+def _quadrupole_interaction_remainder_bound(
+    gravitational_constant: float,
+    masses: np.ndarray,
+    positions: np.ndarray,
+    pair_center: np.ndarray,
+    outer_position: np.ndarray,
+    inner_pair: tuple[int, int],
+    outer: int,
+) -> float:
+    outer_radius = _safe_norm(outer_position)
+    offsets = [positions[index] - pair_center for index in inner_pair]
+    maximum_offset = max(_safe_norm(offset) for offset in offsets)
+    if maximum_offset >= outer_radius:
+        return float("inf")
+    second_moment = sum(float(masses[index] * np.dot(offset, offset)) for index, offset in zip(inner_pair, offsets, strict=True))
+    return float(gravitational_constant * masses[outer] * second_moment / max(outer_radius - maximum_offset, 1.0e-12) ** 3)
+
+
+def _quadrupole_acceleration_constant(
+    system: object,
+    state: np.ndarray,
+    inner_pair: tuple[int, int],
+    outer: int,
+) -> float:
+    positions, _velocities = system.split_state(state)
+    masses = np.asarray(system.masses, dtype=float)
+    pair_mass = float(sum(masses[index] for index in inner_pair))
+    total_mass = float(pair_mass + masses[outer])
+    pair_center = sum(masses[index] * positions[index] for index in inner_pair) / pair_mass
+    offsets = [positions[index] - pair_center for index in inner_pair]
+    second_moment = sum(float(masses[index] * np.dot(offset, offset)) for index, offset in zip(inner_pair, offsets, strict=True))
+    return float(6.0 * system.gravitational_constant * total_mass * second_moment / pair_mass)
+
+
+def _maximum_outer_relative_speed(
+    system: object,
+    states: np.ndarray,
+    inner_pair: tuple[int, int],
+    outer: int,
+) -> float:
+    masses = np.asarray(system.masses, dtype=float)
+    pair_mass = float(sum(masses[index] for index in inner_pair))
+    speeds = []
+    for state in states:
+        _positions, velocities = system.split_state(state)
+        pair_velocity = sum(masses[index] * velocities[index] for index in inner_pair) / pair_mass
+        speeds.append(float(np.linalg.norm(velocities[outer] - pair_velocity)))
+    return float(max(speeds))
 
 
 def _safe_norm(vector: np.ndarray) -> float:

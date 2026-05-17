@@ -9,7 +9,9 @@ Claim:
 
 For a declared hierarchical three-body tail, if the exact Jacobi-coordinate Hamiltonian split is resolved,
 the outer Kepler energy has a positive margin over a rigorous interaction-remainder bound,
-and the outer radius is moving outward throughout the certified tail, then the trajectory lies inside a one-sided escape/scattering cone for that hierarchy.
+the outer radius is moving outward throughout the certified tail,
+and the finite margin dominates a quadrupole-cancelled future-tail exchange integral,
+then the trajectory lies inside a conditional asymptotic escape/scattering cone for that hierarchy.
 
 The split is:
 
@@ -30,15 +32,30 @@ Current proof status:
 - `jacobi_energy_decomposition` gives an exact floating-point Jacobi split for a chosen hierarchy.
 - `jacobi_escape_sufficient_condition` certifies a positive finite-tail escape margin:
   `min(E_outer) - max(interaction_bound) - max(split_residual) > 0`.
-- The theorem suite now includes `jacobi_energy_split_residual` and `jacobi_escape_sufficient_condition` as paper-facing benchmarks.
+- `jacobi_future_tail_bound` adds a conditional future exchange bound using the binary center-of-mass dipole cancellation:
+  the perturbing acceleration is treated as a quadrupole-order `O(R^-4)` tail under explicit assumptions on `|r|`, `|Rdot|`, and outward radial velocity.
+- The theorem suite now includes `jacobi_energy_split_residual`, `jacobi_escape_sufficient_condition`, `jacobi_future_tail_exchange_bound`, and `jacobi_quadrupole_tail_assumptions` as paper-facing benchmarks.
 - A fast hierarchical flyby passes this certificate in the current smoke benchmark.
 
 Open proof obligations:
 
 - Replace floating-point evaluation with interval arithmetic on the certified tail.
-- Prove a future-tail interaction-force integral bound after the certified radius.
-- State the exact hierarchy domain: minimum `R / |r|`, noncollision distance, positive radial velocity, and energy margin.
+- Prove the quadrupole acceleration constant rigorously in the declared norm and dimension.
+- State the exact hierarchy domain: minimum `R / |r|`, noncollision distance, positive radial velocity, bounded inner radius, bounded outer speed, and positive asymptotic margin.
 - Extend from a single certified fast-flyby benchmark to a parameter region with explicit inequalities.
+
+Proposed theorem statement:
+
+Let a Newtonian three-body solution admit Jacobi coordinates `(r, R)` for a selected binary and escaper on an interval `[T0, T1]`.
+Assume no collision, `R > |r| / 2`, `d|R|/dt >= v_* > 0`, `|r| <= r_*`, and `|Rdot| <= V_*` for `t >= T1`.
+Let `E_R` be the outer Kepler energy in the binary-center frame and let `C_Q` bound the quadrupole-cancelled perturbing acceleration by `C_Q / (|R| - r_*/2)^4`.
+If at `T1`
+
+```text
+E_R(T1) > |W(T1)| + mu_R V_* C_Q / (3 v_* (|R(T1)| - r_*/2)^3),
+```
+
+then `E_R(t)` remains positive for all future time allowed by the hypotheses, and the selected outer body is in a hyperbolic-elliptic escape cone relative to the selected binary.
 
 ## Candidate 2: Reduced Shape-Scattering Atlas Conjecture
 
