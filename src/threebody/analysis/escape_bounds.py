@@ -123,6 +123,32 @@ class JacobiFutureTailBound:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class JacobiInflatedMarginCertificate:
+    """Outward-inflated scalar certificate for the conditional escape margin."""
+
+    inner_pair: tuple[int, int]
+    outer_body: int
+    nominal_asymptotic_margin: float
+    roundoff_inflation: float
+    state_inflation: float
+    validated_margin_lower: float
+    validated_positive: bool
+    warning: str
+
+    def as_dict(self) -> dict[str, float | int | bool | str | tuple[int, int]]:
+        return {
+            "inner_pair": self.inner_pair,
+            "outer_body": self.outer_body,
+            "nominal_asymptotic_margin": self.nominal_asymptotic_margin,
+            "roundoff_inflation": self.roundoff_inflation,
+            "state_inflation": self.state_inflation,
+            "validated_margin_lower": self.validated_margin_lower,
+            "validated_positive": self.validated_positive,
+            "warning": self.warning,
+        }
+
+
 def jacobi_energy_decomposition(
     system: object,
     state: np.ndarray,
@@ -366,6 +392,59 @@ def jacobi_future_tail_bound(
         asymptotic_escape_margin=asymptotic_margin,
         assumptions_satisfied=assumptions_satisfied,
         conditional_asymptotic_escape=conditional_escape,
+        warning=warning,
+    )
+
+
+def jacobi_inflated_margin_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    inner_pair: tuple[int, int] = (0, 1),
+    tail_fraction: float = 0.25,
+    relative_inflation: float = 1.0e-10,
+    absolute_inflation: float = 1.0e-12,
+) -> JacobiInflatedMarginCertificate:
+    """Check that the asymptotic escape margin survives conservative scalar inflation.
+
+    This is not a replacement for machine-checked interval integration. It is a
+    reproducible guardrail: theorem candidates fail if the positive margin is
+    comparable to roundoff or state-measurement scale.
+    """
+
+    future = jacobi_future_tail_bound(
+        system,
+        trajectory,
+        inner_pair=inner_pair,
+        tail_fraction=tail_fraction,
+    )
+    tail_count = future.tail_sample_count
+    states = trajectory.y[-tail_count:]
+    state_scale = float(max(np.max(np.abs(states)), 1.0))
+    scalar_scale = max(
+        abs(future.finite_tail_escape_margin),
+        abs(future.future_energy_exchange_bound),
+        abs(future.maximum_quadrupole_acceleration_constant),
+        abs(future.maximum_outer_speed),
+        abs(future.terminal_outer_radius),
+        1.0,
+    )
+    roundoff_inflation = float(32.0 * np.finfo(float).eps * scalar_scale + absolute_inflation)
+    state_inflation = float(relative_inflation * state_scale * scalar_scale)
+    validated_margin = float(future.asymptotic_escape_margin - roundoff_inflation - state_inflation)
+    validated = bool(future.conditional_asymptotic_escape and validated_margin > 0.0)
+    warning = ""
+    if not future.conditional_asymptotic_escape:
+        warning = "nominal conditional asymptotic escape certificate failed"
+    elif validated_margin <= 0.0:
+        warning = "positive nominal margin is not separated from inflated numerical uncertainty"
+    return JacobiInflatedMarginCertificate(
+        inner_pair=inner_pair,
+        outer_body=future.outer_body,
+        nominal_asymptotic_margin=future.asymptotic_escape_margin,
+        roundoff_inflation=roundoff_inflation,
+        state_inflation=state_inflation,
+        validated_margin_lower=validated_margin,
+        validated_positive=validated,
         warning=warning,
     )
 

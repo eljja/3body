@@ -34,12 +34,14 @@ Current proof status:
   `min(E_outer) - max(interaction_bound) - max(split_residual) > 0`.
 - `jacobi_future_tail_bound` adds a conditional future exchange bound using the binary center-of-mass dipole cancellation:
   the perturbing acceleration is treated as a quadrupole-order `O(R^-4)` tail under explicit assumptions on `|r|`, `|Rdot|`, and outward radial velocity.
-- The theorem suite now includes `jacobi_energy_split_residual`, `jacobi_escape_sufficient_condition`, `jacobi_future_tail_exchange_bound`, and `jacobi_quadrupole_tail_assumptions` as paper-facing benchmarks.
+- `jacobi_inflated_margin_certificate` requires the asymptotic margin to stay positive after predeclared scalar roundoff and state-scale inflation.
+- The theorem suite now includes `jacobi_energy_split_residual`, `jacobi_escape_sufficient_condition`, `jacobi_future_tail_exchange_bound`, `jacobi_quadrupole_tail_assumptions`, and `jacobi_inflated_margin_lower_bound` as paper-facing benchmarks.
 - A fast hierarchical flyby passes this certificate in the current smoke benchmark.
+- The detailed theorem/proof note is in `docs/JACOBI_ESCAPE_CONE_THEOREM.md`.
 
 Open proof obligations:
 
-- Replace floating-point evaluation with interval arithmetic on the certified tail.
+- Replace scalar margin inflation with full interval-enclosed trajectory integration.
 - Prove the quadrupole acceleration constant rigorously in the declared norm and dimension.
 - State the exact hierarchy domain: minimum `R / |r|`, noncollision distance, positive radial velocity, bounded inner radius, bounded outer speed, and positive asymptotic margin.
 - Extend from a single certified fast-flyby benchmark to a parameter region with explicit inequalities.

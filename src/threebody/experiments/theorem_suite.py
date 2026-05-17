@@ -5,8 +5,10 @@ from dataclasses import dataclass
 from ..analysis import (
     JacobiEscapeCertificate,
     JacobiFutureTailBound,
+    JacobiInflatedMarginCertificate,
     jacobi_escape_sufficient_condition,
     jacobi_future_tail_bound,
+    jacobi_inflated_margin_certificate,
     word_distance,
 )
 from ..solvers import AdaptiveIntegrator
@@ -109,6 +111,7 @@ class TheoremSuite:
         near_collision = NearCollisionScalingStudy().run()
         jacobi_escape = _jacobi_escape_benchmark()
         jacobi_future_tail = _jacobi_future_tail_benchmark()
+        jacobi_inflated_margin = _jacobi_inflated_margin_benchmark()
         flyby = HierarchicalFlybySweep().run_discovery_validation(
             discovery_binary_phases=(0.0, 1.5707963267948966),
             validation_binary_phases=(
@@ -134,6 +137,7 @@ class TheoremSuite:
             near_collision,
             jacobi_escape,
             jacobi_future_tail,
+            jacobi_inflated_margin,
             flyby_summary,
         )
         candidates = _theorem_candidates(benchmark_rows)
@@ -152,6 +156,7 @@ def _paper_benchmarks(
     near_collision: object,
     jacobi_escape: JacobiEscapeCertificate,
     jacobi_future_tail: JacobiFutureTailBound,
+    jacobi_inflated_margin: JacobiInflatedMarginCertificate,
     flyby_summary: dict[str, object],
 ) -> tuple[PaperBenchmarkResult, ...]:
     transition_counts = [row.transition_count for row in artifact_rows]
@@ -557,6 +562,17 @@ def _paper_benchmarks(
             interpretation=(
                 "The future-tail theorem domain requires outward radial motion, sufficient hierarchy ratio, "
                 "and resolved Jacobi splitting on the certified tail."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_inflated_margin_lower_bound",
+            passed=jacobi_inflated_margin.validated_positive,
+            metric="validated_margin_lower",
+            observed=jacobi_inflated_margin.validated_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "The conditional escape theorem candidate must keep a positive lower margin after "
+                "predeclared scalar roundoff and state-scale inflation."
             ),
         ),
         PaperBenchmarkResult(
@@ -1023,12 +1039,29 @@ def _jacobi_future_tail_benchmark() -> JacobiFutureTailBound:
     return jacobi_future_tail_bound(scenario.system, trajectory, inner_pair=(0, 1))
 
 
+def _jacobi_inflated_margin_benchmark() -> JacobiInflatedMarginCertificate:
+    library = OrbitLibrary()
+    scenario = library.general_hierarchical_flyby(
+        intruder_velocity=(0.8, 1.6),
+        duration=8.0,
+        samples=360,
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+    return jacobi_inflated_margin_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+
+
 def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[TheoremCandidate, ...]:
     benchmark_by_name = {benchmark.name: benchmark for benchmark in benchmarks}
     jacobi_split_passed = benchmark_by_name["jacobi_energy_split_residual"].passed
     jacobi_escape_passed = benchmark_by_name["jacobi_escape_sufficient_condition"].passed
     jacobi_future_tail_passed = benchmark_by_name["jacobi_future_tail_exchange_bound"].passed
     jacobi_tail_assumptions_passed = benchmark_by_name["jacobi_quadrupole_tail_assumptions"].passed
+    jacobi_inflated_margin_passed = benchmark_by_name["jacobi_inflated_margin_lower_bound"].passed
     scattering_score_passed = benchmark_by_name["low_crossing_scattering_map_score"].passed
     scattering_selection_passed = benchmark_by_name["low_crossing_scattering_map_selection"].passed
     low_best_passed = benchmark_by_name["best_low_crossing_model_validation"].passed
@@ -1121,9 +1154,14 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
                 ProofObligation(
                     "interval_arithmetic_remainder",
-                    "open",
-                    "The interaction bound is analytic but evaluated in floating point.",
-                    "Recompute the margin with interval arithmetic over the certified tail.",
+                    "partial" if jacobi_inflated_margin_passed else "failing",
+                    (
+                        "The interaction and future-tail margins are still evaluated on floating trajectories, "
+                        "but the theorem suite now requires a positive outward-inflated scalar lower bound."
+                    ),
+                    None
+                    if jacobi_inflated_margin_passed
+                    else "The positive margin does not survive the predeclared scalar inflation guardrail.",
                 ),
             ),
         ),
