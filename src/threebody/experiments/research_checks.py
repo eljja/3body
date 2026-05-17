@@ -10,6 +10,7 @@ from ..analysis import (
     ThreeBodyInterpreter,
     chart_validity_bound,
     gateway_transit_estimate,
+    hamiltonian_jacobian_structure_certificate,
     levi_civita_equivalence_certificate,
     levi_civita_flow_certificate,
     levi_civita_tidal_bound_certificate,
@@ -929,6 +930,11 @@ class KnownBenchmarkSuite:
             figure.initial_state,
             float(figure.metadata["period"]),
         )
+        hamiltonian_structure = hamiltonian_jacobian_structure_certificate(
+            figure.system,
+            trajectory,
+            stride=max(1, len(trajectory.t) // 12),
+        )
         return (
             _benchmark("restricted_l4", "position_error", float(np.linalg.norm(lagrange["L4"] - l4_reference)), 0.0, 1.0e-12),
             _benchmark("restricted_l5", "position_error", float(np.linalg.norm(lagrange["L5"] - l5_reference)), 0.0, 1.0e-12),
@@ -937,6 +943,7 @@ class KnownBenchmarkSuite:
             _benchmark("figure_eight_variational_volume", "determinant_error", monodromy.determinant_error, 0.0, 1.0e-4),
             _benchmark("figure_eight_variational_reciprocal_pairs", "reciprocal_pair_error", monodromy.reciprocal_pair_error, 0.0, 1.0e-4),
             _benchmark("figure_eight_variational_symplectic_residual", "symplectic_residual", monodromy.symplectic_residual, 0.0, 1.0e-4),
+            _benchmark("figure_eight_hamiltonian_jacobian_structure", "maximum_residual", hamiltonian_structure.maximum_residual, 0.0, hamiltonian_structure.tolerance),
             BenchmarkResult(
                 name="figure_eight_variational_linear_stability",
                 metric="nontrivial_spectral_radius",

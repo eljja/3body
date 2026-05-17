@@ -19,6 +19,28 @@ class LocalLinearization:
 
 
 @dataclass(frozen=True, slots=True)
+class HamiltonianJacobianStructureCertificate:
+    """Pointwise Hamiltonian linearization residual over sampled states."""
+
+    sample_count: int
+    jacobian_step: float
+    tolerance: float
+    maximum_residual: float
+    rms_residual: float
+    structure_resolved: bool
+
+    def as_dict(self) -> dict[str, float | int | bool]:
+        return {
+            "sample_count": self.sample_count,
+            "jacobian_step": self.jacobian_step,
+            "tolerance": self.tolerance,
+            "maximum_residual": self.maximum_residual,
+            "rms_residual": self.rms_residual,
+            "structure_resolved": self.structure_resolved,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class PeriodicMonodromyCertificate:
     """Finite-difference flow-map certificate for a periodic-neighborhood segment."""
 
@@ -172,6 +194,53 @@ def local_linearization(
         eigenvalues=eigenvalues,
         spectral_radius=spectral_radius,
         stiffness_ratio=stiffness_ratio,
+    )
+
+
+def hamiltonian_jacobian_structure_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    *,
+    stride: int = 1,
+    jacobian_step: float = 1.0e-6,
+    tolerance: float = 1.0e-5,
+) -> HamiltonianJacobianStructureCertificate:
+    """Certify that sampled Jacobians satisfy the Hamiltonian matrix identity.
+
+    For q,v coordinates the pulled-back symplectic form is mass-weighted:
+    Omega = [[0, M], [-M, 0]]. The pointwise linearization should satisfy
+    A^T Omega + Omega A = 0 up to finite-difference and integration error.
+    """
+
+    if stride < 1:
+        raise ValueError("stride must be >= 1.")
+    states = np.asarray(trajectory.y[::stride], dtype=float)
+    if states.size == 0:
+        return HamiltonianJacobianStructureCertificate(
+            sample_count=0,
+            jacobian_step=jacobian_step,
+            tolerance=tolerance,
+            maximum_residual=np.inf,
+            rms_residual=np.inf,
+            structure_resolved=False,
+        )
+
+    residuals = []
+    for index, state in enumerate(states):
+        time = float(trajectory.t[min(index * stride, len(trajectory.t) - 1)])
+        jacobian = finite_difference_jacobian(system, state, time=time, step=jacobian_step)
+        residuals.append(_hamiltonian_jacobian_residual(system, jacobian, state.size))
+
+    residual_array = np.asarray(residuals, dtype=float)
+    maximum_residual = float(np.max(residual_array))
+    rms_residual = float(np.sqrt(np.mean(residual_array**2)))
+    return HamiltonianJacobianStructureCertificate(
+        sample_count=int(residual_array.size),
+        jacobian_step=jacobian_step,
+        tolerance=tolerance,
+        maximum_residual=maximum_residual,
+        rms_residual=rms_residual,
+        structure_resolved=bool(np.all(np.isfinite(residual_array)) and maximum_residual <= tolerance),
     )
 
 
@@ -478,6 +547,12 @@ def _reciprocal_pair_error(magnitudes: tuple[float, ...]) -> float:
     if not magnitudes:
         return np.inf
     return float(max(abs(magnitudes[index] * magnitudes[-1 - index] - 1.0) for index in range(len(magnitudes))))
+
+
+def _hamiltonian_jacobian_residual(system: object, jacobian: np.ndarray, state_dimension: int) -> float:
+    form = _velocity_state_symplectic_form(system, state_dimension)
+    residual = jacobian.T @ form + form @ jacobian
+    return float(np.linalg.norm(residual, ord="fro") / max(np.linalg.norm(form, ord="fro"), 1.0e-12))
 
 
 def _symplectic_residual(system: object, transition: np.ndarray, state_dimension: int) -> float:

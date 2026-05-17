@@ -200,6 +200,7 @@ def _paper_benchmarks(
     known_by_name = {row.name: row for row in known_benchmarks}
     figure_eight_variational = known_by_name["figure_eight_variational_linear_stability"]
     figure_eight_symplectic = known_by_name["figure_eight_variational_symplectic_residual"]
+    figure_eight_hamiltonian = known_by_name["figure_eight_hamiltonian_jacobian_structure"]
     figure_eight_variational_convergence = known_by_name["figure_eight_variational_step_convergence"]
     regime_names = {row.name for row in regimes}
     reduced_regime_hints = {
@@ -381,6 +382,17 @@ def _paper_benchmarks(
             interpretation=(
                 "The figure-eight variational state-transition matrix must preserve the mass-weighted "
                 "symplectic form in q,v coordinates before Floquet multipliers are promoted."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="figure_eight_hamiltonian_jacobian_structure",
+            passed=figure_eight_hamiltonian.passed,
+            metric=figure_eight_hamiltonian.metric,
+            observed=figure_eight_hamiltonian.observed,
+            threshold=1.0e-5,
+            interpretation=(
+                "The sampled figure-eight Jacobians must satisfy A^T Omega + Omega A ~= 0, "
+                "so the variational equation is tied to Hamiltonian structure rather than only fitted multipliers."
             ),
         ),
         PaperBenchmarkResult(

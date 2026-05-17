@@ -4,6 +4,7 @@ import numpy as np
 
 from threebody.analysis import (
     finite_difference_jacobian,
+    hamiltonian_jacobian_structure_certificate,
     local_linearization,
     periodic_monodromy_certificate,
     variational_monodromy_convergence_certificate,
@@ -86,3 +87,19 @@ def test_variational_monodromy_convergence_certificate_rejects_step_artifacts() 
     assert certificate.maximum_multiplier_spread < 2.0e-3
     assert certificate.maximum_symplectic_residual < 1.0e-4
     assert certificate.reference.linearly_stable_proxy is True
+
+
+def test_hamiltonian_jacobian_structure_certificate_resolves_figure_eight_samples() -> None:
+    scenario = OrbitLibrary().general_figure_eight(periods=0.1, samples=60)
+    trajectory = AdaptiveIntegrator(rtol=1.0e-10, atol=1.0e-12).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    certificate = hamiltonian_jacobian_structure_certificate(scenario.system, trajectory, stride=10)
+
+    assert certificate.sample_count == 6
+    assert certificate.structure_resolved is True
+    assert certificate.maximum_residual < certificate.tolerance

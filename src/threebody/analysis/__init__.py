@@ -53,11 +53,13 @@ from .transition_graph import TransitionGraph
 from .types import AnalysisReport, ChartScore, ChartTransition, ChartType
 from .validation import TransitionLawValidation, TransitionLawValidator
 from .variational import (
+    HamiltonianJacobianStructureCertificate,
     LocalLinearization,
     PeriodicMonodromyCertificate,
     VariationalMonodromyConvergenceCertificate,
     VariationalMonodromyCertificate,
     finite_difference_jacobian,
+    hamiltonian_jacobian_structure_certificate,
     local_linearization,
     periodic_monodromy_certificate,
     variational_monodromy_convergence_certificate,
@@ -100,6 +102,7 @@ __all__ = [
     "HierarchicalElements",
     "HierarchyActionDriftBound",
     "HierarchyResonanceDiagnostic",
+    "HamiltonianJacobianStructureCertificate",
     "InterpretationSegment",
     "LeviCivitaBinaryChart",
     "LeviCivitaChartCertificate",
@@ -137,6 +140,7 @@ __all__ = [
     "ShapeSpaceCoordinates",
     "feature_vector_for_report",
     "finite_difference_jacobian",
+    "hamiltonian_jacobian_structure_certificate",
     "chart_validity_bound",
     "chart_word_from_reports",
     "collision_regularization_certificate",
