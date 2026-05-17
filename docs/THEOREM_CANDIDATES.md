@@ -17,6 +17,7 @@ It tries to unify local analytic regimes into a reproducible, falsifiable atlas 
 Current proof status:
 
 - `ReducedThreeBodyState` exists.
+- Center-of-mass reduction is now checked as a theorem-suite guardrail: periodic/Floquet/choreography claims are interpreted only after the translational quotient frame is numerically certified.
 - Hierarchy, collision, gateway, escape, and scattering diagnostics exist.
 - `ThreeBodyInterpreter` now converts a trajectory into chart-local interpretation segments with model families, validity statements, and unresolved proof obligations.
 - `InterpretationSuite` now aggregates representative hierarchy, restricted Lagrange, escape, and close-encounter cases into one reproducible coverage certificate.

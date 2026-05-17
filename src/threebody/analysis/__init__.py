@@ -39,7 +39,13 @@ from .interpretation import InterpretationSegment, ThreeBodyInterpreter, Traject
 from .rule_miner import CandidateTransitionLaw, TransitionRuleMiner
 from .scattering import EscapeAsymptoticCertificate, PeriapsisScatteringMap, escape_asymptotic_certificate, periapsis_scattering_map
 from .pipeline import ResearchPipeline, ResearchRunResult, ResearchValidationResult
-from .reduced_state import ReducedThreeBodyState, reduced_state_series, reduced_three_body_state
+from .reduced_state import (
+    CenterOfMassReductionCertificate,
+    ReducedThreeBodyState,
+    center_of_mass_reduction_certificate,
+    reduced_state_series,
+    reduced_three_body_state,
+)
 from .shape import ShapeSpaceCoordinates, shape_space_coordinates
 from .symmetry import ChoreographySymmetryCertificate, choreography_symmetry_certificate
 from .survey import TransitionSurvey, TransitionSurveyResult
@@ -93,6 +99,7 @@ __all__ = [
     "ChartWordSignature",
     "ChartValidityBound",
     "ChoreographySymmetryCertificate",
+    "CenterOfMassReductionCertificate",
     "CollisionRegularizationCertificate",
     "ChartType",
     "CandidateTransitionLaw",
@@ -147,6 +154,7 @@ __all__ = [
     "chart_word_from_reports",
     "collision_regularization_certificate",
     "chart_word_signature",
+    "center_of_mass_reduction_certificate",
     "choreography_symmetry_certificate",
     "estimate_transition_boundaries",
     "fit_power_law_boundary_collapse",

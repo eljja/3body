@@ -198,6 +198,8 @@ def _paper_benchmarks(
     )
     known_pass_rate = sum(1 for row in known_benchmarks if row.passed) / len(known_benchmarks)
     known_by_name = {row.name: row for row in known_benchmarks}
+    figure_eight_com_position = known_by_name["figure_eight_center_of_mass_position"]
+    figure_eight_com_momentum = known_by_name["figure_eight_center_of_mass_momentum"]
     figure_eight_variational = known_by_name["figure_eight_variational_linear_stability"]
     figure_eight_symplectic = known_by_name["figure_eight_variational_symplectic_residual"]
     figure_eight_hamiltonian = known_by_name["figure_eight_hamiltonian_jacobian_structure"]
@@ -362,6 +364,17 @@ def _paper_benchmarks(
             observed=known_pass_rate,
             threshold=1.0,
             interpretation="L4/L5 geometry and figure-eight return must match known reference cases.",
+        ),
+        PaperBenchmarkResult(
+            name="figure_eight_center_of_mass_reduction",
+            passed=figure_eight_com_position.passed and figure_eight_com_momentum.passed,
+            metric="max_center_or_momentum_norm",
+            observed=max(figure_eight_com_position.observed, figure_eight_com_momentum.observed),
+            threshold=1.0e-8,
+            interpretation=(
+                "The figure-eight benchmark must be in the center-of-mass quotient frame before "
+                "periodic, Floquet, or choreography certificates are interpreted."
+            ),
         ),
         PaperBenchmarkResult(
             name="figure_eight_variational_linear_stability",

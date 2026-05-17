@@ -8,6 +8,7 @@ from ..analysis import (
     AnalysisAtlas,
     ChartClassifier,
     ThreeBodyInterpreter,
+    center_of_mass_reduction_certificate,
     chart_validity_bound,
     choreography_symmetry_certificate,
     gateway_transit_estimate,
@@ -921,6 +922,11 @@ class KnownBenchmarkSuite:
         l5_reference = np.array([0.5 - restricted.system.mass_ratio, -np.sqrt(3.0) / 2.0])
         figure = self.library.general_figure_eight(periods=1.0, samples=1200)
         trajectory = self.integrator.integrate(figure.system, figure.t_span, figure.initial_state, t_eval=figure.t_eval)
+        center_of_mass = center_of_mass_reduction_certificate(
+            figure.system,
+            trajectory,
+            stride=max(1, len(trajectory.t) // 12),
+        )
         monodromy = variational_monodromy_certificate(
             figure.system,
             figure.initial_state,
@@ -945,6 +951,8 @@ class KnownBenchmarkSuite:
             _benchmark("restricted_l4", "position_error", float(np.linalg.norm(lagrange["L4"] - l4_reference)), 0.0, 1.0e-12),
             _benchmark("restricted_l5", "position_error", float(np.linalg.norm(lagrange["L5"] - l5_reference)), 0.0, 1.0e-12),
             _benchmark("figure_eight_return", "state_return_error", float(np.linalg.norm(trajectory.y[-1] - trajectory.y[0])), 0.0, 5.0e-3),
+            _benchmark("figure_eight_center_of_mass_position", "maximum_center_norm", center_of_mass.maximum_center_norm, 0.0, center_of_mass.tolerance),
+            _benchmark("figure_eight_center_of_mass_momentum", "maximum_linear_momentum_norm", center_of_mass.maximum_linear_momentum_norm, 0.0, center_of_mass.tolerance),
             _benchmark("figure_eight_variational_closure", "closure_ratio", monodromy.closure_ratio, 0.0, 5.0e-3),
             _benchmark("figure_eight_variational_volume", "determinant_error", monodromy.determinant_error, 0.0, 1.0e-4),
             _benchmark("figure_eight_variational_reciprocal_pairs", "reciprocal_pair_error", monodromy.reciprocal_pair_error, 0.0, 1.0e-4),

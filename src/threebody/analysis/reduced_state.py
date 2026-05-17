@@ -10,6 +10,28 @@ from .shape import shape_space_coordinates
 
 
 @dataclass(frozen=True, slots=True)
+class CenterOfMassReductionCertificate:
+    """Certificate that a trajectory is already in the center-of-mass quotient frame."""
+
+    sample_count: int
+    maximum_center_norm: float
+    maximum_center_velocity_norm: float
+    maximum_linear_momentum_norm: float
+    tolerance: float
+    reduction_resolved: bool
+
+    def as_dict(self) -> dict[str, float | int | bool]:
+        return {
+            "sample_count": self.sample_count,
+            "maximum_center_norm": self.maximum_center_norm,
+            "maximum_center_velocity_norm": self.maximum_center_velocity_norm,
+            "maximum_linear_momentum_norm": self.maximum_linear_momentum_norm,
+            "tolerance": self.tolerance,
+            "reduction_resolved": self.reduction_resolved,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ReducedThreeBodyState:
     """Symmetry-reduced scale/shape/invariant state for a Newtonian three-body configuration."""
 
@@ -93,6 +115,61 @@ def reduced_three_body_state(system: object, state: np.ndarray, time: float = 0.
         collision_depth=collision_depth,
         escape_depth=escape_depth,
         reduced_regime_hint=regime_hint,
+    )
+
+
+def center_of_mass_reduction_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    *,
+    stride: int = 1,
+    tolerance: float = 1.0e-8,
+) -> CenterOfMassReductionCertificate:
+    """Check whether sampled states stay in the center-of-mass inertial frame."""
+
+    if stride < 1:
+        raise ValueError("stride must be >= 1.")
+    if not hasattr(system, "split_state") or not hasattr(system, "masses"):
+        raise TypeError("center_of_mass_reduction_certificate requires a massive body system.")
+
+    masses = np.asarray(system.masses, dtype=float)
+    total_mass = float(np.sum(masses))
+    centers = []
+    center_velocities = []
+    momenta = []
+    for state in trajectory.y[::stride]:
+        positions, velocities = system.split_state(state)
+        center = np.sum(masses[:, None] * positions, axis=0) / total_mass
+        center_velocity = np.sum(masses[:, None] * velocities, axis=0) / total_mass
+        momentum = np.sum(masses[:, None] * velocities, axis=0)
+        centers.append(float(np.linalg.norm(center)))
+        center_velocities.append(float(np.linalg.norm(center_velocity)))
+        momenta.append(float(np.linalg.norm(momentum)))
+
+    if not centers:
+        return CenterOfMassReductionCertificate(
+            sample_count=0,
+            maximum_center_norm=np.inf,
+            maximum_center_velocity_norm=np.inf,
+            maximum_linear_momentum_norm=np.inf,
+            tolerance=tolerance,
+            reduction_resolved=False,
+        )
+
+    maximum_center_norm = float(max(centers))
+    maximum_center_velocity_norm = float(max(center_velocities))
+    maximum_linear_momentum_norm = float(max(momenta))
+    return CenterOfMassReductionCertificate(
+        sample_count=len(centers),
+        maximum_center_norm=maximum_center_norm,
+        maximum_center_velocity_norm=maximum_center_velocity_norm,
+        maximum_linear_momentum_norm=maximum_linear_momentum_norm,
+        tolerance=tolerance,
+        reduction_resolved=bool(
+            maximum_center_norm <= tolerance
+            and maximum_center_velocity_norm <= tolerance
+            and maximum_linear_momentum_norm <= tolerance
+        ),
     )
 
 

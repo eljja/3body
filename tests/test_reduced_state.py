@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from threebody.analysis import reduced_state_series, reduced_three_body_state
+from threebody.analysis import center_of_mass_reduction_certificate, reduced_state_series, reduced_three_body_state
 from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
 
@@ -36,3 +36,20 @@ def test_reduced_state_series_tracks_trajectory_time() -> None:
     assert len(series) == 8
     assert series[0].time == trajectory.t[0]
     assert series[-1].time == trajectory.t[70]
+
+
+def test_center_of_mass_reduction_certificate_resolves_recentered_figure_eight() -> None:
+    scenario = OrbitLibrary().general_figure_eight(periods=0.2, samples=120)
+    trajectory = AdaptiveIntegrator(rtol=1.0e-10, atol=1.0e-12).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    certificate = center_of_mass_reduction_certificate(scenario.system, trajectory, stride=10)
+
+    assert certificate.sample_count == 12
+    assert certificate.reduction_resolved is True
+    assert certificate.maximum_center_norm < certificate.tolerance
+    assert certificate.maximum_linear_momentum_norm < certificate.tolerance
