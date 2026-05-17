@@ -37,7 +37,8 @@ Current proof status:
 - `jacobi_inflated_margin_certificate` requires the asymptotic margin to stay positive after predeclared scalar roundoff and state-scale inflation.
 - `jacobi_self_consistent_escape_cone` checks that the outward radial floor used by the future-tail integral is supported by the validated energy margin.
 - `jacobi_open_escape_cone_certificate` computes a positive tail-data neighborhood radius, so the claim is not a single-trajectory certificate.
-- The theorem suite now includes `jacobi_energy_split_residual`, `jacobi_escape_sufficient_condition`, `jacobi_future_tail_exchange_bound`, `jacobi_quadrupole_tail_assumptions`, `jacobi_inflated_margin_lower_bound`, `jacobi_self_consistent_radial_floor`, and `jacobi_open_cone_radius` as paper-facing benchmarks.
+- `jacobi_quadrupole_acceleration_certificate` checks that the declared `C_Q / R^4` envelope dominates the actual Jacobi perturbing acceleration on the certified tail.
+- The theorem suite now includes `jacobi_energy_split_residual`, `jacobi_escape_sufficient_condition`, `jacobi_future_tail_exchange_bound`, `jacobi_quadrupole_tail_assumptions`, `jacobi_inflated_margin_lower_bound`, `jacobi_self_consistent_radial_floor`, `jacobi_open_cone_radius`, and `jacobi_quadrupole_acceleration_envelope` as paper-facing benchmarks.
 - A fast hierarchical flyby passes this certificate in the current smoke benchmark.
 - The detailed theorem/proof note is in `docs/JACOBI_ESCAPE_CONE_THEOREM.md`.
 

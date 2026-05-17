@@ -84,6 +84,23 @@ For tail data perturbations whose scalar effect on the margin is bounded by `L_M
 This is not yet a sharp Fréchet derivative or interval-Lipschitz proof.
 It is a concrete nonzero-radius obligation that prevents the theorem candidate from being a zero-measure numerical coincidence.
 
+## Quadrupole Envelope Check
+
+The implementation now directly checks the sampled Jacobi perturbing acceleration:
+
+```text
+a_pert = Rddot_actual + G (m1 + m2 + m3) R / |R|^3.
+```
+
+The declared envelope must dominate this acceleration on the certified tail:
+
+```text
+|a_pert| <= C_Q / (|R| - |r|/2)^4.
+```
+
+This is still a sampled certificate, not a formal symbolic proof of the constant.
+It is nevertheless a necessary paper guardrail: the theorem candidate is rejected if the `C_Q` used in the future-tail integral does not dominate the actual perturbation on the benchmark tail.
+
 ## Proof Sketch
 
 The Jacobi split is exact after removing center-of-mass kinetic energy.
@@ -133,6 +150,7 @@ Implemented checks:
 - `jacobi_inflated_margin_certificate`
 - `jacobi_self_consistent_escape_cone`
 - `jacobi_open_escape_cone_certificate`
+- `jacobi_quadrupole_acceleration_certificate`
 
 The theorem suite reports:
 
@@ -143,6 +161,7 @@ The theorem suite reports:
 - `jacobi_inflated_margin_lower_bound`
 - `jacobi_self_consistent_radial_floor`
 - `jacobi_open_cone_radius`
+- `jacobi_quadrupole_acceleration_envelope`
 
 ## Remaining Proof Obligations
 

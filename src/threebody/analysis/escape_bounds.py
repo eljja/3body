@@ -207,6 +207,32 @@ class JacobiOpenConeCertificate:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class JacobiQuadrupoleAccelerationCertificate:
+    """Certificate that the declared quadrupole acceleration envelope dominates the tail."""
+
+    inner_pair: tuple[int, int]
+    outer_body: int
+    tail_sample_count: int
+    maximum_observed_perturbing_acceleration: float
+    minimum_declared_bound: float
+    maximum_bound_ratio: float
+    quadrupole_bound_resolved: bool
+    warning: str
+
+    def as_dict(self) -> dict[str, float | int | bool | str | tuple[int, int]]:
+        return {
+            "inner_pair": self.inner_pair,
+            "outer_body": self.outer_body,
+            "tail_sample_count": self.tail_sample_count,
+            "maximum_observed_perturbing_acceleration": self.maximum_observed_perturbing_acceleration,
+            "minimum_declared_bound": self.minimum_declared_bound,
+            "maximum_bound_ratio": self.maximum_bound_ratio,
+            "quadrupole_bound_resolved": self.quadrupole_bound_resolved,
+            "warning": self.warning,
+        }
+
+
 def jacobi_energy_decomposition(
     system: object,
     state: np.ndarray,
@@ -635,6 +661,47 @@ def jacobi_open_escape_cone_certificate(
     )
 
 
+def jacobi_quadrupole_acceleration_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    inner_pair: tuple[int, int] = (0, 1),
+    tail_fraction: float = 0.25,
+    safety_factor: float = 4.0,
+) -> JacobiQuadrupoleAccelerationCertificate:
+    """Check that the quadrupole perturbing-acceleration envelope dominates the sampled tail."""
+
+    if getattr(system, "body_count", None) != 3:
+        raise TypeError("jacobi_quadrupole_acceleration_certificate requires a three-body Newtonian system.")
+    tail_count = max(3, int(np.ceil(len(trajectory.t) * tail_fraction)))
+    states = trajectory.y[-tail_count:]
+    outer = next(index for index in range(3) if index not in inner_pair)
+    observed = []
+    bounds = []
+    for state in states:
+        perturbation = _outer_jacobi_perturbing_acceleration(system, state, inner_pair, outer)
+        decomposition = jacobi_energy_decomposition(system, state, inner_pair=inner_pair)
+        constant = safety_factor * _quadrupole_acceleration_constant(system, state, inner_pair, outer)
+        denominator = max(decomposition.outer_radius - 0.5 * decomposition.inner_radius, 1.0e-12)
+        observed.append(float(np.linalg.norm(perturbation)))
+        bounds.append(float(constant / denominator**4))
+    observed_array = np.asarray(observed, dtype=float)
+    bound_array = np.asarray(bounds, dtype=float)
+    ratios = observed_array / np.maximum(bound_array, 1.0e-18)
+    maximum_ratio = float(np.max(ratios))
+    resolved = bool(np.all(observed_array <= bound_array) and np.isfinite(maximum_ratio))
+    warning = "" if resolved else "observed Jacobi perturbing acceleration exceeds declared quadrupole envelope"
+    return JacobiQuadrupoleAccelerationCertificate(
+        inner_pair=inner_pair,
+        outer_body=outer,
+        tail_sample_count=tail_count,
+        maximum_observed_perturbing_acceleration=float(np.max(observed_array)),
+        minimum_declared_bound=float(np.min(bound_array)),
+        maximum_bound_ratio=maximum_ratio,
+        quadrupole_bound_resolved=resolved,
+        warning=warning,
+    )
+
+
 def _interaction_remainder_bound(
     gravitational_constant: float,
     masses: np.ndarray,
@@ -688,6 +755,26 @@ def _quadrupole_acceleration_constant(
     offsets = [positions[index] - pair_center for index in inner_pair]
     second_moment = sum(float(masses[index] * np.dot(offset, offset)) for index, offset in zip(inner_pair, offsets, strict=True))
     return float(6.0 * system.gravitational_constant * total_mass * second_moment / pair_mass)
+
+
+def _outer_jacobi_perturbing_acceleration(
+    system: object,
+    state: np.ndarray,
+    inner_pair: tuple[int, int],
+    outer: int,
+) -> np.ndarray:
+    positions, _velocities = system.split_state(state)
+    masses = np.asarray(system.masses, dtype=float)
+    pair_mass = float(sum(masses[index] for index in inner_pair))
+    total_mass = float(pair_mass + masses[outer])
+    accelerations = system.acceleration_field(positions)
+    pair_center = sum(masses[index] * positions[index] for index in inner_pair) / pair_mass
+    pair_acceleration = sum(masses[index] * accelerations[index] for index in inner_pair) / pair_mass
+    outer_position = positions[outer] - pair_center
+    outer_radius = _safe_norm(outer_position)
+    actual_relative_acceleration = accelerations[outer] - pair_acceleration
+    monopole_acceleration = -system.gravitational_constant * total_mass * outer_position / outer_radius**3
+    return actual_relative_acceleration - monopole_acceleration
 
 
 def _maximum_outer_relative_speed(

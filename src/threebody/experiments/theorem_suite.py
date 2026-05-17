@@ -7,11 +7,13 @@ from ..analysis import (
     JacobiFutureTailBound,
     JacobiInflatedMarginCertificate,
     JacobiOpenConeCertificate,
+    JacobiQuadrupoleAccelerationCertificate,
     JacobiSelfConsistentConeCertificate,
     jacobi_escape_sufficient_condition,
     jacobi_future_tail_bound,
     jacobi_inflated_margin_certificate,
     jacobi_open_escape_cone_certificate,
+    jacobi_quadrupole_acceleration_certificate,
     jacobi_self_consistent_escape_cone,
     word_distance,
 )
@@ -118,6 +120,7 @@ class TheoremSuite:
         jacobi_inflated_margin = _jacobi_inflated_margin_benchmark()
         jacobi_self_consistent = _jacobi_self_consistent_benchmark()
         jacobi_open_cone = _jacobi_open_cone_benchmark()
+        jacobi_quadrupole = _jacobi_quadrupole_benchmark()
         flyby = HierarchicalFlybySweep().run_discovery_validation(
             discovery_binary_phases=(0.0, 1.5707963267948966),
             validation_binary_phases=(
@@ -146,6 +149,7 @@ class TheoremSuite:
             jacobi_inflated_margin,
             jacobi_self_consistent,
             jacobi_open_cone,
+            jacobi_quadrupole,
             flyby_summary,
         )
         candidates = _theorem_candidates(benchmark_rows)
@@ -167,6 +171,7 @@ def _paper_benchmarks(
     jacobi_inflated_margin: JacobiInflatedMarginCertificate,
     jacobi_self_consistent: JacobiSelfConsistentConeCertificate,
     jacobi_open_cone: JacobiOpenConeCertificate,
+    jacobi_quadrupole: JacobiQuadrupoleAccelerationCertificate,
     flyby_summary: dict[str, object],
 ) -> tuple[PaperBenchmarkResult, ...]:
     transition_counts = [row.transition_count for row in artifact_rows]
@@ -605,6 +610,17 @@ def _paper_benchmarks(
             interpretation=(
                 "The Jacobi escape result must certify a nonzero open tail-data neighborhood, "
                 "not only a single sampled trajectory."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_quadrupole_acceleration_envelope",
+            passed=jacobi_quadrupole.quadrupole_bound_resolved,
+            metric="maximum_bound_ratio",
+            observed=jacobi_quadrupole.maximum_bound_ratio,
+            threshold=1.0,
+            interpretation=(
+                "The declared quadrupole acceleration envelope must dominate the actual Jacobi perturbing "
+                "acceleration on the certified tail."
             ),
         ),
         PaperBenchmarkResult(
@@ -1119,6 +1135,22 @@ def _jacobi_open_cone_benchmark() -> JacobiOpenConeCertificate:
     return jacobi_open_escape_cone_certificate(scenario.system, trajectory, inner_pair=(0, 1))
 
 
+def _jacobi_quadrupole_benchmark() -> JacobiQuadrupoleAccelerationCertificate:
+    library = OrbitLibrary()
+    scenario = library.general_hierarchical_flyby(
+        intruder_velocity=(0.8, 1.6),
+        duration=8.0,
+        samples=360,
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+    return jacobi_quadrupole_acceleration_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+
+
 def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[TheoremCandidate, ...]:
     benchmark_by_name = {benchmark.name: benchmark for benchmark in benchmarks}
     jacobi_split_passed = benchmark_by_name["jacobi_energy_split_residual"].passed
@@ -1128,6 +1160,7 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     jacobi_inflated_margin_passed = benchmark_by_name["jacobi_inflated_margin_lower_bound"].passed
     jacobi_self_consistent_passed = benchmark_by_name["jacobi_self_consistent_radial_floor"].passed
     jacobi_open_cone_passed = benchmark_by_name["jacobi_open_cone_radius"].passed
+    jacobi_quadrupole_passed = benchmark_by_name["jacobi_quadrupole_acceleration_envelope"].passed
     scattering_score_passed = benchmark_by_name["low_crossing_scattering_map_score"].passed
     scattering_selection_passed = benchmark_by_name["low_crossing_scattering_map_selection"].passed
     low_best_passed = benchmark_by_name["best_low_crossing_model_validation"].passed
@@ -1233,6 +1266,14 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                     None
                     if jacobi_open_cone_passed
                     else "The certificate is still zero-measure and does not define an open regime.",
+                ),
+                ProofObligation(
+                    "quadrupole_acceleration_envelope",
+                    "partial" if jacobi_quadrupole_passed else "failing",
+                    benchmark_by_name["jacobi_quadrupole_acceleration_envelope"].interpretation,
+                    None
+                    if jacobi_quadrupole_passed
+                    else "The declared C_Q envelope does not dominate the sampled perturbing acceleration.",
                 ),
                 ProofObligation(
                     "interval_arithmetic_remainder",
