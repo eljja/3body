@@ -71,6 +71,8 @@ Only after those conditions are met can this be called an accepted interpretatio
 - `local_interpretation_available`: every active segment has a model family and a validity statement.
 - `locally_interpretable_not_theorem_ready`: the trajectory can be explained chart-by-chart, but the proof obligations still block a theorem-level claim.
 
+General three-body certificates now include a Noether invariant guardrail where applicable. Energy, linear momentum, and angular momentum drift must stay below declared tolerances before chart-local claims are promoted.
+
 General three-body certificates now include a center-of-mass reduction guardrail where applicable. The translational quotient frame must keep center position, center velocity, and total linear momentum below tolerance before periodic/Floquet/choreography claims are interpreted.
 
 General three-body trajectories also include a Lagrange-Jacobi identity guardrail where applicable: the sampled trajectory must satisfy `I'' = 4E + 2U` in the center-of-mass frame. This checks the global scale/virial structure imposed by the Newtonian `1/r` potential.

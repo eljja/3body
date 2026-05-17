@@ -24,7 +24,7 @@ from ..analysis import (
     variational_monodromy_convergence_certificate,
     variational_monodromy_certificate,
 )
-from ..diagnostics import InvariantMonitor, StabilityAnalyzer
+from ..diagnostics import InvariantMonitor, StabilityAnalyzer, noether_invariant_drift_certificate
 from ..solvers import AdaptiveIntegrator, StructureAwareIntegrator
 from ..systems import GeneralThreeBodySystem
 from ..types import TrajectoryResult
@@ -924,6 +924,7 @@ class KnownBenchmarkSuite:
         l5_reference = np.array([0.5 - restricted.system.mass_ratio, -np.sqrt(3.0) / 2.0])
         figure = self.library.general_figure_eight(periods=1.0, samples=1200)
         trajectory = self.integrator.integrate(figure.system, figure.t_span, figure.initial_state, t_eval=figure.t_eval)
+        noether = noether_invariant_drift_certificate(figure.system, trajectory)
         center_of_mass = center_of_mass_reduction_certificate(
             figure.system,
             trajectory,
@@ -963,6 +964,9 @@ class KnownBenchmarkSuite:
             _benchmark("restricted_l4", "position_error", float(np.linalg.norm(lagrange["L4"] - l4_reference)), 0.0, 1.0e-12),
             _benchmark("restricted_l5", "position_error", float(np.linalg.norm(lagrange["L5"] - l5_reference)), 0.0, 1.0e-12),
             _benchmark("figure_eight_return", "state_return_error", float(np.linalg.norm(trajectory.y[-1] - trajectory.y[0])), 0.0, 5.0e-3),
+            _benchmark("figure_eight_noether_energy_drift", "maximum_relative_energy_drift", noether.maximum_relative_energy_drift, 0.0, noether.relative_energy_tolerance),
+            _benchmark("figure_eight_noether_linear_momentum", "maximum_linear_momentum_norm", noether.maximum_linear_momentum_norm, 0.0, noether.linear_momentum_tolerance),
+            _benchmark("figure_eight_noether_angular_momentum", "maximum_angular_momentum_drift", noether.maximum_angular_momentum_drift, 0.0, noether.angular_momentum_tolerance),
             _benchmark("figure_eight_center_of_mass_position", "maximum_center_norm", center_of_mass.maximum_center_norm, 0.0, center_of_mass.tolerance),
             _benchmark("figure_eight_center_of_mass_momentum", "maximum_linear_momentum_norm", center_of_mass.maximum_linear_momentum_norm, 0.0, center_of_mass.tolerance),
             _benchmark("figure_eight_lagrange_jacobi_identity", "maximum_relative_residual", lagrange_jacobi.maximum_relative_residual, 0.0, lagrange_jacobi.tolerance),

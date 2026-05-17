@@ -17,6 +17,7 @@ It tries to unify local analytic regimes into a reproducible, falsifiable atlas 
 Current proof status:
 
 - `ReducedThreeBodyState` exists.
+- Noether invariant drift is now checked as a theorem-suite guardrail: energy, linear momentum, and angular momentum must stay within declared tolerances before local chart claims are promoted.
 - Center-of-mass reduction is now checked as a theorem-suite guardrail: periodic/Floquet/choreography claims are interpreted only after the translational quotient frame is numerically certified.
 - The theorem suite now checks the Newtonian Lagrange-Jacobi identity `I'' = 4E + 2U` in the center-of-mass frame, so scale/virial diagnostics are tied to the homogeneous gravitational potential rather than ad hoc trajectory features.
 - The theorem suite now checks Sundman's inequality `|L|^2 <= 2 I T`, adding a global admissibility guardrail for the relationship between angular momentum, moment of inertia, and internal kinetic energy.

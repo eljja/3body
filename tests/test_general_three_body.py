@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from threebody.diagnostics import InvariantMonitor, StabilityAnalyzer
+from threebody.diagnostics import InvariantMonitor, StabilityAnalyzer, noether_invariant_drift_certificate
 from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
 
@@ -34,3 +34,20 @@ def test_figure_eight_energy_and_sensitivity_tools_work() -> None:
 
     assert np.max(np.abs(invariants["energy_drift"])) < 1.0e-7
     assert stability["finite_time_lyapunov"] >= 0.0
+
+
+def test_noether_invariant_drift_certificate_resolves_figure_eight() -> None:
+    scenario = OrbitLibrary().general_figure_eight(periods=0.5, samples=1000)
+    trajectory = AdaptiveIntegrator(rtol=1.0e-10, atol=1.0e-12).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    certificate = noether_invariant_drift_certificate(scenario.system, trajectory)
+
+    assert certificate.invariants_resolved is True
+    assert certificate.maximum_relative_energy_drift < certificate.relative_energy_tolerance
+    assert certificate.maximum_linear_momentum_norm < certificate.linear_momentum_tolerance
+    assert certificate.maximum_angular_momentum_drift < certificate.angular_momentum_tolerance

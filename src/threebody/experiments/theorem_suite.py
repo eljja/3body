@@ -198,6 +198,9 @@ def _paper_benchmarks(
     )
     known_pass_rate = sum(1 for row in known_benchmarks if row.passed) / len(known_benchmarks)
     known_by_name = {row.name: row for row in known_benchmarks}
+    figure_eight_noether_energy = known_by_name["figure_eight_noether_energy_drift"]
+    figure_eight_noether_linear = known_by_name["figure_eight_noether_linear_momentum"]
+    figure_eight_noether_angular = known_by_name["figure_eight_noether_angular_momentum"]
     figure_eight_com_position = known_by_name["figure_eight_center_of_mass_position"]
     figure_eight_com_momentum = known_by_name["figure_eight_center_of_mass_momentum"]
     figure_eight_lagrange_jacobi = known_by_name["figure_eight_lagrange_jacobi_identity"]
@@ -366,6 +369,23 @@ def _paper_benchmarks(
             observed=known_pass_rate,
             threshold=1.0,
             interpretation="L4/L5 geometry and figure-eight return must match known reference cases.",
+        ),
+        PaperBenchmarkResult(
+            name="figure_eight_noether_invariants",
+            passed=figure_eight_noether_energy.passed
+            and figure_eight_noether_linear.passed
+            and figure_eight_noether_angular.passed,
+            metric="max_noether_guardrail_error",
+            observed=max(
+                figure_eight_noether_energy.observed,
+                figure_eight_noether_linear.observed,
+                figure_eight_noether_angular.observed,
+            ),
+            threshold=1.0e-9,
+            interpretation=(
+                "The figure-eight benchmark must conserve Noether invariants before periodic, "
+                "symmetry, or reduced-state certificates are promoted."
+            ),
         ),
         PaperBenchmarkResult(
             name="figure_eight_center_of_mass_reduction",
