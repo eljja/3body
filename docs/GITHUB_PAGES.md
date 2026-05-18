@@ -7,8 +7,8 @@ The static build performs these steps during GitHub Actions deployment:
 
 1. Install the Python package.
 2. Integrate representative two-body, restricted three-body, and general figure-eight trajectories.
-3. Compute invariant drift, stability, analysis-atlas distribution, and theorem-suite summary values.
-4. Embed the resulting Plotly figures and metrics into `site/index.html`.
+3. Compute invariant drift, stability, analysis-atlas distribution, and a representative Jacobi escape-cone certificate.
+4. Embed the resulting Plotly figures, certificate bars, and metrics into `site/index.html`.
 5. Publish the generated `site` directory through GitHub Pages.
 
 Build locally:
@@ -23,4 +23,5 @@ Limitations:
 
 - It is interactive as a Plotly page, but it is not a live solver.
 - Parameter sliders remain in the Streamlit app.
+- The Jacobi escape-cone panel shows a representative flyby plus the latest parameter-box summary; the full theorem suite remains a local/CI research check.
 - New public scenarios require adding them to `threebody.ui.static_site` and rebuilding.

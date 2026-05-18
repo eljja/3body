@@ -27,6 +27,8 @@ The project is built around five ideas:
 - `analysis`
   - `AnalysisAtlas`
   - `ChartClassifier`
+  - `jacobi_open_escape_cone_certificate`
+  - `jacobi_quadrupole_acceleration_certificate`
   - `finite_difference_jacobian`
   - local chart transition detection
 - `experiments`
@@ -46,6 +48,7 @@ The goal is to construct a working analysis method.
 - The general three-body problem is not generically integrable by one global formula, so the project treats it as an atlas problem.
 - Each region of state space should be assigned an interpretive chart: hierarchy, restricted/Lagrange, close encounter, periodic-orbit neighborhood, chaotic transport, or escape/scattering.
 - A real result is a chart, a validity condition, a reduced model, and a transition rule to neighboring charts.
+- The current theorem candidate is the conditional Jacobi escape cone: a hierarchy/escape regime certified by Jacobi energy split, quadrupole future-tail bound, inflated margin, self-consistent radial floor, open-cone radius, and parameter-box reserve checks.
 
 ## Quick Start
 
@@ -88,6 +91,7 @@ Run a transition survey:
 - [Research Program](docs/RESEARCH_PROGRAM.md)
 - [Research Runs](docs/RESEARCH_RUNS.md)
 - [Current Hypotheses](docs/CURRENT_HYPOTHESES.md)
+- [Jacobi Escape Cone Theorem](docs/JACOBI_ESCAPE_CONE_THEOREM.md)
 - [GitHub Pages Static Visualizer](docs/GITHUB_PAGES.md)
 - [Roadmap](docs/ROADMAP.md)
 

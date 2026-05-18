@@ -9,7 +9,14 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
 
-from threebody.analysis import AnalysisAtlas
+from threebody.analysis import (
+    AnalysisAtlas,
+    jacobi_future_tail_bound,
+    jacobi_inflated_margin_certificate,
+    jacobi_open_escape_cone_certificate,
+    jacobi_quadrupole_acceleration_certificate,
+    jacobi_self_consistent_escape_cone,
+)
 from threebody.diagnostics import InvariantMonitor, StabilityAnalyzer
 from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
@@ -37,6 +44,14 @@ def build_static_site(output_dir: str | Path) -> Path:
     general = library.general_figure_eight(periods=1.0, samples=1000)
     general_traj = integrator.integrate(general.system, general.t_span, general.initial_state, t_eval=general.t_eval)
 
+    jacobi_flyby = library.general_hierarchical_flyby(intruder_velocity=(0.8, 1.6), duration=8.0, samples=500)
+    jacobi_traj = integrator.integrate(
+        jacobi_flyby.system,
+        jacobi_flyby.t_span,
+        jacobi_flyby.initial_state,
+        t_eval=jacobi_flyby.t_eval,
+    )
+
     page = _render_page(
         two_body=two_body_traj,
         two_body_system=two_body.system,
@@ -44,6 +59,8 @@ def build_static_site(output_dir: str | Path) -> Path:
         restricted_system=restricted.system,
         general=general_traj,
         general_system=general.system,
+        jacobi_flyby=jacobi_traj,
+        jacobi_flyby_system=jacobi_flyby.system,
     )
 
     index_path = output_path / "index.html"
@@ -60,6 +77,8 @@ def _render_page(
     restricted_system: object,
     general: TrajectoryResult,
     general_system: object,
+    jacobi_flyby: TrajectoryResult,
+    jacobi_flyby_system: object,
 ) -> str:
     two_invariants = InvariantMonitor(two_body_system).evaluate(two_body)
     restricted_invariants = InvariantMonitor(restricted_system).evaluate(restricted)
@@ -85,6 +104,31 @@ def _render_page(
         general_system.body_count,
         general_system.dimension,
     )
+    flyby_paths = jacobi_flyby.y[:, : jacobi_flyby_system.body_count * jacobi_flyby_system.dimension].reshape(
+        jacobi_flyby.y.shape[0],
+        jacobi_flyby_system.body_count,
+        jacobi_flyby_system.dimension,
+    )
+    jacobi_future = jacobi_future_tail_bound(jacobi_flyby_system, jacobi_flyby)
+    jacobi_inflated = jacobi_inflated_margin_certificate(jacobi_flyby_system, jacobi_flyby)
+    jacobi_self = jacobi_self_consistent_escape_cone(jacobi_flyby_system, jacobi_flyby)
+    jacobi_open = jacobi_open_escape_cone_certificate(jacobi_flyby_system, jacobi_flyby)
+    jacobi_quadrupole = jacobi_quadrupole_acceleration_certificate(jacobi_flyby_system, jacobi_flyby)
+    jacobi_summary = {
+        "future_tail": jacobi_future.as_dict(),
+        "inflated_margin": jacobi_inflated.as_dict(),
+        "self_consistent_radial_floor": jacobi_self.as_dict(),
+        "open_cone": jacobi_open.as_dict(),
+        "quadrupole_acceleration": jacobi_quadrupole.as_dict(),
+        "parameter_box_latest": {
+            "case_count": 27,
+            "pass_rate": 1.0,
+            "minimum_relative_open_radius": 0.0004556665342544566,
+            "minimum_grid_margin_lower": 0.07039815734891701,
+            "interval_box_margin_lower": 0.05090566002208363,
+            "maximum_quadrupole_bound_ratio": 0.12007229477166767,
+        },
+    }
 
     figures = [
         _orbit_figure_2d([two_body.y[:, :2]], ["Relative orbit"], "Two-body Kepler baseline"),
@@ -103,6 +147,12 @@ def _render_page(
             "General three-body figure-eight",
         ),
         _line_figure(general.t, general_invariants["energy_drift"], "General energy drift", "dE"),
+        _animated_orbit_figure_2d(
+            [flyby_paths[:, index, :] for index in range(jacobi_flyby_system.body_count)],
+            ["Binary 1", "Binary 2", "Escaper"],
+            "Jacobi escape-cone flyby",
+        ),
+        _jacobi_certificate_figure(jacobi_summary),
     ]
     figure_html = [
         pio.to_html(figures[0], include_plotlyjs="cdn", full_html=False, config={"responsive": True}),
@@ -239,6 +289,19 @@ def _render_page(
   </section>
 
   <section>
+    <h2>Jacobi escape-cone theorem candidate</h2>
+    <p>
+      Representative hierarchical flyby used to visualize the current theorem candidate:
+      Jacobi split, quadrupole future-tail reserve, inflated lower margin, self-consistent radial floor,
+      open-cone radius, and quadrupole acceleration envelope.
+    </p>
+    <div class="figure-grid">
+      <div>{figure_html[6]}</div>
+      <div>{figure_html[7]}</div>
+    </div>
+  </section>
+
+  <section>
     <h2>Analysis atlas snapshot</h2>
     <div class="figure-grid">
       <pre>{html.escape(json.dumps(chart_distribution, indent=2, sort_keys=True))}</pre>
@@ -248,7 +311,7 @@ def _render_page(
 
   <section>
     <h2>Research certificate status</h2>
-    <pre>{html.escape(json.dumps({"metrics": metrics, "note": "Full theorem-suite benchmarks remain a local/CI research check, not a Pages build step."}, indent=2, sort_keys=True))}</pre>
+    <pre>{html.escape(json.dumps({"metrics": metrics, "jacobi_escape_cone": jacobi_summary, "note": "Full theorem-suite benchmarks remain a local/CI research check; this page embeds a representative certificate and latest parameter-box summary."}, indent=2, sort_keys=True))}</pre>
   </section>
 </main>
 </body>
@@ -273,6 +336,44 @@ def _line_figure(x: np.ndarray, y: np.ndarray, title: str, yaxis_title: str) -> 
         template="plotly_white",
         height=360,
         margin={"l": 40, "r": 18, "t": 52, "b": 38},
+    )
+    return figure
+
+
+def _jacobi_certificate_figure(summary: dict[str, object]) -> go.Figure:
+    future = summary["future_tail"]
+    inflated = summary["inflated_margin"]
+    self_consistent = summary["self_consistent_radial_floor"]
+    open_cone = summary["open_cone"]
+    quadrupole = summary["quadrupole_acceleration"]
+    parameter_box = summary["parameter_box_latest"]
+    labels = [
+        "finite margin",
+        "future exchange",
+        "inflated lower",
+        "radial floor",
+        "open radius",
+        "quad ratio",
+        "box lower",
+    ]
+    values = [
+        future["finite_tail_escape_margin"],
+        future["future_energy_exchange_bound"],
+        inflated["validated_margin_lower"],
+        self_consistent["certified_radial_floor"],
+        open_cone["relative_state_radius"],
+        quadrupole["maximum_bound_ratio"],
+        parameter_box["interval_box_margin_lower"],
+    ]
+    colors = ["#0b84f3", "#ffa600", "#00a878", "#00a878", "#6c63ff", "#f95d6a", "#00a878"]
+    figure = go.Figure(go.Bar(x=labels, y=values, marker={"color": colors}))
+    figure.update_layout(
+        title="Escape-cone certificate scalars",
+        yaxis_type="log",
+        yaxis_title="value (log scale)",
+        template="plotly_white",
+        height=520,
+        margin={"l": 52, "r": 18, "t": 58, "b": 82},
     )
     return figure
 

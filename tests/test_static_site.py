@@ -12,3 +12,6 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     content = index_path.read_text(encoding="utf-8")
     assert "ThreeBody Dynamics Lab" in content
     assert "General three-body figure-eight" in content
+    assert "Jacobi escape-cone theorem candidate" in content
+    assert "jacobi_parameter_interval_box_margin" not in content
+    assert "interval_box_margin_lower" in content
