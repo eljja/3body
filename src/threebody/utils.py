@@ -44,3 +44,13 @@ def solve_kepler_elliptic(mean_anomaly: np.ndarray, eccentricity: float, iterati
 
 def orbit_period(gravitational_parameter: float, semimajor_axis: float) -> float:
     return 2.0 * math.pi * math.sqrt(semimajor_axis**3 / gravitational_parameter)
+
+
+def trapezoid_integral(values: np.ndarray, samples: np.ndarray) -> float:
+    """Integrate sampled values with NumPy 1.x/2.x compatibility."""
+
+    if hasattr(np, "trapezoid"):
+        integrate = np.trapezoid
+    else:
+        integrate = np.trapz
+    return float(integrate(values, samples))

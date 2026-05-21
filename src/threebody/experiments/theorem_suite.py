@@ -8,15 +8,23 @@ from ..analysis import (
     JacobiEscapeCertificate,
     JacobiFutureTailBound,
     JacobiInflatedMarginCertificate,
+    JacobiIntervalFlowTubeCertificate,
+    JacobiIntervalPicardFlowCertificate,
+    JacobiIntervalTailCertificate,
     JacobiOpenConeCertificate,
     JacobiQuadrupoleAccelerationCertificate,
     JacobiSelfConsistentConeCertificate,
+    JacobiTailIntervalReserveCertificate,
     jacobi_escape_sufficient_condition,
     jacobi_future_tail_bound,
     jacobi_inflated_margin_certificate,
+    jacobi_interval_flow_tube_certificate,
+    jacobi_interval_picard_flow_certificate,
+    jacobi_interval_escape_certificate,
     jacobi_open_escape_cone_certificate,
     jacobi_quadrupole_acceleration_certificate,
     jacobi_self_consistent_escape_cone,
+    jacobi_tail_interval_reserve_certificate,
     word_distance,
 )
 from ..solvers import AdaptiveIntegrator
@@ -93,11 +101,13 @@ class PaperBenchmarkResult:
 
 @dataclass(frozen=True, slots=True)
 class TheoremSuiteResult:
+    mode: str
     theorem_candidates: tuple[TheoremCandidate, ...]
     benchmarks: tuple[PaperBenchmarkResult, ...]
 
     def as_dict(self) -> dict[str, object]:
         return {
+            "mode": self.mode,
             "theorem_candidates": [candidate.as_dict() for candidate in self.theorem_candidates],
             "benchmarks": [benchmark.as_dict() for benchmark in self.benchmarks],
         }
@@ -113,16 +123,73 @@ class JacobiParameterBoxResult:
     normalized_cell_radius: float
     interval_box_margin_lower: float
     maximum_quadrupole_bound_ratio: float
+    interval_tail_pass_rate: float
+    minimum_interval_tail_margin_lower: float
+    flow_tube_pass_rate: float
+    minimum_flow_tube_margin_lower: float
+    maximum_flow_tube_radius: float
+    picard_flow_pass_rate: float
+    minimum_picard_flow_margin_lower: float
+    maximum_picard_contraction: float
+    picard_finite_difference_lipschitz_bound: float
+    picard_interval_box_margin_lower: float
+    picard_cell_center_count: int
+    picard_cell_center_pass_rate: float
+    minimum_picard_cell_center_margin_lower: float
+    picard_cell_center_variation_bound: float
+    picard_cell_center_reserve_margin_lower: float
+    picard_face_center_count: int
+    picard_face_center_pass_rate: float
+    minimum_picard_face_center_margin_lower: float
+    picard_face_center_variation_bound: float
+    picard_face_center_reserve_margin_lower: float
+    picard_edge_center_count: int
+    picard_edge_center_pass_rate: float
+    minimum_picard_edge_center_margin_lower: float
+    picard_edge_center_variation_bound: float
+    picard_edge_center_reserve_margin_lower: float
+    picard_half_grid_count: int
+    picard_half_grid_lipschitz_bound: float
+    picard_half_grid_interval_margin_lower: float
+    picard_half_grid_subcell_count: int
+    picard_half_grid_subcell_margin_lower: float
     box_certified: bool
     grid_margin_certified: bool
     interval_box_certified: bool
+    parameter_interval_tail_certified: bool
+    parameter_flow_tube_certified: bool
+    parameter_picard_flow_certified: bool
+    parameter_picard_interval_box_certified: bool
+    parameter_picard_cell_centers_certified: bool
+    parameter_picard_face_centers_certified: bool
+    parameter_picard_edge_centers_certified: bool
+    parameter_picard_half_grid_certified: bool
+    parameter_picard_half_grid_subcells_certified: bool
+
+
+@dataclass(frozen=True, slots=True)
+class JacobiResolutionCrosscheckResult:
+    case_count: int
+    pass_rate: float
+    minimum_picard_margin_lower: float
+    maximum_margin_spread: float
+    maximum_tube_radius: float
+    maximum_propagated_endpoint_radius: float
+    maximum_observed_contraction: float
+    minimum_sample_count: int
+    maximum_sample_count: int
+    certified: bool
 
 
 @dataclass(slots=True)
 class TheoremSuite:
     """Reproducible theorem/proof-obligation/benchmark harness."""
 
+    mode: str = "quick"
+
     def run(self) -> TheoremSuiteResult:
+        if self.mode not in {"quick", "paper"}:
+            raise ValueError("TheoremSuite mode must be 'quick' or 'paper'.")
         artifact_rows = ClassifierArtifactStudy().run(duration=8.0, samples=500)
         grammar_artifact_rows = GrammarBranchArtifactStudy().run(duration=8.0, samples=180)
         integrator = IntegratorComparisonStudy().run()
@@ -137,8 +204,13 @@ class TheoremSuite:
         jacobi_inflated_margin = _jacobi_inflated_margin_benchmark()
         jacobi_self_consistent = _jacobi_self_consistent_benchmark()
         jacobi_open_cone = _jacobi_open_cone_benchmark()
+        jacobi_tail_interval = _jacobi_tail_interval_benchmark()
+        jacobi_interval_tail = _jacobi_interval_tail_benchmark()
+        jacobi_flow_tube = _jacobi_flow_tube_benchmark()
+        jacobi_picard_flow = _jacobi_picard_flow_benchmark()
+        jacobi_resolution_crosscheck = _jacobi_resolution_crosscheck_benchmark()
         jacobi_quadrupole = _jacobi_quadrupole_benchmark()
-        jacobi_parameter_box = _jacobi_parameter_box_benchmark()
+        jacobi_parameter_box = _jacobi_parameter_box_benchmark(paper=self.mode == "paper")
         flyby = HierarchicalFlybySweep().run_discovery_validation(
             discovery_binary_phases=(0.0, 1.5707963267948966),
             validation_binary_phases=(
@@ -167,12 +239,17 @@ class TheoremSuite:
             jacobi_inflated_margin,
             jacobi_self_consistent,
             jacobi_open_cone,
+            jacobi_tail_interval,
+            jacobi_interval_tail,
+            jacobi_flow_tube,
+            jacobi_picard_flow,
+            jacobi_resolution_crosscheck,
             jacobi_quadrupole,
             jacobi_parameter_box,
             flyby_summary,
         )
         candidates = _theorem_candidates(benchmark_rows)
-        return TheoremSuiteResult(theorem_candidates=candidates, benchmarks=benchmark_rows)
+        return TheoremSuiteResult(mode=self.mode, theorem_candidates=candidates, benchmarks=benchmark_rows)
 
 
 def _paper_benchmarks(
@@ -190,6 +267,11 @@ def _paper_benchmarks(
     jacobi_inflated_margin: JacobiInflatedMarginCertificate,
     jacobi_self_consistent: JacobiSelfConsistentConeCertificate,
     jacobi_open_cone: JacobiOpenConeCertificate,
+    jacobi_tail_interval: JacobiTailIntervalReserveCertificate,
+    jacobi_interval_tail: JacobiIntervalTailCertificate,
+    jacobi_flow_tube: JacobiIntervalFlowTubeCertificate,
+    jacobi_picard_flow: JacobiIntervalPicardFlowCertificate,
+    jacobi_resolution_crosscheck: JacobiResolutionCrosscheckResult,
     jacobi_quadrupole: JacobiQuadrupoleAccelerationCertificate,
     jacobi_parameter_box: JacobiParameterBoxResult,
     flyby_summary: dict[str, object],
@@ -633,6 +715,88 @@ def _paper_benchmarks(
             ),
         ),
         PaperBenchmarkResult(
+            name="jacobi_terminal_tail_interval_reserve",
+            passed=jacobi_tail_interval.interval_reserve_certified,
+            metric="interval_margin_lower",
+            observed=jacobi_tail_interval.interval_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "The Jacobi escape cone must keep a positive margin after a finite-difference reserve over "
+                "terminal tail-state perturbations; this is a bridge toward interval-enclosed trajectories."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_interval_tail_escape_margin",
+            passed=jacobi_interval_tail.interval_escape_certified,
+            metric="asymptotic_margin_lower",
+            observed=jacobi_interval_tail.asymptotic_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "The Jacobi escape cone must keep a positive asymptotic margin when outer energy, "
+                "interaction remainder, radial floor, hierarchy ratio, and future exchange are evaluated "
+                "by interval arithmetic on a nonzero tail-state box."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_interval_flow_tube",
+            passed=jacobi_flow_tube.flow_tube_certified,
+            metric="interval_escape_margin_lower",
+            observed=jacobi_flow_tube.interval_escape_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "The interval tail-state escape margin must survive an a posteriori flow tube whose radius "
+                "is chosen from the sampled tail's trapezoid defect, and every sampled segment slope must "
+                "lie inside the interval-evaluated Newtonian RHS on its expanded segment hull."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_interval_picard_flow",
+            passed=jacobi_picard_flow.picard_flow_certified,
+            metric="interval_escape_margin_lower",
+            observed=jacobi_picard_flow.interval_escape_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "The Jacobi tail must pass segment-wise interval Picard propagation: each propagated "
+                "interval start box must map into an expanded substep tube with contraction factor below one, "
+                "the propagated box must remain compatible with sampled endpoints, and the final Jacobi "
+                "margin must survive the propagated endpoint enclosure radius."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_picard_interval_jacobian_contraction",
+            passed=jacobi_picard_flow.maximum_observed_contraction < jacobi_picard_flow.target_contraction,
+            metric="maximum_observed_contraction",
+            observed=jacobi_picard_flow.maximum_observed_contraction,
+            threshold=jacobi_picard_flow.target_contraction,
+            interpretation=(
+                "The segment-wise Picard validator must compute its contraction reserve from an interval "
+                "Newtonian RHS Jacobian row-sum bound, not from a purely empirical segment-slope estimate."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_picard_resolution_crosscheck",
+            passed=jacobi_resolution_crosscheck.certified,
+            metric="minimum_picard_margin_lower",
+            observed=jacobi_resolution_crosscheck.minimum_picard_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "The representative Jacobi tail must remain Picard-certified after re-integrating it with "
+                "predeclared sample counts and adaptive-integrator tolerances, reducing dependence on a "
+                "single sampled trajectory."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_picard_resolution_margin_spread",
+            passed=jacobi_resolution_crosscheck.maximum_margin_spread <= 2.0e-2,
+            metric="maximum_margin_spread",
+            observed=jacobi_resolution_crosscheck.maximum_margin_spread,
+            threshold=2.0e-2,
+            interpretation=(
+                "Picard-certified Jacobi margins should not move enough under the resolution/tolerance sweep "
+                "to suggest that the accepted cone is a solver-setting artifact."
+            ),
+        ),
+        PaperBenchmarkResult(
             name="jacobi_quadrupole_acceleration_envelope",
             passed=jacobi_quadrupole.quadrupole_bound_resolved,
             metric="maximum_bound_ratio",
@@ -685,6 +849,109 @@ def _paper_benchmarks(
             interpretation=(
                 "A finite-difference Lipschitz reserve over normalized parameter cells must leave a positive "
                 "lower margin, moving the claim from grid points toward a continuum box certificate."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_parameter_interval_tail_margin",
+            passed=jacobi_parameter_box.parameter_interval_tail_certified,
+            metric="minimum_interval_tail_margin_lower",
+            observed=jacobi_parameter_box.minimum_interval_tail_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "Every sampled point in the predeclared parameter box must keep a positive interval-arithmetic "
+                "tail escape margin, not only a floating or scalar-inflated margin."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_parameter_flow_tube_margin",
+            passed=jacobi_parameter_box.parameter_flow_tube_certified,
+            metric="minimum_flow_tube_margin_lower",
+            observed=jacobi_parameter_box.minimum_flow_tube_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "Every sampled point in the predeclared parameter box must keep a positive flow-level "
+                "Jacobi tail margin under the a posteriori tube check or the stronger Picard propagation "
+                "certificate."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_parameter_picard_flow_margin",
+            passed=jacobi_parameter_box.parameter_picard_flow_certified,
+            metric="minimum_picard_flow_margin_lower",
+            observed=jacobi_parameter_box.minimum_picard_flow_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "Every sampled point in the predeclared parameter box must pass segment-wise interval Picard "
+                "propagation for the outgoing Jacobi tail."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_parameter_picard_interval_box_margin",
+            passed=jacobi_parameter_box.parameter_picard_interval_box_certified,
+            metric="picard_interval_box_margin_lower",
+            observed=jacobi_parameter_box.picard_interval_box_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "The continuum-style finite-difference parameter-cell reserve must remain positive after "
+                "using the Picard-certified Jacobi tail margin, not only the scalar-inflated margin."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_parameter_picard_cell_centers",
+            passed=jacobi_parameter_box.parameter_picard_cell_centers_certified,
+            metric="picard_cell_center_reserve_margin_lower",
+            observed=jacobi_parameter_box.picard_cell_center_reserve_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "Every midpoint of the parameter cells must pass Picard-certified Jacobi escape, and "
+                "the center margin must remain positive after subtracting the observed center-to-corner "
+                "variation inside each cell."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_parameter_picard_face_centers",
+            passed=jacobi_parameter_box.parameter_picard_face_centers_certified,
+            metric="picard_face_center_reserve_margin_lower",
+            observed=jacobi_parameter_box.picard_face_center_reserve_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "Every face-center of the parameter cells must pass Picard-certified Jacobi escape, and "
+                "the face-center margin must remain positive after subtracting the observed face-center-to-corner "
+                "variation on that face."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_parameter_picard_edge_centers",
+            passed=jacobi_parameter_box.parameter_picard_edge_centers_certified,
+            metric="picard_edge_center_reserve_margin_lower",
+            observed=jacobi_parameter_box.picard_edge_center_reserve_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "Every edge-center of the parameter cells must pass Picard-certified Jacobi escape, and "
+                "the edge-center margin must remain positive after subtracting the observed edge-center-to-corner "
+                "variation on that edge."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_parameter_picard_half_grid_margin",
+            passed=jacobi_parameter_box.parameter_picard_half_grid_certified,
+            metric="picard_half_grid_interval_margin_lower",
+            observed=jacobi_parameter_box.picard_half_grid_interval_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "The full 5x5x5 Picard-certified half-grid must leave a positive continuum-style "
+                "finite-difference reserve over its smaller subcells."
+            ),
+        ),
+        PaperBenchmarkResult(
+            name="jacobi_parameter_picard_half_grid_subcells",
+            passed=jacobi_parameter_box.parameter_picard_half_grid_subcells_certified,
+            metric="picard_half_grid_subcell_margin_lower",
+            observed=jacobi_parameter_box.picard_half_grid_subcell_margin_lower,
+            threshold=0.0,
+            interpretation=(
+                "Each of the 64 subcells in the Picard-certified 5x5x5 half-grid must keep a positive "
+                "local finite-difference reserve from its own eight corners."
             ),
         ),
         PaperBenchmarkResult(
@@ -1199,6 +1466,116 @@ def _jacobi_open_cone_benchmark() -> JacobiOpenConeCertificate:
     return jacobi_open_escape_cone_certificate(scenario.system, trajectory, inner_pair=(0, 1))
 
 
+def _jacobi_tail_interval_benchmark() -> JacobiTailIntervalReserveCertificate:
+    library = OrbitLibrary()
+    scenario = library.general_hierarchical_flyby(
+        intruder_velocity=(0.8, 1.6),
+        duration=8.0,
+        samples=360,
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+    return jacobi_tail_interval_reserve_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+
+
+def _jacobi_interval_tail_benchmark() -> JacobiIntervalTailCertificate:
+    library = OrbitLibrary()
+    scenario = library.general_hierarchical_flyby(
+        intruder_velocity=(0.8, 1.6),
+        duration=8.0,
+        samples=360,
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+    return jacobi_interval_escape_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+
+
+def _jacobi_flow_tube_benchmark() -> JacobiIntervalFlowTubeCertificate:
+    library = OrbitLibrary()
+    scenario = library.general_hierarchical_flyby(
+        intruder_velocity=(0.8, 1.6),
+        duration=8.0,
+        samples=360,
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+    return jacobi_interval_flow_tube_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+
+
+def _jacobi_picard_flow_benchmark() -> JacobiIntervalPicardFlowCertificate:
+    library = OrbitLibrary()
+    scenario = library.general_hierarchical_flyby(
+        intruder_velocity=(0.8, 1.6),
+        duration=8.0,
+        samples=360,
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+    return jacobi_interval_picard_flow_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+
+
+def _jacobi_resolution_crosscheck_benchmark() -> JacobiResolutionCrosscheckResult:
+    library = OrbitLibrary()
+    cases = (
+        (500, 1.0e-9, 1.0e-11),
+        (520, 1.0e-9, 1.0e-11),
+        (500, 1.0e-10, 1.0e-12),
+        (500, 1.0e-8, 1.0e-10),
+    )
+    certificates = []
+    sample_counts = []
+    for samples, rtol, atol in cases:
+        scenario = library.general_hierarchical_flyby(
+            intruder_velocity=(0.8, 1.6),
+            duration=8.0,
+            samples=samples,
+        )
+        trajectory = AdaptiveIntegrator(rtol=rtol, atol=atol).integrate(
+            scenario.system,
+            scenario.t_span,
+            scenario.initial_state,
+            t_eval=scenario.t_eval,
+        )
+        certificates.append(jacobi_interval_picard_flow_certificate(scenario.system, trajectory, inner_pair=(0, 1)))
+        sample_counts.append(samples)
+    margins = [certificate.interval_escape_margin_lower for certificate in certificates]
+    pass_count = sum(1 for certificate in certificates if certificate.picard_flow_certified)
+    maximum_margin_spread = float(max(margins) - min(margins))
+    certified = bool(pass_count == len(certificates) and min(margins) > 0.0 and maximum_margin_spread <= 2.0e-2)
+    return JacobiResolutionCrosscheckResult(
+        case_count=len(certificates),
+        pass_rate=float(pass_count / len(certificates)),
+        minimum_picard_margin_lower=float(min(margins)),
+        maximum_margin_spread=maximum_margin_spread,
+        maximum_tube_radius=float(max(certificate.tube_radius for certificate in certificates)),
+        maximum_propagated_endpoint_radius=float(
+            max(certificate.maximum_propagated_endpoint_radius for certificate in certificates)
+        ),
+        maximum_observed_contraction=float(
+            max(certificate.maximum_observed_contraction for certificate in certificates)
+        ),
+        minimum_sample_count=min(sample_counts),
+        maximum_sample_count=max(sample_counts),
+        certified=certified,
+    )
+
+
 def _jacobi_quadrupole_benchmark() -> JacobiQuadrupoleAccelerationCertificate:
     library = OrbitLibrary()
     scenario = library.general_hierarchical_flyby(
@@ -1215,14 +1592,17 @@ def _jacobi_quadrupole_benchmark() -> JacobiQuadrupoleAccelerationCertificate:
     return jacobi_quadrupole_acceleration_certificate(scenario.system, trajectory, inner_pair=(0, 1))
 
 
-def _jacobi_parameter_box_benchmark() -> JacobiParameterBoxResult:
+def _jacobi_parameter_box_benchmark(paper: bool = False) -> JacobiParameterBoxResult:
     library = OrbitLibrary()
     integrator = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11)
     rows = []
     margins_by_index = {}
+    picard_margins_by_index = {}
+    picard_half_grid_margins = {}
     masses = (0.18, 0.20, 0.22)
-    speeds = (1.55, 1.60, 1.65)
+    speeds = (1.60, 1.625, 1.65)
     phases = (0.0, 0.1, 0.2)
+    samples = 520
     for mass_index, intruder_mass in enumerate(masses):
         for speed_index, intruder_speed_y in enumerate(speeds):
             for phase_index, binary_phase in enumerate(phases):
@@ -1231,7 +1611,7 @@ def _jacobi_parameter_box_benchmark() -> JacobiParameterBoxResult:
                     intruder_velocity=(0.8, intruder_speed_y),
                     binary_phase=binary_phase,
                     duration=8.0,
-                    samples=300,
+                    samples=samples,
                 )
                 trajectory = integrator.integrate(
                     scenario.system,
@@ -1242,19 +1622,206 @@ def _jacobi_parameter_box_benchmark() -> JacobiParameterBoxResult:
                 open_cone = jacobi_open_escape_cone_certificate(scenario.system, trajectory, inner_pair=(0, 1))
                 quadrupole = jacobi_quadrupole_acceleration_certificate(scenario.system, trajectory, inner_pair=(0, 1))
                 inflated = jacobi_inflated_margin_certificate(scenario.system, trajectory, inner_pair=(0, 1))
-                rows.append((open_cone, quadrupole, inflated))
+                interval_tail = jacobi_interval_escape_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+                flow_tube = jacobi_interval_flow_tube_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+                picard_flow = jacobi_interval_picard_flow_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+                rows.append((open_cone, quadrupole, inflated, interval_tail, flow_tube, picard_flow))
                 margins_by_index[(mass_index, speed_index, phase_index)] = inflated.validated_margin_lower
+                picard_margins_by_index[(mass_index, speed_index, phase_index)] = picard_flow.interval_escape_margin_lower
+                picard_half_grid_margins[(2 * mass_index, 2 * speed_index, 2 * phase_index)] = (
+                    picard_flow.interval_escape_margin_lower
+                )
+    cell_center_margins: list[float] = []
+    cell_center_pass_count = 0
+    cell_center_variations: list[float] = []
+    if paper:
+        for mass_index in range(len(masses) - 1):
+            for speed_index in range(len(speeds) - 1):
+                for phase_index in range(len(phases) - 1):
+                    intruder_mass = 0.5 * (masses[mass_index] + masses[mass_index + 1])
+                    intruder_speed_y = 0.5 * (speeds[speed_index] + speeds[speed_index + 1])
+                    binary_phase = 0.5 * (phases[phase_index] + phases[phase_index + 1])
+                    scenario = library.general_hierarchical_flyby(
+                        intruder_mass=intruder_mass,
+                        intruder_velocity=(0.8, intruder_speed_y),
+                        binary_phase=binary_phase,
+                        duration=8.0,
+                        samples=samples,
+                    )
+                    trajectory = integrator.integrate(
+                        scenario.system,
+                        scenario.t_span,
+                        scenario.initial_state,
+                        t_eval=scenario.t_eval,
+                    )
+                    picard_flow = jacobi_interval_picard_flow_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+                    cell_center_margins.append(picard_flow.interval_escape_margin_lower)
+                    picard_half_grid_margins[(2 * mass_index + 1, 2 * speed_index + 1, 2 * phase_index + 1)] = (
+                        picard_flow.interval_escape_margin_lower
+                    )
+                    if picard_flow.picard_flow_certified:
+                        cell_center_pass_count += 1
+                    corner_margins = [
+                        picard_margins_by_index[(mass_index + dm, speed_index + dv, phase_index + dp)]
+                        for dm in (0, 1)
+                        for dv in (0, 1)
+                        for dp in (0, 1)
+                    ]
+                    cell_center_variations.append(
+                        max(abs(picard_flow.interval_escape_margin_lower - corner) for corner in corner_margins)
+                    )
+    face_center_margins: list[float] = []
+    face_center_pass_count = 0
+    face_center_variations: list[float] = []
+    face_center_keys = [
+        key
+        for key in np.ndindex(5, 5, 5)
+        if sum(component % 2 == 1 for component in key) == 2
+    ]
+    for key in (face_center_keys if paper else []):
+        mass_position, speed_position, phase_position = key
+        intruder_mass = _half_grid_value(masses, mass_position)
+        intruder_speed_y = _half_grid_value(speeds, speed_position)
+        binary_phase = _half_grid_value(phases, phase_position)
+        scenario = library.general_hierarchical_flyby(
+            intruder_mass=intruder_mass,
+            intruder_velocity=(0.8, intruder_speed_y),
+            binary_phase=binary_phase,
+            duration=8.0,
+            samples=samples,
+        )
+        trajectory = integrator.integrate(
+            scenario.system,
+            scenario.t_span,
+            scenario.initial_state,
+            t_eval=scenario.t_eval,
+        )
+        picard_flow = jacobi_interval_picard_flow_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+        face_center_margins.append(picard_flow.interval_escape_margin_lower)
+        picard_half_grid_margins[key] = picard_flow.interval_escape_margin_lower
+        if picard_flow.picard_flow_certified:
+            face_center_pass_count += 1
+        face_corner_margins = [
+            picard_margins_by_index[corner]
+            for corner in _face_center_corner_indices(key)
+        ]
+        face_center_variations.append(
+            max(abs(picard_flow.interval_escape_margin_lower - corner) for corner in face_corner_margins)
+        )
+    edge_center_margins: list[float] = []
+    edge_center_pass_count = 0
+    edge_center_variations: list[float] = []
+    edge_center_keys = [
+        key
+        for key in np.ndindex(5, 5, 5)
+        if sum(component % 2 == 1 for component in key) == 1
+    ]
+    for key in (edge_center_keys if paper else []):
+        mass_position, speed_position, phase_position = key
+        intruder_mass = _half_grid_value(masses, mass_position)
+        intruder_speed_y = _half_grid_value(speeds, speed_position)
+        binary_phase = _half_grid_value(phases, phase_position)
+        scenario = library.general_hierarchical_flyby(
+            intruder_mass=intruder_mass,
+            intruder_velocity=(0.8, intruder_speed_y),
+            binary_phase=binary_phase,
+            duration=8.0,
+            samples=samples,
+        )
+        trajectory = integrator.integrate(
+            scenario.system,
+            scenario.t_span,
+            scenario.initial_state,
+            t_eval=scenario.t_eval,
+        )
+        picard_flow = jacobi_interval_picard_flow_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+        edge_center_margins.append(picard_flow.interval_escape_margin_lower)
+        picard_half_grid_margins[key] = picard_flow.interval_escape_margin_lower
+        if picard_flow.picard_flow_certified:
+            edge_center_pass_count += 1
+        edge_corner_margins = [
+            picard_margins_by_index[corner]
+            for corner in _edge_center_corner_indices(key)
+        ]
+        edge_center_variations.append(
+            max(abs(picard_flow.interval_escape_margin_lower - corner) for corner in edge_corner_margins)
+        )
     pass_count = sum(
         1
-        for open_cone, quadrupole, inflated in rows
+        for open_cone, quadrupole, inflated, _interval_tail, _flow_tube, _picard_flow in rows
         if open_cone.open_cone_certified and quadrupole.quadrupole_bound_resolved and inflated.validated_positive
     )
-    minimum_radius = min(open_cone.relative_state_radius for open_cone, _quadrupole, _inflated in rows)
-    minimum_margin = min(inflated.validated_margin_lower for _open_cone, _quadrupole, inflated in rows)
-    maximum_ratio = max(quadrupole.maximum_bound_ratio for _open_cone, quadrupole, _inflated in rows)
+    interval_tail_pass_count = sum(
+        1
+        for _open_cone, _quadrupole, _inflated, interval_tail, _flow_tube, _picard_flow in rows
+        if interval_tail.interval_escape_certified
+    )
+    flow_tube_pass_count = sum(
+        1
+        for _open_cone, _quadrupole, _inflated, _interval_tail, flow_tube, _picard_flow in rows
+        if flow_tube.flow_tube_certified
+    )
+    picard_flow_pass_count = sum(
+        1
+        for _open_cone, _quadrupole, _inflated, _interval_tail, _flow_tube, picard_flow in rows
+        if picard_flow.picard_flow_certified
+    )
+    minimum_radius = min(
+        open_cone.relative_state_radius
+        for open_cone, _quadrupole, _inflated, _interval_tail, _flow_tube, _picard_flow in rows
+    )
+    minimum_margin = min(
+        inflated.validated_margin_lower
+        for _open_cone, _quadrupole, inflated, _interval_tail, _flow_tube, _picard_flow in rows
+    )
+    minimum_interval_tail_margin = min(
+        interval_tail.asymptotic_margin_lower
+        for _open_cone, _quadrupole, _inflated, interval_tail, _flow_tube, _picard_flow in rows
+    )
+    minimum_flow_tube_margin = min(
+        flow_tube.interval_escape_margin_lower
+        for _open_cone, _quadrupole, _inflated, _interval_tail, flow_tube, _picard_flow in rows
+    )
+    minimum_picard_flow_margin = min(
+        picard_flow.interval_escape_margin_lower
+        for _open_cone, _quadrupole, _inflated, _interval_tail, _flow_tube, picard_flow in rows
+    )
+    maximum_flow_tube_radius = max(
+        flow_tube.tube_radius
+        for _open_cone, _quadrupole, _inflated, _interval_tail, flow_tube, _picard_flow in rows
+    )
+    maximum_picard_contraction = max(
+        picard_flow.maximum_observed_contraction
+        for _open_cone, _quadrupole, _inflated, _interval_tail, _flow_tube, picard_flow in rows
+    )
+    maximum_ratio = max(
+        quadrupole.maximum_bound_ratio
+        for _open_cone, quadrupole, _inflated, _interval_tail, _flow_tube, _picard_flow in rows
+    )
     lipschitz_bound = _normalized_parameter_lipschitz_bound(margins_by_index)
+    picard_lipschitz_bound = _normalized_parameter_lipschitz_bound(picard_margins_by_index)
     normalized_cell_radius = float(np.sqrt(3.0) * 0.5)
     interval_box_margin = float(minimum_margin - lipschitz_bound * normalized_cell_radius)
+    picard_interval_box_margin = float(minimum_picard_flow_margin - picard_lipschitz_bound * normalized_cell_radius)
+    minimum_cell_center_margin = float(min(cell_center_margins)) if cell_center_margins else float("inf")
+    cell_center_variation_bound = float(max(cell_center_variations)) if cell_center_variations else float("inf")
+    cell_center_reserve_margin = float(minimum_cell_center_margin - cell_center_variation_bound)
+    minimum_face_center_margin = float(min(face_center_margins)) if face_center_margins else float("inf")
+    face_center_variation_bound = float(max(face_center_variations)) if face_center_variations else float("inf")
+    face_center_reserve_margin = float(minimum_face_center_margin - face_center_variation_bound)
+    minimum_edge_center_margin = float(min(edge_center_margins)) if edge_center_margins else float("inf")
+    edge_center_variation_bound = float(max(edge_center_variations)) if edge_center_variations else float("inf")
+    edge_center_reserve_margin = float(minimum_edge_center_margin - edge_center_variation_bound)
+    minimum_half_grid_margin = float(min(picard_half_grid_margins.values())) if picard_half_grid_margins else float("inf")
+    half_grid_lipschitz_bound = _normalized_half_grid_lipschitz_bound(picard_half_grid_margins) if paper else 0.0
+    half_grid_cell_radius = float(np.sqrt(3.0) * 0.25)
+    half_grid_interval_margin = float(minimum_half_grid_margin - half_grid_lipschitz_bound * half_grid_cell_radius)
+    half_grid_subcell_margins = (
+        _half_grid_subcell_margin_lowers(picard_half_grid_margins) if paper else ()
+    )
+    minimum_half_grid_subcell_margin = (
+        float(min(half_grid_subcell_margins)) if half_grid_subcell_margins else float("-inf")
+    )
     return JacobiParameterBoxResult(
         case_count=len(rows),
         pass_rate=float(pass_count / len(rows)),
@@ -1264,9 +1831,79 @@ def _jacobi_parameter_box_benchmark() -> JacobiParameterBoxResult:
         normalized_cell_radius=normalized_cell_radius,
         interval_box_margin_lower=interval_box_margin,
         maximum_quadrupole_bound_ratio=float(maximum_ratio),
+        interval_tail_pass_rate=float(interval_tail_pass_count / len(rows)),
+        minimum_interval_tail_margin_lower=float(minimum_interval_tail_margin),
+        flow_tube_pass_rate=float(flow_tube_pass_count / len(rows)),
+        minimum_flow_tube_margin_lower=float(minimum_flow_tube_margin),
+        maximum_flow_tube_radius=float(maximum_flow_tube_radius),
+        picard_flow_pass_rate=float(picard_flow_pass_count / len(rows)),
+        minimum_picard_flow_margin_lower=float(minimum_picard_flow_margin),
+        maximum_picard_contraction=float(maximum_picard_contraction),
+        picard_finite_difference_lipschitz_bound=float(picard_lipschitz_bound),
+        picard_interval_box_margin_lower=picard_interval_box_margin,
+        picard_cell_center_count=len(cell_center_margins),
+        picard_cell_center_pass_rate=float(cell_center_pass_count / len(cell_center_margins)) if cell_center_margins else 0.0,
+        minimum_picard_cell_center_margin_lower=minimum_cell_center_margin,
+        picard_cell_center_variation_bound=cell_center_variation_bound,
+        picard_cell_center_reserve_margin_lower=cell_center_reserve_margin,
+        picard_face_center_count=len(face_center_margins),
+        picard_face_center_pass_rate=float(face_center_pass_count / len(face_center_margins)) if face_center_margins else 0.0,
+        minimum_picard_face_center_margin_lower=minimum_face_center_margin,
+        picard_face_center_variation_bound=face_center_variation_bound,
+        picard_face_center_reserve_margin_lower=face_center_reserve_margin,
+        picard_edge_center_count=len(edge_center_margins),
+        picard_edge_center_pass_rate=float(edge_center_pass_count / len(edge_center_margins)) if edge_center_margins else 0.0,
+        minimum_picard_edge_center_margin_lower=minimum_edge_center_margin,
+        picard_edge_center_variation_bound=edge_center_variation_bound,
+        picard_edge_center_reserve_margin_lower=edge_center_reserve_margin,
+        picard_half_grid_count=len(picard_half_grid_margins),
+        picard_half_grid_lipschitz_bound=float(half_grid_lipschitz_bound),
+        picard_half_grid_interval_margin_lower=half_grid_interval_margin,
+        picard_half_grid_subcell_count=len(half_grid_subcell_margins),
+        picard_half_grid_subcell_margin_lower=minimum_half_grid_subcell_margin,
         box_certified=pass_count == len(rows) and minimum_radius >= 1.0e-8 and maximum_ratio <= 1.0,
         grid_margin_certified=minimum_margin > 0.0,
         interval_box_certified=interval_box_margin > 0.0,
+        parameter_interval_tail_certified=interval_tail_pass_count == len(rows) and minimum_interval_tail_margin > 0.0,
+        parameter_flow_tube_certified=(
+            minimum_flow_tube_margin > 0.0
+            and (flow_tube_pass_count == len(rows) or picard_flow_pass_count == len(rows))
+        ),
+        parameter_picard_flow_certified=picard_flow_pass_count == len(rows) and minimum_picard_flow_margin > 0.0,
+        parameter_picard_interval_box_certified=picard_interval_box_margin > 0.0,
+        parameter_picard_cell_centers_certified=(
+            paper
+            and
+            cell_center_pass_count == len(cell_center_margins)
+            and minimum_cell_center_margin > 0.0
+            and cell_center_reserve_margin > 0.0
+        ),
+        parameter_picard_face_centers_certified=(
+            paper
+            and
+            face_center_pass_count == len(face_center_margins)
+            and minimum_face_center_margin > 0.0
+            and face_center_reserve_margin > 0.0
+        ),
+        parameter_picard_edge_centers_certified=(
+            paper
+            and
+            edge_center_pass_count == len(edge_center_margins)
+            and minimum_edge_center_margin > 0.0
+            and edge_center_reserve_margin > 0.0
+        ),
+        parameter_picard_half_grid_certified=(
+            paper
+            and
+            len(picard_half_grid_margins) == 125
+            and half_grid_interval_margin > 0.0
+        ),
+        parameter_picard_half_grid_subcells_certified=(
+            paper
+            and
+            len(half_grid_subcell_margins) == 64
+            and minimum_half_grid_subcell_margin > 0.0
+        ),
     )
 
 
@@ -1284,6 +1921,105 @@ def _normalized_parameter_lipschitz_bound(margins_by_index: dict[tuple[int, int,
     return float(1.25 * np.linalg.norm(axis_slopes))
 
 
+def _normalized_half_grid_lipschitz_bound(margins_by_index: dict[tuple[int, int, int], float]) -> float:
+    axis_slopes = []
+    half_step = 0.5
+    for axis in range(3):
+        maximum_axis_slope = 0.0
+        for index, margin in margins_by_index.items():
+            neighbor = list(index)
+            neighbor[axis] += 1
+            neighbor_key = tuple(neighbor)
+            if neighbor_key in margins_by_index:
+                maximum_axis_slope = max(
+                    maximum_axis_slope,
+                    abs(margins_by_index[neighbor_key] - margin) / half_step,
+                )
+        axis_slopes.append(maximum_axis_slope)
+    return float(1.25 * np.linalg.norm(axis_slopes))
+
+
+def _half_grid_subcell_margin_lowers(margins_by_index: dict[tuple[int, int, int], float]) -> tuple[float, ...]:
+    radius = float(np.sqrt(3.0) * 0.25)
+    margin_lowers = []
+    for base in np.ndindex(4, 4, 4):
+        corner_indices = tuple(
+            (base[0] + dx, base[1] + dy, base[2] + dz)
+            for dx in (0, 1)
+            for dy in (0, 1)
+            for dz in (0, 1)
+        )
+        if not all(index in margins_by_index for index in corner_indices):
+            continue
+        corner_margins = {index: margins_by_index[index] for index in corner_indices}
+        minimum_corner_margin = min(corner_margins.values())
+        local_lipschitz = _local_half_grid_lipschitz_bound(corner_margins)
+        margin_lowers.append(float(minimum_corner_margin - local_lipschitz * radius))
+    return tuple(margin_lowers)
+
+
+def _local_half_grid_lipschitz_bound(corner_margins: dict[tuple[int, int, int], float]) -> float:
+    axis_slopes = []
+    half_step = 0.5
+    for axis in range(3):
+        maximum_axis_slope = 0.0
+        for index, margin in corner_margins.items():
+            neighbor = list(index)
+            neighbor[axis] += 1
+            neighbor_key = tuple(neighbor)
+            if neighbor_key in corner_margins:
+                maximum_axis_slope = max(
+                    maximum_axis_slope,
+                    abs(corner_margins[neighbor_key] - margin) / half_step,
+                )
+        axis_slopes.append(maximum_axis_slope)
+    return float(1.25 * np.linalg.norm(axis_slopes))
+
+
+def _half_grid_value(values: tuple[float, ...], position: int) -> float:
+    if position % 2 == 0:
+        return float(values[position // 2])
+    lower = position // 2
+    return float(0.5 * (values[lower] + values[lower + 1]))
+
+
+def _face_center_corner_indices(key: tuple[int, int, int]) -> tuple[tuple[int, int, int], ...]:
+    odd_axes = [axis for axis, component in enumerate(key) if component % 2 == 1]
+    if len(odd_axes) != 2:
+        raise ValueError("face-center key must have exactly two half-grid coordinates")
+    corner_indices = []
+    for first_offset in (0, 1):
+        for second_offset in (0, 1):
+            corner = []
+            offsets = {odd_axes[0]: first_offset, odd_axes[1]: second_offset}
+            for axis, component in enumerate(key):
+                if component % 2 == 0:
+                    corner.append(component // 2)
+                else:
+                    corner.append(component // 2 + offsets[axis])
+            corner_indices.append(tuple(corner))
+    return tuple(corner_indices)
+
+
+def _edge_center_corner_indices(key: tuple[int, int, int]) -> tuple[tuple[int, int, int], ...]:
+    odd_axes = [axis for axis, component in enumerate(key) if component % 2 == 1]
+    if len(odd_axes) != 1:
+        raise ValueError("edge-center key must have exactly one half-grid coordinate")
+    odd_axis = odd_axes[0]
+    corners = []
+    for offset in (0, 1):
+        corner = []
+        for axis, component in enumerate(key):
+            if component % 2 == 0:
+                corner.append(component // 2)
+            elif axis == odd_axis:
+                corner.append(component // 2 + offset)
+            else:
+                raise ValueError("unexpected half-grid coordinate")
+        corners.append(tuple(corner))
+    return tuple(corners)
+
+
 def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[TheoremCandidate, ...]:
     benchmark_by_name = {benchmark.name: benchmark for benchmark in benchmarks}
     jacobi_split_passed = benchmark_by_name["jacobi_energy_split_residual"].passed
@@ -1293,12 +2029,29 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     jacobi_inflated_margin_passed = benchmark_by_name["jacobi_inflated_margin_lower_bound"].passed
     jacobi_self_consistent_passed = benchmark_by_name["jacobi_self_consistent_radial_floor"].passed
     jacobi_open_cone_passed = benchmark_by_name["jacobi_open_cone_radius"].passed
+    jacobi_interval_tail_passed = benchmark_by_name["jacobi_interval_tail_escape_margin"].passed
+    jacobi_flow_tube_passed = benchmark_by_name["jacobi_interval_flow_tube"].passed
+    jacobi_picard_flow_passed = benchmark_by_name["jacobi_interval_picard_flow"].passed
+    jacobi_interval_jacobian_passed = benchmark_by_name["jacobi_picard_interval_jacobian_contraction"].passed
+    jacobi_resolution_crosscheck_passed = (
+        benchmark_by_name["jacobi_picard_resolution_crosscheck"].passed
+        and benchmark_by_name["jacobi_picard_resolution_margin_spread"].passed
+    )
     jacobi_quadrupole_passed = benchmark_by_name["jacobi_quadrupole_acceleration_envelope"].passed
     jacobi_parameter_box_passed = (
         benchmark_by_name["jacobi_parameter_box_open_regime"].passed
         and benchmark_by_name["jacobi_parameter_box_quadrupole_ratio"].passed
         and benchmark_by_name["jacobi_parameter_grid_margin"].passed
         and benchmark_by_name["jacobi_parameter_interval_box_margin"].passed
+        and benchmark_by_name["jacobi_parameter_interval_tail_margin"].passed
+        and benchmark_by_name["jacobi_parameter_flow_tube_margin"].passed
+        and benchmark_by_name["jacobi_parameter_picard_flow_margin"].passed
+        and benchmark_by_name["jacobi_parameter_picard_interval_box_margin"].passed
+        and benchmark_by_name["jacobi_parameter_picard_cell_centers"].passed
+        and benchmark_by_name["jacobi_parameter_picard_face_centers"].passed
+        and benchmark_by_name["jacobi_parameter_picard_edge_centers"].passed
+        and benchmark_by_name["jacobi_parameter_picard_half_grid_margin"].passed
+        and benchmark_by_name["jacobi_parameter_picard_half_grid_subcells"].passed
     )
     scattering_score_passed = benchmark_by_name["low_crossing_scattering_map_score"].passed
     scattering_selection_passed = benchmark_by_name["low_crossing_scattering_map_selection"].passed
@@ -1407,6 +2160,50 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                     else "The certificate is still zero-measure and does not define an open regime.",
                 ),
                 ProofObligation(
+                    "interval_tail_escape_margin",
+                    "partial" if jacobi_interval_tail_passed else "failing",
+                    benchmark_by_name["jacobi_interval_tail_escape_margin"].interpretation,
+                    None
+                    if jacobi_interval_tail_passed
+                    else "The local tail-data box does not keep a positive interval-enclosed asymptotic margin.",
+                ),
+                ProofObligation(
+                    "a_posteriori_flow_tube",
+                    "partial" if jacobi_flow_tube_passed else "failing",
+                    benchmark_by_name["jacobi_interval_flow_tube"].interpretation,
+                    None
+                    if jacobi_flow_tube_passed
+                    else "The expanded tail-state tube does not yet enclose the sampled segment slopes in the interval RHS.",
+                ),
+                ProofObligation(
+                    "interval_picard_flow_propagation",
+                    "partial" if jacobi_picard_flow_passed and jacobi_interval_jacobian_passed else "failing",
+                    benchmark_by_name["jacobi_interval_picard_flow"].interpretation,
+                    None
+                    if jacobi_picard_flow_passed and jacobi_interval_jacobian_passed
+                    else "The tail does not yet pass segment-wise interval Picard propagation.",
+                ),
+                ProofObligation(
+                    "interval_jacobian_contraction_bound",
+                    "partial" if jacobi_interval_jacobian_passed else "failing",
+                    benchmark_by_name["jacobi_picard_interval_jacobian_contraction"].interpretation,
+                    None
+                    if jacobi_interval_jacobian_passed
+                    else "The Picard contraction reserve is not below the declared target under the interval Jacobian bound.",
+                ),
+                ProofObligation(
+                    "resolution_tolerance_crosscheck",
+                    "partial" if jacobi_resolution_crosscheck_passed else "failing",
+                    (
+                        benchmark_by_name["jacobi_picard_resolution_crosscheck"].interpretation
+                        + " "
+                        + benchmark_by_name["jacobi_picard_resolution_margin_spread"].interpretation
+                    ),
+                    None
+                    if jacobi_resolution_crosscheck_passed
+                    else "The Picard-certified margin is not yet stable across the declared resolution/tolerance sweep.",
+                ),
+                ProofObligation(
                     "quadrupole_acceleration_envelope",
                     "partial" if jacobi_quadrupole_passed else "failing",
                     benchmark_by_name["jacobi_quadrupole_acceleration_envelope"].interpretation,
@@ -1424,14 +2221,31 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
                 ProofObligation(
                     "interval_arithmetic_remainder",
-                    "partial" if jacobi_inflated_margin_passed else "failing",
+                    "partial"
+                    if (
+                        jacobi_interval_tail_passed
+                        and jacobi_flow_tube_passed
+                        and jacobi_picard_flow_passed
+                        and jacobi_interval_jacobian_passed
+                        and jacobi_resolution_crosscheck_passed
+                    )
+                    else "failing",
                     (
-                        "The interaction and future-tail margins are still evaluated on floating trajectories, "
-                        "but the theorem suite now requires a positive outward-inflated scalar lower bound."
+                        "The interaction, outer-energy, radial-floor, hierarchy, and future-tail margins are "
+                        "now interval-enclosed on a nonzero tail-state box, and the tail box is tied to an "
+                        "a posteriori interval RHS flow tube plus segment-wise Picard propagation. The "
+                        "representative Picard margin also survives a predeclared resolution/tolerance sweep. "
+                        "This is still not a CAPD-grade validated integrator over arbitrary initial boxes."
                     ),
                     None
-                    if jacobi_inflated_margin_passed
-                    else "The positive margin does not survive the predeclared scalar inflation guardrail.",
+                    if (
+                        jacobi_interval_tail_passed
+                        and jacobi_flow_tube_passed
+                        and jacobi_picard_flow_passed
+                        and jacobi_interval_jacobian_passed
+                        and jacobi_resolution_crosscheck_passed
+                    )
+                    else "The positive margin, interval flow-tube certificate, or Picard propagation certificate fails.",
                 ),
             ),
         ),

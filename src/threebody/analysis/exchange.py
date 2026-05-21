@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..types import TrajectoryResult
-from ..utils import cross_3d
+from ..utils import cross_3d, trapezoid_integral
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +52,7 @@ def encounter_exchange_metrics(
     perturbation_array = np.asarray(perturbation_strengths, dtype=float)
     energy_delta = float(energy_array[-1] - energy_array[0])
     angular_delta = float(angular_array[-1] - angular_array[0])
-    tidal_impulse = float(np.trapz(perturbation_array, trajectory.t))
+    tidal_impulse = trapezoid_integral(perturbation_array, trajectory.t)
     return EncounterExchangeMetrics(
         inner_pair=inner_pair,
         outer_body=outer,

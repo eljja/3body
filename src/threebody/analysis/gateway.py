@@ -68,6 +68,42 @@ class RestrictedChartCertificate:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class GatewayManifoldTubeCertificate:
+    """Interval certificate for a linearized collinear-gateway manifold tube."""
+
+    lagrange_point: str
+    sample_count: int
+    neck_open_fraction: float
+    initial_unstable_projection: float
+    terminal_unstable_projection: float
+    initial_stable_projection: float
+    terminal_stable_projection: float
+    unstable_growth_ratio: float
+    stable_decay_ratio: float
+    minimum_projection_margin: float
+    tube_resolved: bool
+    classification: str
+    warning: str
+
+    def as_dict(self) -> dict[str, float | int | bool | str]:
+        return {
+            "lagrange_point": self.lagrange_point,
+            "sample_count": self.sample_count,
+            "neck_open_fraction": self.neck_open_fraction,
+            "initial_unstable_projection": self.initial_unstable_projection,
+            "terminal_unstable_projection": self.terminal_unstable_projection,
+            "initial_stable_projection": self.initial_stable_projection,
+            "terminal_stable_projection": self.terminal_stable_projection,
+            "unstable_growth_ratio": self.unstable_growth_ratio,
+            "stable_decay_ratio": self.stable_decay_ratio,
+            "minimum_projection_margin": self.minimum_projection_margin,
+            "tube_resolved": self.tube_resolved,
+            "classification": self.classification,
+            "warning": self.warning,
+        }
+
+
 def gateway_transit_estimate(system: object, state: np.ndarray) -> GatewayTransitEstimate:
     """Estimate transit tendency near the nearest collinear Lagrange gateway."""
 
@@ -101,6 +137,91 @@ def gateway_transit_estimate(system: object, state: np.ndarray) -> GatewayTransi
         unstable_projection=float(unstable_projection),
         stable_projection=float(stable_projection),
         transit_likelihood=transit_likelihood,
+    )
+
+
+def gateway_manifold_tube_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    start_index: int = 0,
+    end_index: int | None = None,
+    minimum_neck_open_fraction: float = 1.0,
+    minimum_projection_margin: float = 0.0,
+) -> GatewayManifoldTubeCertificate:
+    """Track stable/unstable projections over a sampled gateway interval.
+
+    This is a local linear tube proxy. It does not replace invariant-manifold
+    continuation, but it promotes the gateway check from a single-state score to
+    an interval-level transit/non-transit target.
+    """
+
+    if not hasattr(system, "jacobi_constant") or not hasattr(system, "lagrange_points"):
+        raise TypeError("gateway_manifold_tube_certificate requires a restricted three-body system.")
+    end = len(trajectory.t) - 1 if end_index is None else min(end_index, len(trajectory.t) - 1)
+    start = max(0, min(start_index, end))
+    states = np.asarray(trajectory.y[start : end + 1], dtype=float)
+    midpoint = states[len(states) // 2]
+    lagrange_points = system.lagrange_points()
+    collinear = {name: point for name, point in lagrange_points.items() if name in {"L1", "L2", "L3"}}
+    nearest = min(collinear, key=lambda name: float(np.linalg.norm(midpoint[:2] - collinear[name])))
+    point = collinear[nearest]
+    equilibrium = np.array([point[0], point[1], 0.0, 0.0], dtype=float)
+    jacobian = finite_difference_jacobian(system, equilibrium)
+    eigenvalues, eigenvectors = np.linalg.eig(jacobian)
+    real_parts = np.real(eigenvalues)
+    unstable_direction = np.real(eigenvectors[:, int(np.argmax(real_parts))])
+    stable_direction = np.real(eigenvectors[:, int(np.argmin(real_parts))])
+    critical = float(system.jacobi_constant(equilibrium))
+    neck_open = []
+    unstable = []
+    stable = []
+    margins = []
+    for state in states:
+        displacement = state - equilibrium
+        unstable_projection = _normalized_projection(displacement, unstable_direction)
+        stable_projection = _normalized_projection(displacement, stable_direction)
+        unstable.append(abs(unstable_projection))
+        stable.append(abs(stable_projection))
+        margins.append(abs(unstable_projection) - abs(stable_projection))
+        neck_open.append(float(critical - float(system.jacobi_constant(state)) > 0.0))
+    unstable_array = np.asarray(unstable, dtype=float)
+    stable_array = np.asarray(stable, dtype=float)
+    neck_open_fraction = float(np.mean(neck_open)) if neck_open else 0.0
+    unstable_growth = float(unstable_array[-1] / max(unstable_array[0], 1.0e-12))
+    stable_decay = float(stable_array[0] / max(stable_array[-1], 1.0e-12))
+    projection_margin = float(np.min(margins))
+    tube_resolved = bool(
+        neck_open_fraction >= minimum_neck_open_fraction
+        and projection_margin > minimum_projection_margin
+        and np.all(np.isfinite(unstable_array))
+        and np.all(np.isfinite(stable_array))
+    )
+    if tube_resolved and unstable_growth >= 1.0:
+        classification = "linearized_unstable_transit_tube"
+        warning = ""
+    elif tube_resolved:
+        classification = "linearized_gateway_tube"
+        warning = ""
+    elif neck_open_fraction < minimum_neck_open_fraction:
+        classification = "neck_closed_or_intermittent"
+        warning = "gateway neck is not open over the required interval fraction"
+    else:
+        classification = "projection_margin_unresolved"
+        warning = "stable projection is not dominated by the unstable tube coordinate"
+    return GatewayManifoldTubeCertificate(
+        lagrange_point=nearest,
+        sample_count=len(states),
+        neck_open_fraction=neck_open_fraction,
+        initial_unstable_projection=float(unstable_array[0]),
+        terminal_unstable_projection=float(unstable_array[-1]),
+        initial_stable_projection=float(stable_array[0]),
+        terminal_stable_projection=float(stable_array[-1]),
+        unstable_growth_ratio=unstable_growth,
+        stable_decay_ratio=stable_decay,
+        minimum_projection_margin=projection_margin,
+        tube_resolved=tube_resolved,
+        classification=classification,
+        warning=warning,
     )
 
 

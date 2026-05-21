@@ -6,7 +6,7 @@ from fractions import Fraction
 import numpy as np
 
 from ..types import TrajectoryResult
-from ..utils import cross_3d
+from ..utils import cross_3d, trapezoid_integral
 from .coordinates import general_three_body_features
 
 
@@ -237,7 +237,7 @@ def hierarchy_action_drift_bound(
         dtype=float,
     )
     reference_period = float(np.median(periods)) if periods.size else max(float(times[-1] - times[0]), 1.0e-12)
-    perturbation_budget = float(np.trapz(perturbations, times) / max(reference_period, 1.0e-12))
+    perturbation_budget = trapezoid_integral(perturbations, times) / max(reference_period, 1.0e-12)
     relative_action_drift = _relative_span(actions)
     relative_angular_momentum_drift = _relative_span(angular_momenta)
     tolerated = bound_multiplier * perturbation_budget + 1.0e-10

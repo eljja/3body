@@ -196,6 +196,32 @@ class LeviCivitaTidalBoundCertificate:
 
 
 @dataclass(frozen=True, slots=True)
+class LeviCivitaStepControlCertificate:
+    """Regularized-time step-size control for a Levi-Civita collision chart."""
+
+    sample_count: int
+    pair: tuple[int, int]
+    maximum_regularized_step: float
+    median_regularized_step: float
+    maximum_curvature_scale: float
+    maximum_dimensionless_step: float
+    step_control_resolved: bool
+    warning: str
+
+    def as_dict(self) -> dict[str, float | int | bool | str | tuple[int, int]]:
+        return {
+            "sample_count": self.sample_count,
+            "pair": self.pair,
+            "maximum_regularized_step": self.maximum_regularized_step,
+            "median_regularized_step": self.median_regularized_step,
+            "maximum_curvature_scale": self.maximum_curvature_scale,
+            "maximum_dimensionless_step": self.maximum_dimensionless_step,
+            "step_control_resolved": self.step_control_resolved,
+            "warning": self.warning,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class CollisionRegularizationCertificate:
     """Interval-level certificate that raw coordinates should be replaced near collision."""
 
@@ -549,6 +575,64 @@ def levi_civita_tidal_bound_certificate(
         maximum_bound_ratio=maximum_bound_ratio,
         maximum_observed_ratio=maximum_observed_ratio,
         bound_satisfied=maximum_observed_ratio <= maximum_bound_ratio,
+    )
+
+
+def levi_civita_step_control_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    start_index: int = 0,
+    end_index: int | None = None,
+    pair: tuple[int, int] | None = None,
+    maximum_dimensionless_step: float = 0.25,
+) -> LeviCivitaStepControlCertificate:
+    """Check whether sampled data resolves the regularized-time LC flow.
+
+    The regularized clock obeys `dt/ds = |r|`. Near collision, inertial time
+    samples can be misleadingly sparse in `s`; this certificate reports the
+    largest dimensionless step relative to the local LC curvature scale.
+    """
+
+    if getattr(system, "body_count", None) != 3:
+        raise TypeError("levi_civita_step_control_certificate requires a general three-body system.")
+    if getattr(system, "dimension", None) != 2:
+        raise ValueError("levi_civita_step_control_certificate is only implemented for planar systems.")
+    end = len(trajectory.t) - 1 if end_index is None else min(end_index, len(trajectory.t) - 1)
+    start = max(0, min(start_index, end))
+    if pair is None:
+        pair = _dominant_close_pair(system, trajectory, start, end)
+    charts = _continuous_levi_civita_charts(
+        tuple(levi_civita_binary_chart(system, state, pair) for state in trajectory.y[start : end + 1])
+    )
+    flows = tuple(
+        _levi_civita_regularized_flow_state_from_chart(system, state, chart)
+        for state, chart in zip(trajectory.y[start : end + 1], charts, strict=True)
+    )
+    regularized_steps = []
+    for index in range(1, len(charts)):
+        dt = float(trajectory.t[start + index] - trajectory.t[start + index - 1])
+        mean_radius = max(0.5 * (charts[index].radius + charts[index - 1].radius), 1.0e-18)
+        regularized_steps.append(abs(dt) / mean_radius)
+    step_array = np.asarray(regularized_steps, dtype=float)
+    maximum_step = float(np.max(step_array)) if step_array.size else 0.0
+    median_step = float(np.median(step_array)) if step_array.size else 0.0
+    curvature_scales = []
+    for flow in flows:
+        speed_scale = max(float(np.linalg.norm(flow.u_prime)), 1.0e-12)
+        curvature_scales.append(float(np.linalg.norm(flow.u_double_prime) / speed_scale))
+    maximum_curvature = float(max(curvature_scales)) if curvature_scales else 0.0
+    dimensionless = float(maximum_step * maximum_curvature)
+    resolved = bool(np.isfinite(dimensionless) and dimensionless <= maximum_dimensionless_step)
+    warning = "" if resolved else "regularized-time sample step is too large for LC flow promotion"
+    return LeviCivitaStepControlCertificate(
+        sample_count=len(charts),
+        pair=pair,
+        maximum_regularized_step=maximum_step,
+        median_regularized_step=median_step,
+        maximum_curvature_scale=maximum_curvature,
+        maximum_dimensionless_step=dimensionless,
+        step_control_resolved=resolved,
+        warning=warning,
     )
 
 

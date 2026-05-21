@@ -38,15 +38,24 @@ Current proof status:
 - `jacobi_self_consistent_escape_cone` checks that the outward radial floor used by the future-tail integral is supported by the validated energy margin.
 - `jacobi_open_escape_cone_certificate` computes a positive tail-data neighborhood radius, so the claim is not a single-trajectory certificate.
 - `jacobi_quadrupole_acceleration_certificate` checks that the declared `C_Q / R^4` envelope dominates the actual Jacobi perturbing acceleration on the certified tail.
+- `jacobi_interval_escape_certificate` now evaluates the outer Kepler energy, interaction remainder, radial floor, hierarchy ratio, terminal radius, binary scale, outer speed, and future exchange bound by interval arithmetic on a nonzero tail-state box.
+- `jacobi_interval_flow_tube_certificate` expands the outgoing tail by an a posteriori trapezoid-defect radius, interval-evaluates the Newtonian RHS on each segment hull, and requires the sampled segment slopes to lie inside that interval vector field while the Jacobi interval margin remains positive.
+- `jacobi_interval_picard_flow_certificate` subdivides tail segments and propagates interval start boxes by Picard self-inclusion `X_start + h f(Z) subset Z` under an interval Newtonian RHS Jacobian row-sum contraction bound.
+- The Picard certificate now feeds the propagated endpoint enclosure radius, not only the sampled defect-tube radius, back into the Jacobi interval escape margin.
+- The parameter-box reserve is now recomputed from Picard-certified tail margins, so the continuum-style reserve no longer rests only on scalar-inflated margins.
+- Parameter-cell midpoints, face centers, and edge centers are now Picard-certified and compared against their adjacent corner margins, reducing the risk that the parameter box is only passing on grid nodes.
+- The full 5x5x5 Picard-certified half-grid now has both a global smaller-subcell finite-difference reserve and 64 local subcell reserves.
+- The representative Jacobi tail now has a Picard-certified resolution/tolerance crosscheck across predeclared `samples/rtol/atol` settings, reducing dependence on one adaptive-integrator output.
 - The theorem suite now checks a predeclared 3x3x3 parameter grid and a finite-difference Lipschitz reserve over normalized parameter cells.
-- The theorem suite now includes `jacobi_energy_split_residual`, `jacobi_escape_sufficient_condition`, `jacobi_future_tail_exchange_bound`, `jacobi_quadrupole_tail_assumptions`, `jacobi_inflated_margin_lower_bound`, `jacobi_self_consistent_radial_floor`, `jacobi_open_cone_radius`, `jacobi_quadrupole_acceleration_envelope`, `jacobi_parameter_box_open_regime`, `jacobi_parameter_box_quadrupole_ratio`, `jacobi_parameter_grid_margin`, and `jacobi_parameter_interval_box_margin` as paper-facing benchmarks.
+- The theorem suite now includes `jacobi_energy_split_residual`, `jacobi_escape_sufficient_condition`, `jacobi_future_tail_exchange_bound`, `jacobi_quadrupole_tail_assumptions`, `jacobi_inflated_margin_lower_bound`, `jacobi_self_consistent_radial_floor`, `jacobi_open_cone_radius`, `jacobi_interval_tail_escape_margin`, `jacobi_interval_flow_tube`, `jacobi_interval_picard_flow`, `jacobi_picard_interval_jacobian_contraction`, `jacobi_picard_resolution_crosscheck`, `jacobi_picard_resolution_margin_spread`, `jacobi_quadrupole_acceleration_envelope`, `jacobi_parameter_box_open_regime`, `jacobi_parameter_box_quadrupole_ratio`, `jacobi_parameter_grid_margin`, `jacobi_parameter_interval_box_margin`, `jacobi_parameter_interval_tail_margin`, `jacobi_parameter_flow_tube_margin`, `jacobi_parameter_picard_flow_margin`, `jacobi_parameter_picard_interval_box_margin`, `jacobi_parameter_picard_cell_centers`, `jacobi_parameter_picard_face_centers`, `jacobi_parameter_picard_edge_centers`, `jacobi_parameter_picard_half_grid_margin`, and `jacobi_parameter_picard_half_grid_subcells` as paper-facing benchmarks.
 - A fast hierarchical flyby passes this certificate in the current smoke benchmark.
 - The detailed theorem/proof note is in `docs/JACOBI_ESCAPE_CONE_THEOREM.md`.
 
 Open proof obligations:
 
-- Replace scalar margin inflation with full interval-enclosed trajectory integration.
-- Replace the finite-difference parameter-box reserve with interval derivative bounds over mass, velocity, phase, and tail state.
+- Replace the in-repo segment-wise Picard validator with an independent production-grade interval ODE implementation.
+- Replace the Picard-margin finite-difference parameter-box reserve with interval derivative bounds over mass, velocity, phase, and tail state.
+- Replace the finite resolution/tolerance crosscheck with a backend-independent validated ODE propagation proof.
 - Prove the quadrupole acceleration constant rigorously in the declared norm and dimension.
 - Replace the scalar open-cone sensitivity radius with a true interval-Lipschitz bound.
 - State the exact hierarchy domain: minimum `R / |r|`, noncollision distance, positive radial velocity, bounded inner radius, bounded outer speed, and positive asymptotic margin.
@@ -207,8 +216,9 @@ Open proof obligations:
 Run:
 
 ```powershell
-threebody theorem-suite
+threebody theorem-suite --mode paper
 threebody interpretation-suite
 ```
 
-The suite reports which obligations are partial, failing, or open.
+The paper suite reports which obligations are partial, failing, or open.
+For faster development checks, `threebody theorem-suite` runs the quick mode and omits the full 5x5x5 Jacobi half-grid.

@@ -7,7 +7,7 @@ from math import pi
 from pathlib import Path
 from typing import Sequence
 
-from .analysis import ResearchPipeline, ThreeBodyInterpreter
+from .analysis import AnalysisAtlas, ResearchPipeline, ThreeBodyInterpreter
 from .experiments import (
     BoundaryResolutionStudy,
     ClassifierArtifactStudy,
@@ -111,6 +111,12 @@ def build_parser() -> argparse.ArgumentParser:
     checks.set_defaults(func=run_research_checks_command)
     theorem = subparsers.add_parser("theorem-suite", help="Run theorem-candidate proof obligations and paper benchmarks.")
     theorem.add_argument(
+        "--mode",
+        choices=("quick", "paper"),
+        default="quick",
+        help="Use quick for development checks or paper for the full Picard-certified 5x5x5 parameter grid.",
+    )
+    theorem.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -152,6 +158,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-interpretation-suite.json.",
     )
     interpretation_suite.set_defaults(func=run_interpretation_suite_command)
+    benchmark = subparsers.add_parser("atlas-benchmark", help="Export reproducible atlas benchmark cases.")
+    benchmark.add_argument(
+        "--scenario",
+        action="append",
+        choices=("figure-eight", "hierarchical-flyby", "restricted-l4", "restricted-l5"),
+        default=None,
+        help="Scenario to include. Repeat to include multiple cases. Defaults to a representative smoke suite.",
+    )
+    benchmark.add_argument("--periods", type=float, default=0.25, help="Scenario duration or flyby integration time.")
+    benchmark.add_argument("--samples", type=int, default=240, help="Number of solver sample times per case.")
+    benchmark.add_argument("--stride", type=int, default=20, help="Classification stride through each trajectory.")
+    benchmark.add_argument("--rtol", type=float, default=1.0e-9, help="Adaptive integrator relative tolerance.")
+    benchmark.add_argument("--atol", type=float, default=1.0e-11, help="Adaptive integrator absolute tolerance.")
+    benchmark.add_argument(
+        "--include-trajectories",
+        action="store_true",
+        help="Include sampled state arrays in the JSON artifact.",
+    )
+    benchmark.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-atlas-benchmark.json.",
+    )
+    benchmark.set_defaults(func=run_atlas_benchmark_command)
     return parser
 
 
@@ -320,19 +351,20 @@ def run_research_checks_command(args: argparse.Namespace) -> int:
 
 
 def run_theorem_suite_command(args: argparse.Namespace) -> int:
-    result = TheoremSuite().run()
+    result = TheoremSuite(mode=args.mode).run()
     output = args.output or _default_output_path("theorem-suite")
     output.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "metadata": {
             "created_at": datetime.now(UTC).isoformat(),
             "kind": "theorem-suite",
+            "mode": args.mode,
         },
         "summary": result.as_dict(),
     }
     output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"wrote {output}")
-    print(f"theorem_candidates={len(result.theorem_candidates)} benchmarks={len(result.benchmarks)}")
+    print(f"mode={result.mode} theorem_candidates={len(result.theorem_candidates)} benchmarks={len(result.benchmarks)}")
     return 0
 
 
@@ -391,17 +423,96 @@ def run_interpretation_suite_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_atlas_benchmark_command(args: argparse.Namespace) -> int:
+    library = OrbitLibrary()
+    integrator = AdaptiveIntegrator(rtol=args.rtol, atol=args.atol)
+    atlas = AnalysisAtlas()
+    scenario_names = args.scenario or ["figure-eight", "hierarchical-flyby", "restricted-l4"]
+    cases = []
+    for scenario_name in scenario_names:
+        scenario = _scenario_from_name(library, scenario_name, periods=args.periods, samples=args.samples)
+        trajectory = integrator.integrate(
+            scenario.system,
+            scenario.t_span,
+            scenario.initial_state,
+            t_eval=scenario.t_eval,
+        )
+        reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=args.stride)
+        transitions = atlas.transitions(scenario.system, trajectory, stride=args.stride)
+        case = {
+            "scenario": scenario.name,
+            "source_name": scenario_name,
+            "description": scenario.description,
+            "t_span": list(scenario.t_span),
+            "samples": 0 if scenario.t_eval is None else int(len(scenario.t_eval)),
+            "initial_state": scenario.initial_state.tolist(),
+            "chart_distribution": {
+                str(chart): float(fraction)
+                for chart, fraction in atlas.chart_distribution(reports).items()
+            },
+            "transitions": [
+                {
+                    "index": transition.index,
+                    "time": transition.time,
+                    "previous": str(transition.previous),
+                    "current": str(transition.current),
+                    "reason": transition.reason,
+                }
+                for transition in transitions
+            ],
+            "reproduce": (
+                "threebody interpret "
+                f"--scenario {scenario_name} --periods {args.periods} "
+                f"--samples {args.samples} --stride {args.stride}"
+            ),
+        }
+        if args.include_trajectories:
+            case["trajectory"] = {
+                "t": trajectory.t.tolist(),
+                "y": trajectory.y.tolist(),
+                "success": trajectory.success,
+                "message": trajectory.message,
+            }
+        cases.append(case)
+    output = args.output or _default_output_path("atlas-benchmark")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "metadata": {
+            "created_at": datetime.now(UTC).isoformat(),
+            "kind": "atlas-benchmark",
+            "schema_version": 1,
+            "parameters": {
+                "periods": args.periods,
+                "samples": args.samples,
+                "stride": args.stride,
+                "rtol": args.rtol,
+                "atol": args.atol,
+                "include_trajectories": args.include_trajectories,
+            },
+        },
+        "cases": cases,
+    }
+    output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"wrote {output}")
+    print(f"cases={len(cases)}")
+    return 0
+
+
 def _scenario_from_args(args: argparse.Namespace) -> Scenario:
     library = OrbitLibrary()
-    if args.scenario == "figure-eight":
-        return library.general_figure_eight(periods=args.periods, samples=args.samples)
-    if args.scenario == "hierarchical-flyby":
-        return library.general_hierarchical_flyby(duration=args.periods, samples=args.samples)
-    if args.scenario == "restricted-l4":
-        return library.restricted_l4(periods=args.periods, samples=args.samples)
-    if args.scenario == "restricted-l5":
-        return library.restricted_l5(periods=args.periods, samples=args.samples)
-    raise ValueError(f"Unknown scenario: {args.scenario}")
+    return _scenario_from_name(library, args.scenario, periods=args.periods, samples=args.samples)
+
+
+def _scenario_from_name(library: OrbitLibrary, scenario: str, periods: float, samples: int) -> Scenario:
+    if scenario == "figure-eight":
+        return library.general_figure_eight(periods=periods, samples=samples)
+    if scenario == "hierarchical-flyby":
+        return library.general_hierarchical_flyby(duration=periods, samples=samples)
+    if scenario == "restricted-l4":
+        return library.restricted_l4(periods=periods, samples=samples)
+    if scenario == "restricted-l5":
+        return library.restricted_l5(periods=periods, samples=samples)
+    raise ValueError(f"Unknown scenario: {scenario}")
 
 
 def _default_output_path(scenario: str) -> Path:

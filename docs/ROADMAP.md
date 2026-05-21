@@ -55,3 +55,18 @@
 - reject candidate laws that do not transfer across perturbation seeds
 - replace interval rules with chart-specific analytic criteria where possible
 - track law coverage, false positives, and missed transitions as first-class metrics
+
+## Current Push: Paper-Grade Certificates
+
+- NumPy 1.x/2.x integration compatibility is part of the reproducibility baseline.
+- Jacobi escape work now includes a terminal tail-state finite-difference reserve as a bridge from open-cone scalar sensitivity toward interval-enclosed trajectories.
+- Jacobi escape work now includes interval arithmetic over nonzero outgoing tail-state boxes for the outer energy, interaction remainder, radial floor, hierarchy ratio, and future-tail exchange bound.
+- Jacobi escape work now includes an a posteriori interval RHS flow-tube check over the outgoing tail, using trapezoid-defect tube radii and segment-wise interval vector-field inclusion.
+- Jacobi escape work now includes segment-wise interval Picard propagation over the outgoing tail, with interval Newtonian RHS Jacobian contraction checks and endpoint-tube compatibility.
+- Jacobi escape work now feeds the propagated Picard endpoint enclosure radius back into the interval Jacobi margin instead of relying only on the sampled defect-tube radius.
+- Jacobi escape work now crosschecks the representative Picard-certified tail across predeclared sample-count and adaptive-tolerance settings.
+- Jacobi escape parameter-box work now applies the finite-difference continuum reserve to Picard-certified margins, not only scalar-inflated margins.
+- Jacobi escape parameter-box work now checks the full Picard-certified 5x5x5 half-grid and reports both global and 64 local smaller-subcell finite-difference reserves.
+- Close-encounter work now includes Levi-Civita regularized-time step control so near-collision sampling quality can be audited before promoting residual claims.
+- Restricted gateway work now includes a linearized manifold-tube interval certificate, separating single-state neck openness from sampled tube-like transit evidence.
+- Atlas benchmarks can now be exported with `threebody atlas-benchmark` so chart labels, transition rows, initial states, and reproduction commands are packaged together.

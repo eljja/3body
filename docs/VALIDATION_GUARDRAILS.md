@@ -7,6 +7,8 @@ This file defines what the project is not allowed to claim yet.
 The project has an empirical atlas and falsification harness.
 It does not have a global solution of the Newtonian three-body problem.
 It also does not yet have theorem-level error bounds for every chart.
+`threebody theorem-suite` runs quick development checks by default.
+Paper-facing Jacobi parameter-box claims require `threebody theorem-suite --mode paper`.
 
 Allowed claims:
 
@@ -52,3 +54,10 @@ Forbidden claims:
 - Lagrange gateway transport now has a linearized L1/L2/L3 transit estimate based on neck openness and stable/unstable eigendirection projection. It is not yet a full invariant-manifold computation.
 - Shape-space close encounter support is currently a diagnostic blow-up coordinate, not a fully regularized flow.
 - Escape scattering is detected as a regime, but outgoing asymptotic Kepler-element convergence is not yet enforced.
+- Jacobi escape now has a local interval-arithmetic tail-state certificate, an a posteriori interval RHS flow-tube check, and segment-wise Picard propagation of interval start boxes with an interval Newtonian RHS Jacobian contraction bound. This is stronger than scalar margin inflation and finite-difference terminal reserve, but it is not yet an independent CAPD-grade proof. Claims must say "segment-wise interval Picard certified over the sampled Jacobi tail" unless interval parameters and the full initial-value problem are propagated by a production validated integrator.
+- Jacobi Picard claims must state whether the final margin uses the sampled defect-tube radius or the propagated endpoint enclosure radius. Paper-facing rows must use the propagated endpoint radius.
+- Jacobi representative-tail claims must also report the Picard resolution/tolerance crosscheck. Passing one adaptive-integrator output is not enough to argue that the local cone is independent of solver settings.
+- Jacobi parameter-box claims may cite the continuum-style reserve only as a finite-difference reserve over Picard-certified margins. They must not call it a rigorous interval-parameter derivative bound until mass, velocity, phase, and tail-state derivatives are interval-enclosed.
+- Jacobi parameter-box promotion must include the parameter-cell midpoint, face-center, and edge-center checks. Passing only the grid nodes is no longer sufficient for paper-facing claims.
+- Jacobi parameter-box promotion must also report the 5x5x5 half-grid reserve. The original 3x3x3 reserve is no longer sufficient on its own.
+- Jacobi paper-mode promotion must report the 64 local half-grid subcell reserves. A single global half-grid reserve is no longer sufficient on its own.

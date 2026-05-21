@@ -4,12 +4,15 @@ import numpy as np
 
 from threebody.analysis import (
     collision_regularization_certificate,
+    finite_difference_jacobian,
+    gateway_manifold_tube_certificate,
     gateway_transit_estimate,
     levi_civita_binary_chart,
     levi_civita_chart_certificate,
     levi_civita_equivalence_certificate,
     levi_civita_flow_certificate,
     levi_civita_regularized_flow_state,
+    levi_civita_step_control_certificate,
     levi_civita_tidal_bound_certificate,
     mcgehee_collision_diagnostic,
     restricted_chart_certificate,
@@ -152,6 +155,30 @@ def test_levi_civita_flow_certificate_reports_defined_rhs() -> None:
     assert certificate.maximum_finite_difference_residual is not None
 
 
+def test_levi_civita_step_control_certificate_resolves_regularized_time_step() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 1.0, 0.05), dimension=2)
+    states = []
+    for _index in range(3):
+        states.append(
+            system.flatten_state(
+                np.array([[-0.0025, 0.0], [0.0025, 0.0], [1.0, 0.2]], dtype=float),
+                np.array([[0.0, -1.0], [0.0, 1.0], [0.0, 0.0]], dtype=float),
+            )
+        )
+    trajectory = TrajectoryResult(
+        t=np.array([0.0, 1.0e-7, 2.0e-7]),
+        y=np.vstack(states),
+        success=True,
+        message="synthetic regularized step",
+    )
+
+    certificate = levi_civita_step_control_certificate(system, trajectory, pair=(0, 1))
+
+    assert certificate.step_control_resolved is True
+    assert certificate.maximum_regularized_step > 0.0
+    assert certificate.maximum_dimensionless_step < 0.25
+
+
 def test_levi_civita_equivalence_certificate_reconstructs_inertial_dynamics() -> None:
     system = GeneralThreeBodySystem(masses=(1.0, 2.0, 0.5), dimension=2)
     state = system.flatten_state(
@@ -203,6 +230,30 @@ def test_gateway_transit_estimate_reports_neck_openness() -> None:
     assert estimate.lagrange_point == "L1"
     assert isinstance(estimate.neck_open, bool)
     assert estimate.transit_likelihood >= 0.0
+
+
+def test_gateway_manifold_tube_certificate_tracks_unstable_tube_interval() -> None:
+    system = RestrictedThreeBodySystem()
+    l1 = system.lagrange_points()["L1"]
+    equilibrium = np.array([l1[0], l1[1], 0.0, 0.0], dtype=float)
+    jacobian = finite_difference_jacobian(system, equilibrium)
+    eigenvalues, eigenvectors = np.linalg.eig(jacobian)
+    unstable_direction = np.real(eigenvectors[:, int(np.argmax(np.real(eigenvalues)))])
+    unstable_direction = unstable_direction / np.linalg.norm(unstable_direction)
+    states = np.vstack([equilibrium + scale * unstable_direction for scale in (1.0e-3, 2.0e-3, 4.0e-3)])
+    trajectory = TrajectoryResult(
+        t=np.array([0.0, 1.0, 2.0]),
+        y=states,
+        success=True,
+        message="synthetic gateway tube",
+    )
+
+    certificate = gateway_manifold_tube_certificate(system, trajectory)
+
+    assert certificate.lagrange_point == "L1"
+    assert certificate.tube_resolved is True
+    assert certificate.classification == "linearized_unstable_transit_tube"
+    assert certificate.unstable_growth_ratio > 1.0
 
 
 def test_restricted_chart_certificate_reports_lagrange_jacobi_control() -> None:

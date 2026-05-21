@@ -85,16 +85,38 @@ This writes classifier-artifact sensitivity rows, adaptive-vs-structure-aware in
 The integrator comparison deliberately reports `regularized_available = false` until a real collision-regularized stepper exists.
 Any close-encounter compact model is provisional while that flag is false.
 
-To run the paper-level theorem candidate harness:
+To run the quick theorem candidate harness during development:
 
 ```powershell
 threebody theorem-suite
 ```
 
-This emits theorem candidates, proof obligations, and paper benchmark rows.
+To run the full paper-level theorem candidate harness, including the Picard-certified 5x5x5 Jacobi parameter half-grid:
+
+```powershell
+threebody theorem-suite --mode paper
+```
+
+Both modes emit theorem candidates, proof obligations, and benchmark rows.
+Only `--mode paper` is sufficient for paper-facing Jacobi parameter-box claims.
 No row in this suite should be interpreted as a proof; it is a reproducibility and overclaim-prevention artifact.
+The Jacobi representative-tail rows include a Picard resolution/tolerance crosscheck; paper claims should report both `jacobi_picard_resolution_crosscheck` and `jacobi_picard_resolution_margin_spread`.
+They should also report `jacobi_picard_interval_jacobian_contraction`, which records the maximum Picard contraction computed from the interval Newtonian RHS Jacobian row-sum bound.
 For the scattering conjecture, the suite reports both `low_crossing_scattering_map_score` and `low_crossing_scattering_map_selection`.
 A positive score without selection means the feature family may contain signal, but it has not beaten simpler competing explanations.
+
+The Jacobi escape rows now include `jacobi_terminal_tail_interval_reserve`.
+This is not a replacement for interval-enclosed integration.
+It is a finite-difference reserve over terminal tail-state perturbations, intended to make the next proof obligation explicit: replace sampled terminal-state sensitivity with a rigorous interval trajectory enclosure.
+
+To export a reusable atlas benchmark artifact:
+
+```powershell
+threebody atlas-benchmark --scenario figure-eight --scenario hierarchical-flyby --scenario restricted-l4 --samples 240 --stride 20
+```
+
+The artifact records initial states, chart distributions, transition rows, and reproduction commands.
+Use `--include-trajectories` when the sampled state arrays themselves should be included.
 
 To split the run into discovery and validation ensembles:
 

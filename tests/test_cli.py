@@ -72,3 +72,32 @@ def test_interpretation_suite_cli_writes_certificate_coverage(tmp_path) -> None:
     assert payload["summary"]["local_interpretation_rate"] == 1.0
     assert "close_encounter" in payload["summary"]["covered_chart_types"]
     assert payload["summary"]["unresolved_blockers"]
+
+
+def test_atlas_benchmark_cli_writes_reproducible_cases(tmp_path) -> None:
+    output = tmp_path / "atlas-benchmark.json"
+
+    exit_code = main(
+        [
+            "atlas-benchmark",
+            "--scenario",
+            "figure-eight",
+            "--periods",
+            "0.02",
+            "--samples",
+            "30",
+            "--stride",
+            "10",
+            "--output",
+            str(output),
+        ]
+    )
+
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert payload["metadata"]["kind"] == "atlas-benchmark"
+    assert payload["metadata"]["schema_version"] == 1
+    assert payload["cases"][0]["source_name"] == "figure-eight"
+    assert payload["cases"][0]["initial_state"]
+    assert payload["cases"][0]["chart_distribution"]
+    assert "threebody interpret" in payload["cases"][0]["reproduce"]
