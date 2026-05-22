@@ -16,6 +16,7 @@ from threebody.analysis import (
     jacobi_interval_picard_flow_certificate,
     jacobi_picard_tuning_certificate,
     markov_chain_from_words,
+    poincare_coordinate_sweep_from_reports,
     poincare_section_sweep_from_reports,
     poincare_section_word_from_reports,
     refined_chart_word_from_reports,
@@ -341,6 +342,7 @@ def run_verification_report(
         reports,
         coordinate="hierarchy_perturbation_strength",
     )
+    poincare_coordinate_sweep = poincare_coordinate_sweep_from_reports(reports)
     comparison = bootstrap_comparison.comparison
     return {
         "metadata": {
@@ -360,6 +362,7 @@ def run_verification_report(
             "bootstrap_comparison": bootstrap_comparison.as_dict(),
             "order_selection": order_selection.as_dict(),
             "poincare_section_sweep": poincare_sweep.as_dict(),
+            "poincare_coordinate_sweep": poincare_coordinate_sweep.as_dict(),
         },
         "promotion_gates": {
             "picard_certified": bool(jacobi_report["picard_tuning"]["certified"]),
@@ -372,6 +375,9 @@ def run_verification_report(
             "hysteresis_memory_order_selected": order_selection.memory_selected,
             "poincare_has_sufficient_section": poincare_sweep.has_sufficient_section,
             "poincare_best_crossing_count": poincare_sweep.best.crossing_count,
+            "poincare_coordinate_has_sufficient_section": poincare_coordinate_sweep.has_sufficient_section,
+            "poincare_best_coordinate": poincare_coordinate_sweep.best.coordinate,
+            "poincare_best_coordinate_crossing_count": poincare_coordinate_sweep.best.best.crossing_count,
         },
     }
 

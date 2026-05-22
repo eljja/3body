@@ -22,6 +22,7 @@ from threebody.analysis import (
     jacobi_self_consistent_escape_cone,
     markov_chain_from_words,
     poincare_section_word_from_reports,
+    poincare_coordinate_sweep_from_reports,
     poincare_section_sweep_from_reports,
     refined_chart_word_from_reports,
     return_map_word_from_reports,
@@ -162,6 +163,7 @@ def _render_page(
     return_word = training_words[0]
     poincare_word = poincare_section_word_from_reports(grammar_reports, coordinate="hierarchy_perturbation_strength")
     poincare_sweep = poincare_section_sweep_from_reports(grammar_reports, coordinate="hierarchy_perturbation_strength")
+    poincare_coordinate_sweep = poincare_coordinate_sweep_from_reports(grammar_reports)
     markov_chain = markov_chain_from_words(training_words)
     markov_comparison = compare_markov_chain_to_independent_baseline(markov_chain, training_words, (validation_word,))
     markov_bootstrap = bootstrap_markov_baseline_comparison(
@@ -186,6 +188,7 @@ def _render_page(
             "word_mode": "refined",
             "poincare_section_word_length": poincare_word.length,
             "poincare_section_sweep": poincare_sweep.as_dict(),
+            "poincare_coordinate_sweep": poincare_coordinate_sweep.as_dict(),
             "training_word_lengths": [word.length for word in training_words],
             "validation_word_length": validation_word.length,
             "chain": markov_chain.as_dict(),
@@ -257,6 +260,9 @@ def _render_page(
         "hysteresis_memory_order_selected": markov_order_selection.memory_selected,
         "poincare_has_sufficient_section": poincare_sweep.has_sufficient_section,
         "poincare_best_crossing_count": poincare_sweep.best.crossing_count,
+        "poincare_coordinate_has_sufficient_section": poincare_coordinate_sweep.has_sufficient_section,
+        "poincare_best_coordinate": poincare_coordinate_sweep.best.coordinate,
+        "poincare_best_coordinate_crossing_count": poincare_coordinate_sweep.best.best.crossing_count,
     }
     gate_cards = "\n".join(
         [
@@ -277,6 +283,12 @@ def _render_page(
                 "pass",
                 f"order {promotion_gates['hysteresis_selected_markov_order']}",
                 f"BIC memory selected: {str(promotion_gates['hysteresis_memory_order_selected']).lower()}",
+            ),
+            _gate_card(
+                "Poincare sweep",
+                "pass" if promotion_gates["poincare_coordinate_has_sufficient_section"] else "wait",
+                f"{promotion_gates['poincare_best_coordinate']}: {promotion_gates['poincare_best_coordinate_crossing_count']}",
+                "best coordinate crossings",
             ),
         ]
     )

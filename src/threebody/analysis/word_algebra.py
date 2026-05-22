@@ -242,6 +242,29 @@ class PoincareSectionSweep:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class PoincareCoordinateSweep:
+    """Sweep section coordinates and quantiles for usable Poincare words."""
+
+    coordinates: tuple[str, ...]
+    minimum_crossings: int
+    best: PoincareSectionSweep
+    sweeps: tuple[PoincareSectionSweep, ...]
+
+    @property
+    def has_sufficient_section(self) -> bool:
+        return self.best.has_sufficient_section
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "coordinates": list(self.coordinates),
+            "minimum_crossings": self.minimum_crossings,
+            "has_sufficient_section": self.has_sufficient_section,
+            "best": self.best.as_dict(),
+            "sweeps": [sweep.as_dict() for sweep in self.sweeps],
+        }
+
+
 def chart_word_from_reports(reports: tuple[AnalysisReport, ...] | list[AnalysisReport]) -> ChartWord:
     symbols: list[object] = []
     previous: object | None = None
@@ -409,6 +432,57 @@ def poincare_section_sweep_from_reports(
         minimum_crossings=minimum_crossings,
         best=best,
         candidates=tuple(candidates),
+    )
+
+
+def poincare_coordinate_sweep_from_reports(
+    reports: tuple[AnalysisReport, ...] | list[AnalysisReport],
+    *,
+    coordinates: tuple[str, ...] = (
+        "hierarchy_perturbation_strength",
+        "hierarchy_ratio",
+        "escape_index",
+        "normalized_area",
+        "shape_anisotropy",
+        "virial_ratio",
+        "outer_specific_energy",
+    ),
+    direction: str = "both",
+    minimum_crossings: int = 4,
+) -> PoincareCoordinateSweep:
+    """Find the most event-rich section across common chart diagnostics."""
+
+    sweeps = tuple(
+        poincare_section_sweep_from_reports(
+            reports,
+            coordinate=coordinate,
+            direction=direction,
+            minimum_crossings=minimum_crossings,
+        )
+        for coordinate in coordinates
+    )
+    if not sweeps:
+        empty = poincare_section_sweep_from_reports(
+            reports,
+            coordinate="hierarchy_perturbation_strength",
+            direction=direction,
+            minimum_crossings=minimum_crossings,
+        )
+        return PoincareCoordinateSweep((), minimum_crossings, empty, (empty,))
+    best = max(
+        sweeps,
+        key=lambda sweep: (
+            int(sweep.has_sufficient_section),
+            sweep.best.crossing_count,
+            sweep.best.distinct_symbol_count,
+            -abs(sweep.best.quantile - 0.5),
+        ),
+    )
+    return PoincareCoordinateSweep(
+        coordinates=tuple(coordinates),
+        minimum_crossings=minimum_crossings,
+        best=best,
+        sweeps=sweeps,
     )
 
 
@@ -825,6 +899,37 @@ def poincare_section_sweep_rows(
         )
         row = sweep.best.as_dict()
         row["scenario"] = name
+        row["has_sufficient_section"] = sweep.has_sufficient_section
+        rows.append(row)
+    return rows
+
+
+def poincare_coordinate_sweep_rows(
+    reports_by_name: dict[str, tuple[AnalysisReport, ...]],
+    *,
+    coordinates: tuple[str, ...] = (
+        "hierarchy_perturbation_strength",
+        "hierarchy_ratio",
+        "escape_index",
+        "normalized_area",
+        "shape_anisotropy",
+        "virial_ratio",
+        "outer_specific_energy",
+    ),
+    direction: str = "both",
+    minimum_crossings: int = 4,
+) -> list[dict[str, object]]:
+    rows = []
+    for name, reports in reports_by_name.items():
+        sweep = poincare_coordinate_sweep_from_reports(
+            reports,
+            coordinates=coordinates,
+            direction=direction,
+            minimum_crossings=minimum_crossings,
+        )
+        row = sweep.best.best.as_dict()
+        row["scenario"] = name
+        row["best_coordinate"] = sweep.best.coordinate
         row["has_sufficient_section"] = sweep.has_sufficient_section
         rows.append(row)
     return rows

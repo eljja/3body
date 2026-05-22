@@ -13,6 +13,7 @@ from .events import transition_event_evidence, transition_event_rows
 from .word_algebra import (
     poincare_word_signature_rows,
     poincare_section_sweep_rows,
+    poincare_coordinate_sweep_rows,
     refined_word_signature_rows,
     return_word_signature_rows,
     word_signature_rows,
@@ -77,6 +78,27 @@ class TransitionSurveyResult:
         return poincare_section_sweep_rows(
             self.reports_by_name,
             coordinate=coordinate,
+            direction=direction,
+            minimum_crossings=minimum_crossings,
+        )
+
+    def poincare_coordinate_sweep_rows(
+        self,
+        coordinates: tuple[str, ...] = (
+            "hierarchy_perturbation_strength",
+            "hierarchy_ratio",
+            "escape_index",
+            "normalized_area",
+            "shape_anisotropy",
+            "virial_ratio",
+            "outer_specific_energy",
+        ),
+        direction: str = "both",
+        minimum_crossings: int = 4,
+    ) -> list[dict[str, object]]:
+        return poincare_coordinate_sweep_rows(
+            self.reports_by_name,
+            coordinates=coordinates,
             direction=direction,
             minimum_crossings=minimum_crossings,
         )

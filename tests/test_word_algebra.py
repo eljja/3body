@@ -9,6 +9,7 @@ from threebody.analysis import (
     chart_word_signature,
     compare_markov_chain_to_independent_baseline,
     markov_chain_from_words,
+    poincare_coordinate_sweep_from_reports,
     poincare_section_sweep_from_reports,
     poincare_section_word_from_reports,
     refined_chart_symbol,
@@ -160,6 +161,37 @@ def test_poincare_section_sweep_selects_richest_crossing_word() -> None:
     assert sweep.best.crossing_count >= 4
     assert sweep.has_sufficient_section is True
     assert sweep.as_dict()["best"]["word_length"] == sweep.best.word.length
+
+
+def test_poincare_coordinate_sweep_selects_best_coordinate() -> None:
+    class _Features:
+        nearest_pair = (0, 1)
+        hierarchy_ratio = 1.0
+        hierarchy_perturbation_strength = 1.0
+        nearest_pair_specific_energy = -1.0
+
+    reports = []
+    for first_value, second_value in ((0.1, 0.1), (0.2, 0.9), (0.3, 0.2), (0.4, 0.8), (0.5, 0.3), (0.6, 0.7)):
+        features = _Features()
+        features.hierarchy_perturbation_strength = first_value
+        features.hierarchy_ratio = second_value
+        reports.append(
+            AnalysisReport(
+                primary_chart=ChartType.TWO_BODY_HIERARCHY,
+                scores=(ChartScore(ChartType.TWO_BODY_HIERARCHY, 1.0, "test"),),
+                features=features,
+            )
+        )
+
+    sweep = poincare_coordinate_sweep_from_reports(
+        reports,
+        coordinates=("hierarchy_perturbation_strength", "hierarchy_ratio"),
+        minimum_crossings=3,
+    )
+
+    assert sweep.best.coordinate == "hierarchy_ratio"
+    assert sweep.has_sufficient_section is True
+    assert sweep.best.best.crossing_count >= 3
 
 
 def test_markov_chain_from_words_reports_symbolic_transition_probabilities() -> None:
