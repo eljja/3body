@@ -164,6 +164,29 @@ def _render_page(
     poincare_word = poincare_section_word_from_reports(grammar_reports, coordinate="hierarchy_perturbation_strength")
     poincare_sweep = poincare_section_sweep_from_reports(grammar_reports, coordinate="hierarchy_perturbation_strength")
     poincare_coordinate_sweep = poincare_coordinate_sweep_from_reports(grammar_reports)
+    poincare_training_words = (
+        poincare_section_word_from_reports(
+            grammar_reports,
+            coordinate=poincare_coordinate_sweep.best.coordinate,
+            section_value=poincare_coordinate_sweep.best.best.section_value,
+            direction=poincare_coordinate_sweep.best.direction,
+        ),
+        poincare_section_word_from_reports(
+            grammar_phase_reports,
+            coordinate=poincare_coordinate_sweep.best.coordinate,
+            section_value=poincare_coordinate_sweep.best.best.section_value,
+            direction=poincare_coordinate_sweep.best.direction,
+        ),
+    )
+    poincare_markov_chain = markov_chain_from_words(poincare_training_words)
+    poincare_markov_bootstrap = bootstrap_markov_baseline_comparison(
+        poincare_markov_chain,
+        poincare_training_words,
+        (poincare_training_words[0],),
+        resamples=512,
+        random_seed=19,
+    )
+    poincare_order_selection = select_markov_order(poincare_training_words, (poincare_training_words[0],), max_order=2)
     markov_chain = markov_chain_from_words(training_words)
     markov_comparison = compare_markov_chain_to_independent_baseline(markov_chain, training_words, (validation_word,))
     markov_bootstrap = bootstrap_markov_baseline_comparison(
@@ -189,6 +212,12 @@ def _render_page(
             "poincare_section_word_length": poincare_word.length,
             "poincare_section_sweep": poincare_sweep.as_dict(),
             "poincare_coordinate_sweep": poincare_coordinate_sweep.as_dict(),
+            "poincare_markov": {
+                "training_word_lengths": [word.length for word in poincare_training_words],
+                "chain": poincare_markov_chain.as_dict(),
+                "bootstrap_comparison": poincare_markov_bootstrap.as_dict(),
+                "order_selection": poincare_order_selection.as_dict(),
+            },
             "training_word_lengths": [word.length for word in training_words],
             "validation_word_length": validation_word.length,
             "chain": markov_chain.as_dict(),
@@ -263,6 +292,10 @@ def _render_page(
         "poincare_coordinate_has_sufficient_section": poincare_coordinate_sweep.has_sufficient_section,
         "poincare_best_coordinate": poincare_coordinate_sweep.best.coordinate,
         "poincare_best_coordinate_crossing_count": poincare_coordinate_sweep.best.best.crossing_count,
+        "poincare_markov_significant_baseline_win": poincare_markov_bootstrap.significant_baseline_win,
+        "poincare_markov_log_likelihood_gain_ci": poincare_markov_bootstrap.log_likelihood_gain_ci,
+        "poincare_selected_markov_order": poincare_order_selection.selected_order,
+        "poincare_memory_order_selected": poincare_order_selection.memory_selected,
     }
     gate_cards = "\n".join(
         [
@@ -285,10 +318,16 @@ def _render_page(
                 f"BIC memory selected: {str(promotion_gates['hysteresis_memory_order_selected']).lower()}",
             ),
             _gate_card(
-                "Poincare sweep",
-                "pass" if promotion_gates["poincare_coordinate_has_sufficient_section"] else "wait",
+                "Poincare memory",
+                "pass"
+                if (
+                    promotion_gates["poincare_coordinate_has_sufficient_section"]
+                    and promotion_gates["poincare_markov_significant_baseline_win"]
+                    and promotion_gates["poincare_memory_order_selected"]
+                )
+                else "wait",
                 f"{promotion_gates['poincare_best_coordinate']}: {promotion_gates['poincare_best_coordinate_crossing_count']}",
-                "best coordinate crossings",
+                f"gain CI [{promotion_gates['poincare_markov_log_likelihood_gain_ci'][0]:.2e}, {promotion_gates['poincare_markov_log_likelihood_gain_ci'][1]:.2e}]",
             ),
         ]
     )

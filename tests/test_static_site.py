@@ -27,5 +27,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "poincare_best_crossing_count" in content
     assert "poincare_coordinate_sweep" in content
     assert "poincare_best_coordinate_crossing_count" in content
+    assert "poincare_markov" in content
+    assert "Poincare memory" in content
+    assert "poincare_markov_significant_baseline_win" in content
     assert "jacobi_parameter_interval_box_margin" not in content
     assert "interval_box_margin_lower" in content

@@ -343,6 +343,18 @@ def run_verification_report(
         coordinate="hierarchy_perturbation_strength",
     )
     poincare_coordinate_sweep = poincare_coordinate_sweep_from_reports(reports)
+    poincare_words = [
+        _poincare_word_from_sweep(reports, poincare_coordinate_sweep),
+    ]
+    poincare_chain = markov_chain_from_words(tuple(poincare_words))
+    poincare_bootstrap = bootstrap_markov_baseline_comparison(
+        poincare_chain,
+        tuple(poincare_words),
+        tuple(poincare_words),
+        resamples=512,
+        random_seed=17,
+    )
+    poincare_order_selection = select_markov_order(tuple(poincare_words), tuple(poincare_words), max_order=2)
     comparison = bootstrap_comparison.comparison
     return {
         "metadata": {
@@ -363,6 +375,11 @@ def run_verification_report(
             "order_selection": order_selection.as_dict(),
             "poincare_section_sweep": poincare_sweep.as_dict(),
             "poincare_coordinate_sweep": poincare_coordinate_sweep.as_dict(),
+            "poincare_markov": {
+                "chain": poincare_chain.as_dict(),
+                "bootstrap_comparison": poincare_bootstrap.as_dict(),
+                "order_selection": poincare_order_selection.as_dict(),
+            },
         },
         "promotion_gates": {
             "picard_certified": bool(jacobi_report["picard_tuning"]["certified"]),
@@ -378,6 +395,10 @@ def run_verification_report(
             "poincare_coordinate_has_sufficient_section": poincare_coordinate_sweep.has_sufficient_section,
             "poincare_best_coordinate": poincare_coordinate_sweep.best.coordinate,
             "poincare_best_coordinate_crossing_count": poincare_coordinate_sweep.best.best.crossing_count,
+            "poincare_markov_significant_baseline_win": poincare_bootstrap.significant_baseline_win,
+            "poincare_markov_log_likelihood_gain_ci": list(poincare_bootstrap.log_likelihood_gain_ci),
+            "poincare_selected_markov_order": poincare_order_selection.selected_order,
+            "poincare_memory_order_selected": poincare_order_selection.memory_selected,
         },
     }
 
@@ -395,6 +416,15 @@ def _hysteresis_word_from_reports(
     if word_mode == "poincare":
         return poincare_section_word_from_reports(reports, coordinate=coordinate)
     raise ValueError("word_mode must be 'refined', 'return', or 'poincare'.")
+
+
+def _poincare_word_from_sweep(reports: tuple[object, ...], sweep: object):
+    return poincare_section_word_from_reports(
+        reports,
+        coordinate=sweep.best.coordinate,
+        section_value=sweep.best.best.section_value,
+        direction=sweep.best.direction,
+    )
 
 
 def _reference_scenario(
