@@ -4,12 +4,14 @@ from threebody.analysis import (
     AnalysisReport,
     ChartScore,
     ChartType,
+    ChartWord,
     bootstrap_markov_baseline_comparison,
     chart_word_from_reports,
     chart_word_signature,
     compare_markov_chain_to_independent_baseline,
     markov_chain_from_words,
     poincare_coordinate_sweep_from_reports,
+    permutation_control_markov_validation,
     poincare_section_sweep_from_reports,
     poincare_section_word_from_reports,
     refined_chart_symbol,
@@ -323,6 +325,26 @@ def test_markov_chain_bootstrap_comparison_reports_uncertainty() -> None:
     assert bootstrap.perplexity_ratio_ci[0] <= bootstrap.perplexity_ratio_ci[1]
     assert bootstrap.beats_baseline_fraction > 0.5
     assert "significant_baseline_win" in bootstrap.as_dict()
+
+
+def test_markov_chain_permutation_control_detects_symbol_order() -> None:
+    cycle = ("A", "B", "C", "D", "E") * 6
+    training = ChartWord(cycle)
+    heldout = ChartWord(cycle)
+
+    chain = markov_chain_from_words((training,))
+    control = permutation_control_markov_validation(
+        chain,
+        (heldout,),
+        permutations=128,
+        random_seed=13,
+    )
+
+    assert control.passes_permutation_control is True
+    assert control.actual_minus_control > 0.0
+    assert control.control_exceedance_fraction < 0.05
+    assert control.control_mean_log_likelihood_ci[0] <= control.control_mean_log_likelihood_ci[1]
+    assert "passes_permutation_control" in control.as_dict()
 
 
 def test_markov_order_selection_prefers_memory_when_bic_improves() -> None:

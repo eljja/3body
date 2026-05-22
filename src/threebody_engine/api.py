@@ -16,6 +16,7 @@ from threebody.analysis import (
     jacobi_interval_picard_flow_certificate,
     jacobi_picard_tuning_certificate,
     markov_chain_from_words,
+    permutation_control_markov_validation,
     poincare_coordinate_sweep_from_reports,
     poincare_section_sweep_from_reports,
     poincare_section_word_from_reports,
@@ -355,6 +356,12 @@ def run_verification_report(
         random_seed=17,
     )
     poincare_order_selection = select_markov_order(tuple(poincare_words), tuple(poincare_words), max_order=2)
+    poincare_permutation_control = permutation_control_markov_validation(
+        poincare_chain,
+        tuple(poincare_words),
+        permutations=512,
+        random_seed=29,
+    )
     comparison = bootstrap_comparison.comparison
     return {
         "metadata": {
@@ -379,6 +386,7 @@ def run_verification_report(
                 "chain": poincare_chain.as_dict(),
                 "bootstrap_comparison": poincare_bootstrap.as_dict(),
                 "order_selection": poincare_order_selection.as_dict(),
+                "permutation_control": poincare_permutation_control.as_dict(),
             },
         },
         "promotion_gates": {
@@ -399,6 +407,8 @@ def run_verification_report(
             "poincare_markov_log_likelihood_gain_ci": list(poincare_bootstrap.log_likelihood_gain_ci),
             "poincare_selected_markov_order": poincare_order_selection.selected_order,
             "poincare_memory_order_selected": poincare_order_selection.memory_selected,
+            "poincare_passes_permutation_control": poincare_permutation_control.passes_permutation_control,
+            "poincare_permutation_control_gap": poincare_permutation_control.actual_minus_control,
         },
     }
 

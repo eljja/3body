@@ -21,6 +21,7 @@ from threebody.analysis import (
     jacobi_quadrupole_acceleration_certificate,
     jacobi_self_consistent_escape_cone,
     markov_chain_from_words,
+    permutation_control_markov_validation,
     poincare_section_word_from_reports,
     poincare_coordinate_sweep_from_reports,
     poincare_section_sweep_from_reports,
@@ -187,6 +188,12 @@ def _render_page(
         random_seed=19,
     )
     poincare_order_selection = select_markov_order(poincare_training_words, (poincare_training_words[0],), max_order=2)
+    poincare_permutation_control = permutation_control_markov_validation(
+        poincare_markov_chain,
+        (poincare_training_words[0],),
+        permutations=512,
+        random_seed=23,
+    )
     markov_chain = markov_chain_from_words(training_words)
     markov_comparison = compare_markov_chain_to_independent_baseline(markov_chain, training_words, (validation_word,))
     markov_bootstrap = bootstrap_markov_baseline_comparison(
@@ -217,6 +224,7 @@ def _render_page(
                 "chain": poincare_markov_chain.as_dict(),
                 "bootstrap_comparison": poincare_markov_bootstrap.as_dict(),
                 "order_selection": poincare_order_selection.as_dict(),
+                "permutation_control": poincare_permutation_control.as_dict(),
             },
             "training_word_lengths": [word.length for word in training_words],
             "validation_word_length": validation_word.length,
@@ -296,6 +304,8 @@ def _render_page(
         "poincare_markov_log_likelihood_gain_ci": poincare_markov_bootstrap.log_likelihood_gain_ci,
         "poincare_selected_markov_order": poincare_order_selection.selected_order,
         "poincare_memory_order_selected": poincare_order_selection.memory_selected,
+        "poincare_passes_permutation_control": poincare_permutation_control.passes_permutation_control,
+        "poincare_permutation_control_gap": poincare_permutation_control.actual_minus_control,
     }
     gate_cards = "\n".join(
         [
@@ -324,10 +334,11 @@ def _render_page(
                     promotion_gates["poincare_coordinate_has_sufficient_section"]
                     and promotion_gates["poincare_markov_significant_baseline_win"]
                     and promotion_gates["poincare_memory_order_selected"]
+                    and promotion_gates["poincare_passes_permutation_control"]
                 )
                 else "wait",
                 f"{promotion_gates['poincare_best_coordinate']}: {promotion_gates['poincare_best_coordinate_crossing_count']}",
-                f"gain CI [{promotion_gates['poincare_markov_log_likelihood_gain_ci'][0]:.2e}, {promotion_gates['poincare_markov_log_likelihood_gain_ci'][1]:.2e}]",
+                f"perm gap {promotion_gates['poincare_permutation_control_gap']:.2e}",
             ),
         ]
     )

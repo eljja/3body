@@ -143,6 +143,34 @@ class ChartWordMarkovBootstrapComparison:
 
 
 @dataclass(frozen=True, slots=True)
+class ChartWordMarkovPermutationControl:
+    """Negative control that shuffles held-out symbols while preserving counts."""
+
+    markov_validation: ChartWordMarkovValidation
+    resample_count: int
+    confidence_level: float
+    random_seed: int
+    control_mean_log_likelihood: float
+    control_mean_log_likelihood_ci: tuple[float, float]
+    actual_minus_control: float
+    control_exceedance_fraction: float
+    passes_permutation_control: bool
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "markov_validation": self.markov_validation.as_dict(),
+            "resample_count": self.resample_count,
+            "confidence_level": self.confidence_level,
+            "random_seed": self.random_seed,
+            "control_mean_log_likelihood": self.control_mean_log_likelihood,
+            "control_mean_log_likelihood_ci": list(self.control_mean_log_likelihood_ci),
+            "actual_minus_control": self.actual_minus_control,
+            "control_exceedance_fraction": self.control_exceedance_fraction,
+            "passes_permutation_control": self.passes_permutation_control,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ChartWordMarkovOrderScore:
     """Held-out score for one symbolic Markov order."""
 
@@ -781,6 +809,62 @@ def bootstrap_markov_baseline_comparison(
     )
 
 
+def permutation_control_markov_validation(
+    chain: ChartWordMarkovChain,
+    validation_words: tuple[ChartWord, ...] | list[ChartWord],
+    *,
+    permutations: int = 512,
+    confidence_level: float = 0.95,
+    random_seed: int = 0,
+    unseen_probability: float = 1.0e-12,
+) -> ChartWordMarkovPermutationControl:
+    """Test whether symbolic order beats shuffled held-out chart words."""
+
+    validation = validate_markov_chain(chain, validation_words, unseen_probability=unseen_probability)
+    permutations = max(int(permutations), 0)
+    if validation.transition_count == 0 or permutations == 0:
+        return ChartWordMarkovPermutationControl(
+            markov_validation=validation,
+            resample_count=permutations,
+            confidence_level=float(confidence_level),
+            random_seed=int(random_seed),
+            control_mean_log_likelihood=validation.mean_log_likelihood,
+            control_mean_log_likelihood_ci=(validation.mean_log_likelihood, validation.mean_log_likelihood),
+            actual_minus_control=0.0,
+            control_exceedance_fraction=1.0,
+            passes_permutation_control=False,
+        )
+
+    generator = np.random.default_rng(random_seed)
+    control_means = np.empty(permutations, dtype=float)
+    for sample_index in range(permutations):
+        permuted_words = _permuted_words(validation_words, generator)
+        control = validate_markov_chain(chain, permuted_words, unseen_probability=unseen_probability)
+        control_means[sample_index] = control.mean_log_likelihood
+
+    alpha = float(np.clip(1.0 - confidence_level, 0.0, 1.0))
+    lower_q = 100.0 * (alpha / 2.0)
+    upper_q = 100.0 * (1.0 - alpha / 2.0)
+    control_mean = float(np.mean(control_means))
+    control_ci = (
+        float(np.percentile(control_means, lower_q)),
+        float(np.percentile(control_means, upper_q)),
+    )
+    actual_minus_control = float(validation.mean_log_likelihood - control_mean)
+    exceedance = float(np.mean(control_means >= validation.mean_log_likelihood))
+    return ChartWordMarkovPermutationControl(
+        markov_validation=validation,
+        resample_count=permutations,
+        confidence_level=float(confidence_level),
+        random_seed=int(random_seed),
+        control_mean_log_likelihood=control_mean,
+        control_mean_log_likelihood_ci=control_ci,
+        actual_minus_control=actual_minus_control,
+        control_exceedance_fraction=exceedance,
+        passes_permutation_control=bool(validation.mean_log_likelihood > control_ci[1]),
+    )
+
+
 def select_markov_order(
     training_words: tuple[ChartWord, ...] | list[ChartWord],
     validation_words: tuple[ChartWord, ...] | list[ChartWord],
@@ -1013,6 +1097,21 @@ def _transition_pairs_from_words(words: tuple[ChartWord, ...] | list[ChartWord])
     for word in words:
         pairs.extend(word.transition_pairs())
     return pairs
+
+
+def _permuted_words(
+    words: tuple[ChartWord, ...] | list[ChartWord],
+    generator: np.random.Generator,
+) -> tuple[ChartWord, ...]:
+    permuted = []
+    for word in words:
+        if word.length <= 1:
+            permuted.append(word)
+            continue
+        symbols = list(word.symbols)
+        generator.shuffle(symbols)
+        permuted.append(ChartWord(tuple(symbols)))
+    return tuple(permuted)
 
 
 def _score_markov_order(
