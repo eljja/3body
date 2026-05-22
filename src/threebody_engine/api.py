@@ -17,6 +17,7 @@ from threebody.analysis import (
     jacobi_picard_tuning_certificate,
     markov_chain_from_words,
     permutation_control_markov_validation,
+    poincare_markov_section_robustness,
     poincare_coordinate_sweep_from_reports,
     poincare_section_sweep_from_reports,
     poincare_section_word_from_reports,
@@ -362,6 +363,15 @@ def run_verification_report(
         permutations=512,
         random_seed=29,
     )
+    poincare_section_robustness = poincare_markov_section_robustness(
+        (tuple(reports),),
+        poincare_coordinate_sweep.best,
+        resamples=128,
+        permutations=128,
+        random_seed=37,
+        minimum_pass_count=1,
+        minimum_pass_fraction=0.1,
+    )
     comparison = bootstrap_comparison.comparison
     return {
         "metadata": {
@@ -387,6 +397,7 @@ def run_verification_report(
                 "bootstrap_comparison": poincare_bootstrap.as_dict(),
                 "order_selection": poincare_order_selection.as_dict(),
                 "permutation_control": poincare_permutation_control.as_dict(),
+                "section_robustness": poincare_section_robustness.as_dict(),
             },
         },
         "promotion_gates": {
@@ -409,6 +420,9 @@ def run_verification_report(
             "poincare_memory_order_selected": poincare_order_selection.memory_selected,
             "poincare_passes_permutation_control": poincare_permutation_control.passes_permutation_control,
             "poincare_permutation_control_gap": poincare_permutation_control.actual_minus_control,
+            "poincare_section_robust_pass_count": poincare_section_robustness.pass_count,
+            "poincare_section_robust_pass_fraction": poincare_section_robustness.pass_fraction,
+            "poincare_passes_section_robustness": poincare_section_robustness.passes_robustness,
         },
     }
 

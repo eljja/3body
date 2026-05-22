@@ -11,6 +11,7 @@ from threebody.analysis import (
     compare_markov_chain_to_independent_baseline,
     markov_chain_from_words,
     poincare_coordinate_sweep_from_reports,
+    poincare_markov_section_robustness,
     permutation_control_markov_validation,
     poincare_section_sweep_from_reports,
     poincare_section_word_from_reports,
@@ -194,6 +195,53 @@ def test_poincare_coordinate_sweep_selects_best_coordinate() -> None:
     assert sweep.best.coordinate == "hierarchy_ratio"
     assert sweep.has_sufficient_section is True
     assert sweep.best.best.crossing_count >= 3
+
+
+def test_poincare_markov_section_robustness_reports_candidate_passes() -> None:
+    class _Features:
+        nearest_pair = (0, 1)
+        hierarchy_ratio = 1.0
+        hierarchy_perturbation_strength = 1.0
+        nearest_pair_specific_energy = -1.0
+
+    reports = []
+    charts = (
+        ChartType.TWO_BODY_HIERARCHY,
+        ChartType.CHAOTIC_TRANSPORT,
+        ChartType.ESCAPE_TRANSPORT,
+        ChartType.CHAOTIC_TRANSPORT,
+    )
+    for index in range(24):
+        features = _Features()
+        features.hierarchy_perturbation_strength = 0.2 if index % 2 == 0 else 0.8
+        reports.append(
+            AnalysisReport(
+                primary_chart=charts[index % len(charts)],
+                scores=(ChartScore(charts[index % len(charts)], 1.0, "test"),),
+                features=features,
+            )
+        )
+
+    sweep = poincare_section_sweep_from_reports(
+        reports,
+        coordinate="hierarchy_perturbation_strength",
+        quantiles=(0.25, 0.5, 0.75),
+        minimum_crossings=3,
+    )
+    robustness = poincare_markov_section_robustness(
+        (tuple(reports),),
+        sweep,
+        resamples=16,
+        permutations=16,
+        random_seed=3,
+        minimum_pass_count=1,
+        minimum_pass_fraction=0.0,
+    )
+
+    assert robustness.evaluated_count == 3
+    assert 0 <= robustness.pass_count <= robustness.evaluated_count
+    assert 0.0 <= robustness.pass_fraction <= 1.0
+    assert "passes_robustness" in robustness.as_dict()
 
 
 def test_markov_chain_from_words_reports_symbolic_transition_probabilities() -> None:

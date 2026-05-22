@@ -293,6 +293,64 @@ class PoincareCoordinateSweep:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class PoincareMarkovSectionRobustnessCandidate:
+    """Markov-memory validation for one Poincare section candidate."""
+
+    coordinate: str
+    quantile: float
+    section_value: float
+    direction: str
+    word_lengths: tuple[int, ...]
+    minimum_word_length: int
+    significant_baseline_win: bool
+    memory_order_selected: bool
+    passes_permutation_control: bool
+    permutation_control_gap: float
+    passes: bool
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "coordinate": self.coordinate,
+            "quantile": self.quantile,
+            "section_value": self.section_value,
+            "direction": self.direction,
+            "word_lengths": list(self.word_lengths),
+            "minimum_word_length": self.minimum_word_length,
+            "significant_baseline_win": self.significant_baseline_win,
+            "memory_order_selected": self.memory_order_selected,
+            "passes_permutation_control": self.passes_permutation_control,
+            "permutation_control_gap": self.permutation_control_gap,
+            "passes": self.passes,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class PoincareMarkovSectionRobustness:
+    """Section-selection robustness summary for Poincare symbolic memory."""
+
+    coordinate: str
+    evaluated_count: int
+    pass_count: int
+    pass_fraction: float
+    minimum_pass_count: int
+    minimum_pass_fraction: float
+    passes_robustness: bool
+    candidates: tuple[PoincareMarkovSectionRobustnessCandidate, ...]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "coordinate": self.coordinate,
+            "evaluated_count": self.evaluated_count,
+            "pass_count": self.pass_count,
+            "pass_fraction": self.pass_fraction,
+            "minimum_pass_count": self.minimum_pass_count,
+            "minimum_pass_fraction": self.minimum_pass_fraction,
+            "passes_robustness": self.passes_robustness,
+            "candidates": [candidate.as_dict() for candidate in self.candidates],
+        }
+
+
 def chart_word_from_reports(reports: tuple[AnalysisReport, ...] | list[AnalysisReport]) -> ChartWord:
     symbols: list[object] = []
     previous: object | None = None
@@ -511,6 +569,103 @@ def poincare_coordinate_sweep_from_reports(
         minimum_crossings=minimum_crossings,
         best=best,
         sweeps=sweeps,
+    )
+
+
+def poincare_markov_section_robustness(
+    report_sets: tuple[tuple[AnalysisReport, ...], ...] | list[tuple[AnalysisReport, ...]],
+    section_sweep: PoincareSectionSweep,
+    *,
+    validation_index: int = 0,
+    resamples: int = 128,
+    permutations: int = 128,
+    random_seed: int = 0,
+    minimum_pass_count: int = 2,
+    minimum_pass_fraction: float = 0.25,
+) -> PoincareMarkovSectionRobustness:
+    """Check whether Poincare Markov memory survives nearby section choices."""
+
+    sets = tuple(tuple(reports) for reports in report_sets)
+    if not sets:
+        return PoincareMarkovSectionRobustness(
+            coordinate=section_sweep.coordinate,
+            evaluated_count=0,
+            pass_count=0,
+            pass_fraction=0.0,
+            minimum_pass_count=max(int(minimum_pass_count), 0),
+            minimum_pass_fraction=float(minimum_pass_fraction),
+            passes_robustness=False,
+            candidates=(),
+        )
+    safe_validation_index = int(np.clip(validation_index, 0, len(sets) - 1))
+    rows: list[PoincareMarkovSectionRobustnessCandidate] = []
+    for candidate_index, candidate in enumerate(section_sweep.candidates):
+        if not np.isfinite(candidate.section_value):
+            continue
+        words = tuple(
+            poincare_section_word_from_reports(
+                reports,
+                coordinate=candidate.coordinate,
+                section_value=candidate.section_value,
+                direction=candidate.direction,
+            )
+            for reports in sets
+        )
+        word_lengths = tuple(word.length for word in words)
+        minimum_word_length = min(word_lengths) if word_lengths else 0
+        sufficient_crossings = minimum_word_length >= section_sweep.minimum_crossings
+        chain = markov_chain_from_words(words)
+        validation_words = (words[safe_validation_index],)
+        bootstrap = bootstrap_markov_baseline_comparison(
+            chain,
+            words,
+            validation_words,
+            resamples=resamples,
+            random_seed=random_seed + candidate_index,
+        )
+        order_selection = select_markov_order(words, validation_words, max_order=2)
+        permutation_control = permutation_control_markov_validation(
+            chain,
+            validation_words,
+            permutations=permutations,
+            random_seed=random_seed + 1000 + candidate_index,
+        )
+        passes = bool(
+            sufficient_crossings
+            and bootstrap.significant_baseline_win
+            and order_selection.memory_selected
+            and permutation_control.passes_permutation_control
+        )
+        rows.append(
+            PoincareMarkovSectionRobustnessCandidate(
+                coordinate=candidate.coordinate,
+                quantile=candidate.quantile,
+                section_value=candidate.section_value,
+                direction=candidate.direction,
+                word_lengths=word_lengths,
+                minimum_word_length=minimum_word_length,
+                significant_baseline_win=bootstrap.significant_baseline_win,
+                memory_order_selected=order_selection.memory_selected,
+                passes_permutation_control=permutation_control.passes_permutation_control,
+                permutation_control_gap=permutation_control.actual_minus_control,
+                passes=passes,
+            )
+        )
+    pass_count = sum(1 for row in rows if row.passes)
+    evaluated_count = len(rows)
+    pass_fraction = float(pass_count / evaluated_count) if evaluated_count else 0.0
+    return PoincareMarkovSectionRobustness(
+        coordinate=section_sweep.coordinate,
+        evaluated_count=evaluated_count,
+        pass_count=pass_count,
+        pass_fraction=pass_fraction,
+        minimum_pass_count=max(int(minimum_pass_count), 0),
+        minimum_pass_fraction=float(minimum_pass_fraction),
+        passes_robustness=bool(
+            pass_count >= max(int(minimum_pass_count), 0)
+            and pass_fraction >= float(minimum_pass_fraction)
+        ),
+        candidates=tuple(rows),
     )
 
 

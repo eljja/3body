@@ -77,7 +77,7 @@ from threebody_engine import (
 ```
 
 The hysteresis helpers accept `word_mode="refined"`, `"return"`, or `"poincare"`.
-The default promotion path uses refined chart words; Poincare-section words, section sweeps, and multi-coordinate sweeps are available as stricter diagnostics when a scenario has enough crossings.
+The default promotion path uses refined chart words; Poincare-section words, section sweeps, multi-coordinate sweeps, permutation controls, and section-robustness checks are available as stricter diagnostics when a scenario has enough crossings.
 
 Run the test suite:
 

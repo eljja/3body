@@ -22,6 +22,7 @@ from threebody.analysis import (
     jacobi_self_consistent_escape_cone,
     markov_chain_from_words,
     permutation_control_markov_validation,
+    poincare_markov_section_robustness,
     poincare_section_word_from_reports,
     poincare_coordinate_sweep_from_reports,
     poincare_section_sweep_from_reports,
@@ -194,6 +195,13 @@ def _render_page(
         permutations=512,
         random_seed=23,
     )
+    poincare_section_robustness = poincare_markov_section_robustness(
+        (grammar_reports, grammar_phase_reports),
+        poincare_coordinate_sweep.best,
+        resamples=128,
+        permutations=128,
+        random_seed=31,
+    )
     markov_chain = markov_chain_from_words(training_words)
     markov_comparison = compare_markov_chain_to_independent_baseline(markov_chain, training_words, (validation_word,))
     markov_bootstrap = bootstrap_markov_baseline_comparison(
@@ -225,6 +233,7 @@ def _render_page(
                 "bootstrap_comparison": poincare_markov_bootstrap.as_dict(),
                 "order_selection": poincare_order_selection.as_dict(),
                 "permutation_control": poincare_permutation_control.as_dict(),
+                "section_robustness": poincare_section_robustness.as_dict(),
             },
             "training_word_lengths": [word.length for word in training_words],
             "validation_word_length": validation_word.length,
@@ -306,6 +315,9 @@ def _render_page(
         "poincare_memory_order_selected": poincare_order_selection.memory_selected,
         "poincare_passes_permutation_control": poincare_permutation_control.passes_permutation_control,
         "poincare_permutation_control_gap": poincare_permutation_control.actual_minus_control,
+        "poincare_section_robust_pass_count": poincare_section_robustness.pass_count,
+        "poincare_section_robust_pass_fraction": poincare_section_robustness.pass_fraction,
+        "poincare_passes_section_robustness": poincare_section_robustness.passes_robustness,
     }
     gate_cards = "\n".join(
         [
@@ -335,10 +347,17 @@ def _render_page(
                     and promotion_gates["poincare_markov_significant_baseline_win"]
                     and promotion_gates["poincare_memory_order_selected"]
                     and promotion_gates["poincare_passes_permutation_control"]
+                    and promotion_gates["poincare_passes_section_robustness"]
                 )
                 else "wait",
                 f"{promotion_gates['poincare_best_coordinate']}: {promotion_gates['poincare_best_coordinate_crossing_count']}",
                 f"perm gap {promotion_gates['poincare_permutation_control_gap']:.2e}",
+            ),
+            _gate_card(
+                "Section robustness",
+                "pass" if promotion_gates["poincare_passes_section_robustness"] else "wait",
+                f"{promotion_gates['poincare_section_robust_pass_count']} section passes",
+                f"fraction {promotion_gates['poincare_section_robust_pass_fraction']:.2f}",
             ),
         ]
     )
