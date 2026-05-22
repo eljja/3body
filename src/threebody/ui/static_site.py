@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import UTC, datetime
+import hashlib
 import html
 import json
 import os
@@ -109,9 +110,15 @@ def build_static_site(output_dir: str | Path) -> Path:
     )
 
     index_path = output_path / "index.html"
+    certificate_path = output_path / "certificate.json"
+    manifest_path = output_path / "manifest.json"
     index_path.write_text(page, encoding="utf-8")
-    (output_path / "certificate.json").write_text(
+    certificate_path.write_text(
         json.dumps(certificate_bundle, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    manifest_path.write_text(
+        json.dumps(_artifact_manifest(output_path, provenance), indent=2, sort_keys=True),
         encoding="utf-8",
     )
     (output_path / ".nojekyll").write_text("", encoding="utf-8")
@@ -434,6 +441,7 @@ def _render_page(
     certificate_bundle = {
         "certificate_schema_version": 1,
         "artifact": "threebody-static-research-certificate",
+        "artifact_manifest": "manifest.json",
         "metrics": metrics,
         "promotion_gates": promotion_gates,
         "jacobi_escape_cone": jacobi_summary,
@@ -700,7 +708,11 @@ def _render_page(
       {_provenance_card("Run", str(provenance["run_id"]), str(provenance["run_attempt"]))}
       {_provenance_card("Generated UTC", str(provenance["generated_at_utc"]), str(provenance["python_version"]))}
     </div>
-    <p><a href="certificate.json">Open machine-readable certificate JSON</a></p>
+    <p>
+      <a href="certificate.json">Open machine-readable certificate JSON</a>
+      ·
+      <a href="manifest.json">Open artifact integrity manifest</a>
+    </p>
   </section>
 
   <section>
@@ -727,6 +739,31 @@ def _build_provenance() -> dict[str, object]:
         "python_version": platform.python_version(),
         "generator": "threebody.ui.static_site",
     }
+
+
+def _artifact_manifest(output_path: Path, provenance: dict[str, object]) -> dict[str, object]:
+    artifacts = {}
+    for name in ("index.html", "certificate.json"):
+        path = output_path / name
+        artifacts[name] = {
+            "sha256": _sha256_file(path),
+            "bytes": path.stat().st_size,
+        }
+    return {
+        "manifest_schema_version": 1,
+        "artifact": "threebody-static-site-manifest",
+        "hash_algorithm": "sha256",
+        "build_provenance": provenance,
+        "artifacts": artifacts,
+    }
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _progress_map(
