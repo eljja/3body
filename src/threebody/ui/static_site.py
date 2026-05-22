@@ -361,6 +361,7 @@ def _render_page(
             ),
         ]
     )
+    progress_map = _progress_map(promotion_gates, metrics, jacobi_summary)
     chart_distribution = {str(key): float(value) for key, value in general_distribution.items()}
     transition_rows = [
         {
@@ -414,6 +415,49 @@ def _render_page(
     .grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 20px 0 24px; }}
     .upgrade-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }}
     .gate-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }}
+    .progress-track {{ display: grid; grid-template-columns: repeat(7, minmax(120px, 1fr)); gap: 10px; margin-top: 18px; }}
+    .progress-step {{
+      position: relative;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+      min-height: 148px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--accent);
+      border-radius: 8px;
+      background: #fff;
+    }}
+    .progress-step.pass {{ border-top-color: var(--success); }}
+    .progress-step.wait {{ border-top-color: var(--warn); }}
+    .progress-index {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: rgba(11, 132, 243, 0.12);
+      color: var(--accent);
+      font: 700 0.82rem ui-monospace, SFMono-Regular, Consolas, monospace;
+    }}
+    .progress-step.pass .progress-index {{ background: rgba(0, 143, 90, 0.12); color: var(--success); }}
+    .progress-step.wait .progress-index {{ background: rgba(183, 121, 31, 0.12); color: var(--warn); }}
+    .progress-step strong {{ font-size: 0.98rem; }}
+    .progress-step span {{ color: var(--muted); font-size: 0.82rem; line-height: 1.45; }}
+    .evidence-grid {{ display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }}
+    .evidence {{
+      display: grid;
+      gap: 8px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.92);
+    }}
+    .evidence label {{ color: var(--muted); font-size: 0.78rem; text-transform: uppercase; }}
+    .evidence strong {{ font: 700 1rem ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }}
+    .meter {{ height: 8px; overflow: hidden; border-radius: 999px; background: #e8eef6; }}
+    .meter span {{ display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #00a878, #0b84f3); }}
     .gate {{
       display: grid;
       gap: 8px;
@@ -466,7 +510,7 @@ def _render_page(
     }}
     a {{ color: var(--accent); }}
     @media (max-width: 900px) {{
-      .grid, .figure-grid, .upgrade-grid, .gate-grid {{ grid-template-columns: 1fr; }}
+      .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .evidence-grid {{ grid-template-columns: 1fr; }}
       main {{ width: min(100vw - 18px, 1180px); padding-top: 12px; }}
     }}
   </style>
@@ -488,6 +532,15 @@ def _render_page(
     {_metric_card("General energy drift", metrics["general_max_energy_drift"])}
     {_metric_card("Figure-eight FTLE", metrics["figure_eight_finite_time_lyapunov"])}
   </div>
+
+  <section>
+    <h2>Research progress map</h2>
+    <p>
+      The static site now shows how the verification engine changed from visual orbit demos into gated,
+      falsifiable symbolic-dynamics evidence. Each step below is backed by the current build output.
+    </p>
+    {progress_map}
+  </section>
 
   <section>
     <h2>Verification engine upgrades</h2>
@@ -570,6 +623,122 @@ def _render_page(
 </body>
 </html>
 """
+
+
+def _progress_map(
+    promotion_gates: dict[str, object],
+    metrics: dict[str, float],
+    jacobi_summary: dict[str, object],
+) -> str:
+    markov = jacobi_summary["hysteresis_markov"]
+    poincare_markov = markov["poincare_markov"]
+    permutation = poincare_markov["permutation_control"]
+    section_robustness = poincare_markov["section_robustness"]
+    baseline_bootstrap = markov["bootstrap_comparison"]
+    picard_pass = bool(promotion_gates["picard_certified"])
+    baseline_pass = bool(promotion_gates["hysteresis_significant_baseline_win"])
+    order_pass = bool(promotion_gates["hysteresis_memory_order_selected"])
+    poincare_pass = bool(
+        promotion_gates["poincare_coordinate_has_sufficient_section"]
+        and promotion_gates["poincare_markov_significant_baseline_win"]
+        and promotion_gates["poincare_memory_order_selected"]
+    )
+    permutation_pass = bool(promotion_gates["poincare_passes_permutation_control"])
+    robustness_pass = bool(promotion_gates["poincare_passes_section_robustness"])
+    steps = (
+        (
+            "Picard contraction",
+            picard_pass,
+            f"max {metrics['picard_max_contraction']:.3e}",
+            "scaled Jacobian tuning",
+        ),
+        (
+            "Hysteresis grammar",
+            baseline_pass,
+            f"CI {promotion_gates['hysteresis_log_likelihood_gain_ci'][0]:.2e}+",
+            "beats independent baseline",
+        ),
+        (
+            "Markov order",
+            order_pass,
+            f"order {promotion_gates['hysteresis_selected_markov_order']}",
+            "BIC selects memory",
+        ),
+        (
+            "Poincare sweep",
+            poincare_pass,
+            f"{promotion_gates['poincare_best_coordinate_crossing_count']} crossings",
+            str(promotion_gates["poincare_best_coordinate"]),
+        ),
+        (
+            "Permutation control",
+            permutation_pass,
+            f"gap {promotion_gates['poincare_permutation_control_gap']:.2e}",
+            "symbol order beats shuffle",
+        ),
+        (
+            "Section robustness",
+            robustness_pass,
+            f"{promotion_gates['poincare_section_robust_pass_count']} / {section_robustness['evaluated_count']}",
+            "nearby sections repeat",
+        ),
+        (
+            "Engine API",
+            True,
+            "threebody-engine",
+            "JSON gates exported",
+        ),
+    )
+    track = "".join(
+        _progress_step(index, title, "pass" if passed else "wait", value, detail)
+        for index, (title, passed, value, detail) in enumerate(steps, start=1)
+    )
+    baseline_strength = float(baseline_bootstrap["beats_baseline_fraction"])
+    permutation_strength = float(1.0 - permutation["control_exceedance_fraction"])
+    robustness_fraction = float(section_robustness["pass_fraction"])
+    evidence = "".join(
+        [
+            _evidence_card("Picard maximum", f"{metrics['picard_max_contraction']:.3e}", 1.0 if picard_pass else 0.0),
+            _evidence_card("Baseline confidence", f"{baseline_strength:.2f}", baseline_strength),
+            _evidence_card("Permutation confidence", f"{permutation_strength:.2f}", permutation_strength),
+            _evidence_card("Section robustness", f"{robustness_fraction:.2f}", robustness_fraction),
+            _evidence_card("Poincare crossings", str(promotion_gates["poincare_best_coordinate_crossing_count"]), 1.0),
+        ]
+    )
+    return (
+        '<div class="progress-track">'
+        f"{track}"
+        "</div>"
+        '<div class="evidence-grid">'
+        f"{evidence}"
+        "</div>"
+    )
+
+
+def _progress_step(index: int, title: str, status: str, value: str, detail: str) -> str:
+    normalized_status = "pass" if status == "pass" else "wait"
+    return (
+        f'<div class="progress-step {normalized_status}">'
+        f'<span class="progress-index">{index}</span>'
+        f"<strong>{html.escape(title)}</strong>"
+        f'<span class="gate-status">{"PASS" if normalized_status == "pass" else "WAIT"}</span>'
+        f'<span class="gate-value">{html.escape(value)}</span>'
+        f"<span>{html.escape(detail)}</span>"
+        "</div>"
+    )
+
+
+def _evidence_card(label: str, value: str, fraction: float) -> str:
+    width = 100.0 * float(np.clip(fraction, 0.0, 1.0))
+    return (
+        '<div class="evidence">'
+        f"<label>{html.escape(label)}</label>"
+        f"<strong>{html.escape(value)}</strong>"
+        '<div class="meter">'
+        f'<span style="width: {width:.1f}%"></span>'
+        "</div>"
+        "</div>"
+    )
 
 
 def _metric_card(label: str, value: object) -> str:

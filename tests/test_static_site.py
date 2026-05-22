@@ -14,6 +14,9 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "General three-body figure-eight" in content
     assert "Jacobi escape-cone theorem candidate" in content
     assert "Verification engine upgrades" in content
+    assert "Research progress map" in content
+    assert "Permutation confidence" in content
+    assert "Poincare sweep" in content
     assert "Picard contraction tuning" in content
     assert "Markov baseline test" in content
     assert "promotion_gates" in content
