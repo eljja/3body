@@ -302,6 +302,8 @@ class PoincareMarkovSectionRobustnessCandidate:
     section_value: float
     direction: str
     word_lengths: tuple[int, ...]
+    training_word_lengths: tuple[int, ...]
+    validation_word_lengths: tuple[int, ...]
     minimum_word_length: int
     significant_baseline_win: bool
     memory_order_selected: bool
@@ -316,6 +318,8 @@ class PoincareMarkovSectionRobustnessCandidate:
             "section_value": self.section_value,
             "direction": self.direction,
             "word_lengths": list(self.word_lengths),
+            "training_word_lengths": list(self.training_word_lengths),
+            "validation_word_lengths": list(self.validation_word_lengths),
             "minimum_word_length": self.minimum_word_length,
             "significant_baseline_win": self.significant_baseline_win,
             "memory_order_selected": self.memory_order_selected,
@@ -576,6 +580,7 @@ def poincare_markov_section_robustness(
     report_sets: tuple[tuple[AnalysisReport, ...], ...] | list[tuple[AnalysisReport, ...]],
     section_sweep: PoincareSectionSweep,
     *,
+    validation_report_sets: tuple[tuple[AnalysisReport, ...], ...] | list[tuple[AnalysisReport, ...]] | None = None,
     validation_index: int = 0,
     resamples: int = 128,
     permutations: int = 128,
@@ -585,8 +590,13 @@ def poincare_markov_section_robustness(
 ) -> PoincareMarkovSectionRobustness:
     """Check whether Poincare Markov memory survives nearby section choices."""
 
-    sets = tuple(tuple(reports) for reports in report_sets)
-    if not sets:
+    training_sets = tuple(tuple(reports) for reports in report_sets)
+    validation_sets = (
+        training_sets
+        if validation_report_sets is None
+        else tuple(tuple(reports) for reports in validation_report_sets)
+    )
+    if not training_sets or not validation_sets:
         return PoincareMarkovSectionRobustness(
             coordinate=section_sweep.coordinate,
             evaluated_count=0,
@@ -597,33 +607,44 @@ def poincare_markov_section_robustness(
             passes_robustness=False,
             candidates=(),
         )
-    safe_validation_index = int(np.clip(validation_index, 0, len(sets) - 1))
+    safe_validation_index = int(np.clip(validation_index, 0, len(validation_sets) - 1))
     rows: list[PoincareMarkovSectionRobustnessCandidate] = []
     for candidate_index, candidate in enumerate(section_sweep.candidates):
         if not np.isfinite(candidate.section_value):
             continue
-        words = tuple(
+        training_words = tuple(
             poincare_section_word_from_reports(
                 reports,
                 coordinate=candidate.coordinate,
                 section_value=candidate.section_value,
                 direction=candidate.direction,
             )
-            for reports in sets
+            for reports in training_sets
         )
-        word_lengths = tuple(word.length for word in words)
+        validation_words_all = tuple(
+            poincare_section_word_from_reports(
+                reports,
+                coordinate=candidate.coordinate,
+                section_value=candidate.section_value,
+                direction=candidate.direction,
+            )
+            for reports in validation_sets
+        )
+        validation_words = (validation_words_all[safe_validation_index],)
+        training_word_lengths = tuple(word.length for word in training_words)
+        validation_word_lengths = tuple(word.length for word in validation_words_all)
+        word_lengths = training_word_lengths + validation_word_lengths
         minimum_word_length = min(word_lengths) if word_lengths else 0
         sufficient_crossings = minimum_word_length >= section_sweep.minimum_crossings
-        chain = markov_chain_from_words(words)
-        validation_words = (words[safe_validation_index],)
+        chain = markov_chain_from_words(training_words)
         bootstrap = bootstrap_markov_baseline_comparison(
             chain,
-            words,
+            training_words,
             validation_words,
             resamples=resamples,
             random_seed=random_seed + candidate_index,
         )
-        order_selection = select_markov_order(words, validation_words, max_order=2)
+        order_selection = select_markov_order(training_words, validation_words, max_order=2)
         permutation_control = permutation_control_markov_validation(
             chain,
             validation_words,
@@ -643,6 +664,8 @@ def poincare_markov_section_robustness(
                 section_value=candidate.section_value,
                 direction=candidate.direction,
                 word_lengths=word_lengths,
+                training_word_lengths=training_word_lengths,
+                validation_word_lengths=validation_word_lengths,
                 minimum_word_length=minimum_word_length,
                 significant_baseline_win=bootstrap.significant_baseline_win,
                 memory_order_selected=order_selection.memory_selected,

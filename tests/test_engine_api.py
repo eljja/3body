@@ -151,6 +151,7 @@ def test_engine_api_runs_integrated_verification_report() -> None:
     assert "baseline_comparison" in report["hysteresis_markov"]
     assert "bootstrap_comparison" in report["hysteresis_markov"]
     assert "order_selection" in report["hysteresis_markov"]
+    assert report["hysteresis_markov"]["validation_mode"] == "heldout_binary_phase"
     assert "poincare_section_sweep" in report["hysteresis_markov"]
     assert "poincare_coordinate_sweep" in report["hysteresis_markov"]
     assert "poincare_markov" in report["hysteresis_markov"]
@@ -165,5 +166,6 @@ def test_engine_api_runs_integrated_verification_report() -> None:
     assert "poincare_selected_markov_order" in report["promotion_gates"]
     assert "poincare_passes_permutation_control" in report["promotion_gates"]
     assert "poincare_permutation_control_gap" in report["promotion_gates"]
+    assert report["promotion_gates"]["poincare_heldout_phase_validation"] is True
     assert "poincare_section_robust_pass_count" in report["promotion_gates"]
     assert "poincare_passes_section_robustness" in report["promotion_gates"]

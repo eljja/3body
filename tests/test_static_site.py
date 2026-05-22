@@ -32,6 +32,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "poincare_best_coordinate_crossing_count" in content
     assert "poincare_markov" in content
     assert "Poincare memory" in content
+    assert "heldout_binary_phase" in content
+    assert "poincare_heldout_phase_validation" in content
     assert "poincare_markov_significant_baseline_win" in content
     assert "permutation_control" in content
     assert "poincare_passes_permutation_control" in content

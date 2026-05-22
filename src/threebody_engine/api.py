@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from threebody.analysis import (
@@ -322,50 +323,80 @@ def run_verification_report(
         inner_pair=inner_pair,
         target_contraction=target_contraction,
     )
-    chain, bootstrap_comparison = compare_hysteresis_markov_to_baseline_with_uncertainty(
-        (scenario,),
-        (scenario,),
-        periods=periods,
-        samples=samples,
-        stride=stride,
-        word_mode=word_mode,
-    )
-    order_selection = select_hysteresis_markov_order(
-        (scenario,),
-        (scenario,),
-        periods=periods,
-        samples=samples,
-        stride=stride,
-        word_mode=word_mode,
-    )
     atlas = AnalysisAtlas()
     reports = atlas.analyze_trajectory(reference.system, trajectory, stride=stride)
+    heldout_training_reports = _heldout_phase_training_reports(
+        scenario,
+        periods=periods,
+        samples=samples,
+        stride=stride,
+    )
+    if heldout_training_reports:
+        training_words = tuple(
+            _hysteresis_word_from_reports(report_set, coordinate="hierarchy_perturbation_strength", word_mode=word_mode)
+            for report_set in heldout_training_reports
+        )
+        validation_words = (
+            _hysteresis_word_from_reports(reports, coordinate="hierarchy_perturbation_strength", word_mode=word_mode),
+        )
+        chain = markov_chain_from_words(training_words)
+        bootstrap_comparison = bootstrap_markov_baseline_comparison(
+            chain,
+            training_words,
+            validation_words,
+            resamples=512,
+            random_seed=0,
+        )
+        order_selection = select_markov_order(training_words, validation_words, max_order=2)
+        validation_mode = "heldout_binary_phase"
+    else:
+        chain, bootstrap_comparison = compare_hysteresis_markov_to_baseline_with_uncertainty(
+            (scenario,),
+            (scenario,),
+            periods=periods,
+            samples=samples,
+            stride=stride,
+            word_mode=word_mode,
+        )
+        order_selection = select_hysteresis_markov_order(
+            (scenario,),
+            (scenario,),
+            periods=periods,
+            samples=samples,
+            stride=stride,
+            word_mode=word_mode,
+        )
+        validation_mode = "self_reference"
     poincare_sweep = poincare_section_sweep_from_reports(
         reports,
         coordinate="hierarchy_perturbation_strength",
     )
-    poincare_coordinate_sweep = poincare_coordinate_sweep_from_reports(reports)
-    poincare_words = [
-        _poincare_word_from_sweep(reports, poincare_coordinate_sweep),
-    ]
-    poincare_chain = markov_chain_from_words(tuple(poincare_words))
+    section_source_reports = heldout_training_reports[0] if heldout_training_reports else reports
+    poincare_coordinate_sweep = poincare_coordinate_sweep_from_reports(section_source_reports)
+    poincare_training_words = tuple(
+        _poincare_word_from_sweep(report_set, poincare_coordinate_sweep)
+        for report_set in (heldout_training_reports or (reports,))
+    )
+    poincare_validation_words = (_poincare_word_from_sweep(reports, poincare_coordinate_sweep),)
+    poincare_chain = markov_chain_from_words(poincare_training_words)
     poincare_bootstrap = bootstrap_markov_baseline_comparison(
         poincare_chain,
-        tuple(poincare_words),
-        tuple(poincare_words),
+        poincare_training_words,
+        poincare_validation_words,
         resamples=512,
         random_seed=17,
     )
-    poincare_order_selection = select_markov_order(tuple(poincare_words), tuple(poincare_words), max_order=2)
+    poincare_order_selection = select_markov_order(poincare_training_words, poincare_validation_words, max_order=2)
     poincare_permutation_control = permutation_control_markov_validation(
         poincare_chain,
-        tuple(poincare_words),
+        poincare_validation_words,
         permutations=512,
         random_seed=29,
     )
     poincare_section_robustness = poincare_markov_section_robustness(
-        (tuple(reports),),
+        heldout_training_reports or (tuple(reports),),
         poincare_coordinate_sweep.best,
+        validation_report_sets=(tuple(reports),) if heldout_training_reports else None,
         resamples=128,
         permutations=128,
         random_seed=37,
@@ -390,9 +421,13 @@ def run_verification_report(
             "baseline_comparison": comparison.as_dict(),
             "bootstrap_comparison": bootstrap_comparison.as_dict(),
             "order_selection": order_selection.as_dict(),
+            "validation_mode": validation_mode,
             "poincare_section_sweep": poincare_sweep.as_dict(),
             "poincare_coordinate_sweep": poincare_coordinate_sweep.as_dict(),
             "poincare_markov": {
+                "training_word_lengths": [word.length for word in poincare_training_words],
+                "validation_word_lengths": [word.length for word in poincare_validation_words],
+                "validation_mode": validation_mode,
                 "chain": poincare_chain.as_dict(),
                 "bootstrap_comparison": poincare_bootstrap.as_dict(),
                 "order_selection": poincare_order_selection.as_dict(),
@@ -418,6 +453,7 @@ def run_verification_report(
             "poincare_markov_log_likelihood_gain_ci": list(poincare_bootstrap.log_likelihood_gain_ci),
             "poincare_selected_markov_order": poincare_order_selection.selected_order,
             "poincare_memory_order_selected": poincare_order_selection.memory_selected,
+            "poincare_heldout_phase_validation": bool(heldout_training_reports),
             "poincare_passes_permutation_control": poincare_permutation_control.passes_permutation_control,
             "poincare_permutation_control_gap": poincare_permutation_control.actual_minus_control,
             "poincare_section_robust_pass_count": poincare_section_robustness.pass_count,
@@ -440,6 +476,36 @@ def _hysteresis_word_from_reports(
     if word_mode == "poincare":
         return poincare_section_word_from_reports(reports, coordinate=coordinate)
     raise ValueError("word_mode must be 'refined', 'return', or 'poincare'.")
+
+
+def _heldout_phase_training_reports(
+    scenario: ReferenceScenario,
+    *,
+    periods: float,
+    samples: int,
+    stride: int,
+) -> tuple[tuple[object, ...], ...]:
+    if scenario != "hierarchical-flyby":
+        return ()
+    library = OrbitLibrary()
+    integrator = AdaptiveIntegrator()
+    atlas = AnalysisAtlas()
+    report_sets = []
+    for binary_phase in (0.5 * math.pi, math.pi):
+        phase_scenario = library.general_hierarchical_flyby(
+            binary_phase=binary_phase,
+            intruder_velocity=(0.8, 1.6),
+            duration=periods,
+            samples=samples,
+        )
+        phase_trajectory = integrator.integrate(
+            phase_scenario.system,
+            phase_scenario.t_span,
+            phase_scenario.initial_state,
+            t_eval=phase_scenario.t_eval,
+        )
+        report_sets.append(atlas.analyze_trajectory(phase_scenario.system, phase_trajectory, stride=stride))
+    return tuple(report_sets)
 
 
 def _poincare_word_from_sweep(reports: tuple[object, ...], sweep: object):

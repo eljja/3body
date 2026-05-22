@@ -78,6 +78,13 @@ def build_static_site(output_dir: str | Path) -> Path:
         grammar_phase_flyby.initial_state,
         t_eval=grammar_phase_flyby.t_eval,
     )
+    grammar_phase_extra_flyby = library.general_hierarchical_flyby(binary_phase=np.pi, duration=8.0, samples=500)
+    grammar_phase_extra_traj = integrator.integrate(
+        grammar_phase_extra_flyby.system,
+        grammar_phase_extra_flyby.t_span,
+        grammar_phase_extra_flyby.initial_state,
+        t_eval=grammar_phase_extra_flyby.t_eval,
+    )
 
     page = _render_page(
         two_body=two_body_traj,
@@ -92,6 +99,8 @@ def build_static_site(output_dir: str | Path) -> Path:
         grammar_flyby_system=grammar_flyby.system,
         grammar_phase_flyby=grammar_phase_traj,
         grammar_phase_flyby_system=grammar_phase_flyby.system,
+        grammar_phase_extra_flyby=grammar_phase_extra_traj,
+        grammar_phase_extra_flyby_system=grammar_phase_extra_flyby.system,
     )
 
     index_path = output_path / "index.html"
@@ -114,6 +123,8 @@ def _render_page(
     grammar_flyby_system: object,
     grammar_phase_flyby: TrajectoryResult,
     grammar_phase_flyby_system: object,
+    grammar_phase_extra_flyby: TrajectoryResult,
+    grammar_phase_extra_flyby_system: object,
 ) -> str:
     two_invariants = InvariantMonitor(two_body_system).evaluate(two_body)
     restricted_invariants = InvariantMonitor(restricted_system).evaluate(restricted)
@@ -157,24 +168,37 @@ def _render_page(
         grammar_phase_flyby,
         stride=max(1, len(grammar_phase_flyby.t) // 120),
     )
-    training_words = (
-        refined_chart_word_from_reports(grammar_reports),
-        refined_chart_word_from_reports(grammar_phase_reports),
+    grammar_phase_extra_reports = atlas.analyze_trajectory(
+        grammar_phase_extra_flyby_system,
+        grammar_phase_extra_flyby,
+        stride=max(1, len(grammar_phase_extra_flyby.t) // 120),
     )
-    validation_word = training_words[0]
-    return_word = training_words[0]
+    training_words = (
+        refined_chart_word_from_reports(grammar_phase_reports),
+        refined_chart_word_from_reports(grammar_phase_extra_reports),
+    )
+    validation_word = refined_chart_word_from_reports(grammar_reports)
+    return_word = validation_word
     poincare_word = poincare_section_word_from_reports(grammar_reports, coordinate="hierarchy_perturbation_strength")
     poincare_sweep = poincare_section_sweep_from_reports(grammar_reports, coordinate="hierarchy_perturbation_strength")
-    poincare_coordinate_sweep = poincare_coordinate_sweep_from_reports(grammar_reports)
+    poincare_coordinate_sweep = poincare_coordinate_sweep_from_reports(grammar_phase_reports)
     poincare_training_words = (
         poincare_section_word_from_reports(
-            grammar_reports,
+            grammar_phase_reports,
             coordinate=poincare_coordinate_sweep.best.coordinate,
             section_value=poincare_coordinate_sweep.best.best.section_value,
             direction=poincare_coordinate_sweep.best.direction,
         ),
         poincare_section_word_from_reports(
-            grammar_phase_reports,
+            grammar_phase_extra_reports,
+            coordinate=poincare_coordinate_sweep.best.coordinate,
+            section_value=poincare_coordinate_sweep.best.best.section_value,
+            direction=poincare_coordinate_sweep.best.direction,
+        ),
+    )
+    poincare_validation_words = (
+        poincare_section_word_from_reports(
+            grammar_reports,
             coordinate=poincare_coordinate_sweep.best.coordinate,
             section_value=poincare_coordinate_sweep.best.best.section_value,
             direction=poincare_coordinate_sweep.best.direction,
@@ -184,20 +208,21 @@ def _render_page(
     poincare_markov_bootstrap = bootstrap_markov_baseline_comparison(
         poincare_markov_chain,
         poincare_training_words,
-        (poincare_training_words[0],),
+        poincare_validation_words,
         resamples=512,
         random_seed=19,
     )
-    poincare_order_selection = select_markov_order(poincare_training_words, (poincare_training_words[0],), max_order=2)
+    poincare_order_selection = select_markov_order(poincare_training_words, poincare_validation_words, max_order=2)
     poincare_permutation_control = permutation_control_markov_validation(
         poincare_markov_chain,
-        (poincare_training_words[0],),
+        poincare_validation_words,
         permutations=512,
         random_seed=23,
     )
     poincare_section_robustness = poincare_markov_section_robustness(
-        (grammar_reports, grammar_phase_reports),
+        (grammar_phase_reports, grammar_phase_extra_reports),
         poincare_coordinate_sweep.best,
+        validation_report_sets=(grammar_reports,),
         resamples=128,
         permutations=128,
         random_seed=31,
@@ -229,6 +254,8 @@ def _render_page(
             "poincare_coordinate_sweep": poincare_coordinate_sweep.as_dict(),
             "poincare_markov": {
                 "training_word_lengths": [word.length for word in poincare_training_words],
+                "validation_word_lengths": [word.length for word in poincare_validation_words],
+                "validation_mode": "heldout_binary_phase",
                 "chain": poincare_markov_chain.as_dict(),
                 "bootstrap_comparison": poincare_markov_bootstrap.as_dict(),
                 "order_selection": poincare_order_selection.as_dict(),
@@ -313,6 +340,7 @@ def _render_page(
         "poincare_markov_log_likelihood_gain_ci": poincare_markov_bootstrap.log_likelihood_gain_ci,
         "poincare_selected_markov_order": poincare_order_selection.selected_order,
         "poincare_memory_order_selected": poincare_order_selection.memory_selected,
+        "poincare_heldout_phase_validation": True,
         "poincare_passes_permutation_control": poincare_permutation_control.passes_permutation_control,
         "poincare_permutation_control_gap": poincare_permutation_control.actual_minus_control,
         "poincare_section_robust_pass_count": poincare_section_robustness.pass_count,
@@ -537,7 +565,8 @@ def _render_page(
     <h2>Research progress map</h2>
     <p>
       The static site now shows how the verification engine changed from visual orbit demos into gated,
-      falsifiable symbolic-dynamics evidence. Each step below is backed by the current build output.
+      falsifiable symbolic-dynamics evidence with held-out binary-phase validation. Each step below is
+      backed by the current build output.
     </p>
     {progress_map}
   </section>
@@ -656,7 +685,7 @@ def _progress_map(
             "Hysteresis grammar",
             baseline_pass,
             f"CI {promotion_gates['hysteresis_log_likelihood_gain_ci'][0]:.2e}+",
-            "beats independent baseline",
+            "held-out phase baseline",
         ),
         (
             "Markov order",
@@ -668,7 +697,7 @@ def _progress_map(
             "Poincare sweep",
             poincare_pass,
             f"{promotion_gates['poincare_best_coordinate_crossing_count']} crossings",
-            str(promotion_gates["poincare_best_coordinate"]),
+            f"held-out {promotion_gates['poincare_best_coordinate']}",
         ),
         (
             "Permutation control",
