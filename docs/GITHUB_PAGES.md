@@ -7,7 +7,7 @@ The static build performs these steps during GitHub Actions deployment:
 
 1. Install the Python package.
 2. Integrate representative two-body, restricted three-body, and general figure-eight trajectories.
-3. Compute invariant drift, stability, analysis-atlas distribution, representative Jacobi escape-cone certificates, Picard contraction tuning, hysteresis grammar Markov diagnostics with bootstrap uncertainty, and Markov order selection.
+3. Compute invariant drift, stability, analysis-atlas distribution, representative Jacobi escape-cone certificates, Picard contraction tuning, hysteresis grammar Markov diagnostics with bootstrap uncertainty, Markov order selection, and Poincare-section word diagnostics.
 4. Embed the resulting Plotly figures, certificate bars, promotion gates, and metrics into `site/index.html`.
 5. Publish the generated `site` directory through GitHub Pages.
 
@@ -25,4 +25,5 @@ Limitations:
 - Parameter sliders remain in the Streamlit app.
 - The Jacobi escape-cone panel shows a representative flyby plus the latest parameter-box summary; the full theorem suite remains a local/CI research check.
 - The Picard and symbolic-dynamics panel shows representative promotion gates: contraction reserve, hysteresis Markov-vs-baseline diagnostics, bootstrap gain interval, and BIC-selected memory order.
+- The promotion gate uses refined chart words because the representative Poincare-section word currently has too few crossings for a stable Markov claim; the section word is still embedded in the JSON certificate as a falsification diagnostic.
 - New public scenarios require adding them to `threebody.ui.static_site` and rebuilding.

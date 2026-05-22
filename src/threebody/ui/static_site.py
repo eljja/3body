@@ -21,6 +21,7 @@ from threebody.analysis import (
     jacobi_quadrupole_acceleration_certificate,
     jacobi_self_consistent_escape_cone,
     markov_chain_from_words,
+    poincare_section_word_from_reports,
     refined_chart_word_from_reports,
     return_map_word_from_reports,
     select_markov_order,
@@ -157,7 +158,8 @@ def _render_page(
         refined_chart_word_from_reports(grammar_phase_reports),
     )
     validation_word = training_words[0]
-    return_word = return_map_word_from_reports(grammar_reports, coordinate="hierarchy_perturbation_strength")
+    return_word = training_words[0]
+    poincare_word = poincare_section_word_from_reports(grammar_reports, coordinate="hierarchy_perturbation_strength")
     markov_chain = markov_chain_from_words(training_words)
     markov_comparison = compare_markov_chain_to_independent_baseline(markov_chain, training_words, (validation_word,))
     markov_bootstrap = bootstrap_markov_baseline_comparison(
@@ -178,6 +180,9 @@ def _render_page(
         "picard_tuning": jacobi_tuning.as_dict(),
         "hysteresis_markov": {
             "return_word": return_word.as_string(),
+            "poincare_section_word": poincare_word.as_string(),
+            "word_mode": "refined",
+            "poincare_section_word_length": poincare_word.length,
             "training_word_lengths": [word.length for word in training_words],
             "validation_word_length": validation_word.length,
             "chain": markov_chain.as_dict(),

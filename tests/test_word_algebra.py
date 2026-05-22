@@ -9,6 +9,7 @@ from threebody.analysis import (
     chart_word_signature,
     compare_markov_chain_to_independent_baseline,
     markov_chain_from_words,
+    poincare_section_word_from_reports,
     refined_chart_symbol,
     return_map_word_from_reports,
     select_markov_order,
@@ -98,6 +99,35 @@ def test_return_map_word_uses_coordinate_extrema() -> None:
 
     assert word.length >= 2
     assert "return:hierarchy_ratio" in word.as_string()
+
+
+def test_poincare_section_word_uses_explicit_crossings() -> None:
+    class _Features:
+        nearest_pair = (0, 1)
+        hierarchy_ratio = 1.0
+        hierarchy_perturbation_strength = 1.0
+        nearest_pair_specific_energy = -1.0
+
+    reports = []
+    for value in (0.2, 1.2, 0.4, 1.4, 0.3):
+        features = _Features()
+        features.hierarchy_perturbation_strength = value
+        reports.append(
+            AnalysisReport(
+                primary_chart=ChartType.TWO_BODY_HIERARCHY,
+                scores=(ChartScore(ChartType.TWO_BODY_HIERARCHY, 1.0, "test"),),
+                features=features,
+            )
+        )
+
+    word = poincare_section_word_from_reports(
+        reports,
+        coordinate="hierarchy_perturbation_strength",
+        section_value=0.8,
+    )
+
+    assert word.length >= 3
+    assert "section:hierarchy_perturbation_strength" in word.as_string()
 
 
 def test_markov_chain_from_words_reports_symbolic_transition_probabilities() -> None:

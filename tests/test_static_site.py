@@ -21,5 +21,7 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "bootstrap_comparison" in content
     assert "hysteresis_selected_markov_order" in content
     assert "order_selection" in content
+    assert "poincare_section_word" in content
+    assert "word_mode" in content
     assert "jacobi_parameter_interval_box_margin" not in content
     assert "interval_box_margin_lower" in content

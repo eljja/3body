@@ -112,6 +112,30 @@ def test_engine_api_selects_hysteresis_markov_order() -> None:
     assert selection.criterion == "bic"
 
 
+def test_engine_api_supports_poincare_hysteresis_words() -> None:
+    chain, bootstrap = compare_hysteresis_markov_to_baseline_with_uncertainty(
+        ("hierarchical-flyby",),
+        ("hierarchical-flyby",),
+        periods=2.0,
+        samples=80,
+        stride=10,
+        word_mode="poincare",
+        resamples=16,
+    )
+    selection = select_hysteresis_markov_order(
+        ("hierarchical-flyby",),
+        ("hierarchical-flyby",),
+        periods=2.0,
+        samples=80,
+        stride=10,
+        word_mode="poincare",
+    )
+
+    assert chain.states
+    assert bootstrap.comparison.markov_validation.transition_count >= 0
+    assert selection.selected_order in {0, 1, 2}
+
+
 def test_engine_api_runs_integrated_verification_report() -> None:
     report = run_verification_report(
         scenario="hierarchical-flyby",
@@ -121,6 +145,7 @@ def test_engine_api_runs_integrated_verification_report() -> None:
     )
 
     assert report["metadata"]["engine"] == "threebody-engine"
+    assert report["metadata"]["word_mode"] == "refined"
     assert report["promotion_gates"]["picard_certified"] is True
     assert report["promotion_gates"]["picard_contraction_reserve"] > 0.0
     assert "baseline_comparison" in report["hysteresis_markov"]

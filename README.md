@@ -76,6 +76,9 @@ from threebody_engine import (
 )
 ```
 
+The hysteresis helpers accept `word_mode="refined"`, `"return"`, or `"poincare"`.
+The default promotion path uses refined chart words; Poincare-section words are available as a stricter diagnostic when a scenario has enough section crossings.
+
 Run the test suite:
 
 ```powershell

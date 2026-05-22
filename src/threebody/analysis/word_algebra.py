@@ -246,6 +246,57 @@ def return_map_word_from_reports(
     return ChartWord(tuple(symbols))
 
 
+def poincare_section_word_from_reports(
+    reports: tuple[AnalysisReport, ...] | list[AnalysisReport],
+    *,
+    coordinate: str = "hierarchy_perturbation_strength",
+    section_value: float | None = None,
+    direction: str = "both",
+) -> ChartWord:
+    """Build a chart word from crossings of an explicit diagnostic section."""
+
+    if len(reports) < 2:
+        return refined_chart_word_from_reports(reports)
+    values = np.asarray([_feature_value(report, coordinate) for report in reports], dtype=float)
+    finite_values = values[np.isfinite(values)]
+    if finite_values.size == 0:
+        return refined_chart_word_from_reports(reports)
+    section = float(np.median(finite_values) if section_value is None else section_value)
+    direction = direction.lower()
+    if direction not in {"both", "up", "down"}:
+        raise ValueError("direction must be 'both', 'up', or 'down'.")
+    symbols: list[object] = []
+    for index in range(1, len(reports)):
+        previous, current = values[index - 1], values[index]
+        if not np.isfinite(previous) or not np.isfinite(current) or previous == current:
+            continue
+        previous_offset = previous - section
+        current_offset = current - section
+        if previous_offset == 0.0:
+            previous_offset = -np.sign(current_offset)
+        if current_offset == 0.0:
+            current_offset = np.sign(previous_offset)
+        if previous_offset * current_offset > 0.0:
+            continue
+        crossing_direction = "up" if current > previous else "down"
+        if direction != "both" and crossing_direction != direction:
+            continue
+        alpha = float(np.clip((section - previous) / (current - previous), 0.0, 1.0))
+        symbol = poincare_section_symbol(
+            reports[index],
+            coordinate=coordinate,
+            section_value=section,
+            direction=crossing_direction,
+            alpha=alpha,
+        )
+        if symbols and symbols[-1] == symbol:
+            continue
+        symbols.append(symbol)
+    if not symbols:
+        return refined_chart_word_from_reports(reports)
+    return ChartWord(tuple(symbols))
+
+
 def return_map_symbol(report: AnalysisReport, *, coordinate: str, event: str) -> str:
     value = _feature_value(report, coordinate)
     if coordinate == "hierarchy_perturbation_strength":
@@ -253,6 +304,22 @@ def return_map_symbol(report: AnalysisReport, *, coordinate: str, event: str) ->
     else:
         bucket = _linear_bin(value, width=2.0, maximum=9)
     return f"return:{coordinate}:{event}:B{bucket}:{refined_chart_symbol(report)}"
+
+
+def poincare_section_symbol(
+    report: AnalysisReport,
+    *,
+    coordinate: str,
+    section_value: float,
+    direction: str,
+    alpha: float,
+) -> str:
+    if coordinate == "hierarchy_perturbation_strength":
+        section_bucket = _log_strength_bin(section_value)
+    else:
+        section_bucket = _linear_bin(section_value, width=2.0, maximum=9)
+    phase_bucket = _linear_bin(alpha, width=0.25, maximum=3)
+    return f"section:{coordinate}:{direction}:S{section_bucket}:A{phase_bucket}:{refined_chart_symbol(report)}"
 
 
 def refined_chart_symbol(report: AnalysisReport) -> str:
@@ -597,6 +664,31 @@ def return_word_signature_rows(
         row = signature.as_dict()
         row["scenario"] = name
         row["coordinate"] = coordinate
+        rows.append(row)
+    return rows
+
+
+def poincare_word_signature_rows(
+    reports_by_name: dict[str, tuple[AnalysisReport, ...]],
+    *,
+    coordinate: str = "hierarchy_perturbation_strength",
+    section_value: float | None = None,
+    direction: str = "both",
+) -> list[dict[str, float | int | str | bool]]:
+    rows = []
+    for name, reports in reports_by_name.items():
+        word = poincare_section_word_from_reports(
+            reports,
+            coordinate=coordinate,
+            section_value=section_value,
+            direction=direction,
+        )
+        signature = chart_word_signature(word)
+        row = signature.as_dict()
+        row["scenario"] = name
+        row["coordinate"] = coordinate
+        row["section_value"] = float("nan") if section_value is None else float(section_value)
+        row["direction"] = direction
         rows.append(row)
     return rows
 

@@ -13,9 +13,11 @@ from threebody.analysis import (
     JacobiIntervalPicardFlowCertificate,
     JacobiPicardTuningCertificate,
     compare_markov_chain_to_independent_baseline,
-    hysteresis_markov_chain_from_reports,
     jacobi_interval_picard_flow_certificate,
     jacobi_picard_tuning_certificate,
+    markov_chain_from_words,
+    poincare_section_word_from_reports,
+    refined_chart_word_from_reports,
     return_map_word_from_reports,
     select_markov_order,
     validate_markov_chain,
@@ -25,6 +27,7 @@ from threebody.solvers import AdaptiveIntegrator
 from threebody.types import Scenario, TrajectoryResult
 
 ReferenceScenario = Literal["figure-eight", "hierarchical-flyby", "restricted-l4", "restricted-l5"]
+WordMode = Literal["refined", "return", "poincare"]
 
 
 def integrate_reference_scenario(
@@ -117,19 +120,21 @@ def build_hysteresis_markov_chain(
     samples: int = 240,
     stride: int = 20,
     coordinate: str = "hierarchy_perturbation_strength",
+    word_mode: WordMode = "refined",
 ) -> ChartWordMarkovChain:
-    """Build a symbolic Markov model from return-map chart words."""
+    """Build a symbolic Markov model from refined, return-map, or Poincare-section chart words."""
 
     atlas = AnalysisAtlas()
-    reports_by_name = {}
+    words = []
     for scenario_name in scenarios:
         scenario, trajectory = integrate_reference_scenario(
             scenario_name,
             periods=periods,
             samples=samples,
         )
-        reports_by_name[scenario.name] = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
-    return hysteresis_markov_chain_from_reports(reports_by_name, coordinate=coordinate)
+        reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
+        words.append(_hysteresis_word_from_reports(reports, coordinate=coordinate, word_mode=word_mode))
+    return markov_chain_from_words(tuple(words))
 
 
 def validate_hysteresis_markov_chain(
@@ -140,6 +145,7 @@ def validate_hysteresis_markov_chain(
     samples: int = 240,
     stride: int = 20,
     coordinate: str = "hierarchy_perturbation_strength",
+    word_mode: WordMode = "refined",
 ) -> tuple[ChartWordMarkovChain, ChartWordMarkovValidation]:
     """Fit and validate a hysteresis symbolic Markov model."""
 
@@ -149,6 +155,7 @@ def validate_hysteresis_markov_chain(
         samples=samples,
         stride=stride,
         coordinate=coordinate,
+        word_mode=word_mode,
     )
     atlas = AnalysisAtlas()
     heldout_words = []
@@ -159,7 +166,7 @@ def validate_hysteresis_markov_chain(
             samples=samples,
         )
         reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
-        heldout_words.append(return_map_word_from_reports(reports, coordinate=coordinate))
+        heldout_words.append(_hysteresis_word_from_reports(reports, coordinate=coordinate, word_mode=word_mode))
     return chain, validate_markov_chain(chain, tuple(heldout_words))
 
 
@@ -171,12 +178,12 @@ def compare_hysteresis_markov_to_baseline(
     samples: int = 240,
     stride: int = 20,
     coordinate: str = "hierarchy_perturbation_strength",
+    word_mode: WordMode = "refined",
 ) -> tuple[ChartWordMarkovChain, ChartWordMarkovBaselineComparison]:
     """Fit hysteresis Markov dynamics and compare against an independent baseline."""
 
     atlas = AnalysisAtlas()
     training_words = []
-    reports_by_name = {}
     for scenario_name in train_scenarios:
         scenario, trajectory = integrate_reference_scenario(
             scenario_name,
@@ -184,9 +191,8 @@ def compare_hysteresis_markov_to_baseline(
             samples=samples,
         )
         reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
-        reports_by_name[scenario.name] = reports
-        training_words.append(return_map_word_from_reports(reports, coordinate=coordinate))
-    chain = hysteresis_markov_chain_from_reports(reports_by_name, coordinate=coordinate)
+        training_words.append(_hysteresis_word_from_reports(reports, coordinate=coordinate, word_mode=word_mode))
+    chain = markov_chain_from_words(tuple(training_words))
     validation_words = []
     for scenario_name in validation_scenarios:
         scenario, trajectory = integrate_reference_scenario(
@@ -195,7 +201,7 @@ def compare_hysteresis_markov_to_baseline(
             samples=samples,
         )
         reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
-        validation_words.append(return_map_word_from_reports(reports, coordinate=coordinate))
+        validation_words.append(_hysteresis_word_from_reports(reports, coordinate=coordinate, word_mode=word_mode))
     return chain, compare_markov_chain_to_independent_baseline(
         chain,
         tuple(training_words),
@@ -211,6 +217,7 @@ def compare_hysteresis_markov_to_baseline_with_uncertainty(
     samples: int = 240,
     stride: int = 20,
     coordinate: str = "hierarchy_perturbation_strength",
+    word_mode: WordMode = "refined",
     resamples: int = 512,
     confidence_level: float = 0.95,
     random_seed: int = 0,
@@ -219,7 +226,6 @@ def compare_hysteresis_markov_to_baseline_with_uncertainty(
 
     atlas = AnalysisAtlas()
     training_words = []
-    reports_by_name = {}
     for scenario_name in train_scenarios:
         scenario, trajectory = integrate_reference_scenario(
             scenario_name,
@@ -227,9 +233,8 @@ def compare_hysteresis_markov_to_baseline_with_uncertainty(
             samples=samples,
         )
         reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
-        reports_by_name[scenario.name] = reports
-        training_words.append(return_map_word_from_reports(reports, coordinate=coordinate))
-    chain = hysteresis_markov_chain_from_reports(reports_by_name, coordinate=coordinate)
+        training_words.append(_hysteresis_word_from_reports(reports, coordinate=coordinate, word_mode=word_mode))
+    chain = markov_chain_from_words(tuple(training_words))
     validation_words = []
     for scenario_name in validation_scenarios:
         scenario, trajectory = integrate_reference_scenario(
@@ -238,7 +243,7 @@ def compare_hysteresis_markov_to_baseline_with_uncertainty(
             samples=samples,
         )
         reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
-        validation_words.append(return_map_word_from_reports(reports, coordinate=coordinate))
+        validation_words.append(_hysteresis_word_from_reports(reports, coordinate=coordinate, word_mode=word_mode))
     return chain, bootstrap_markov_baseline_comparison(
         chain,
         tuple(training_words),
@@ -257,6 +262,7 @@ def select_hysteresis_markov_order(
     samples: int = 240,
     stride: int = 20,
     coordinate: str = "hierarchy_perturbation_strength",
+    word_mode: WordMode = "refined",
     max_order: int = 2,
     criterion: str = "bic",
 ) -> ChartWordMarkovOrderSelection:
@@ -271,7 +277,7 @@ def select_hysteresis_markov_order(
             samples=samples,
         )
         reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
-        training_words.append(return_map_word_from_reports(reports, coordinate=coordinate))
+        training_words.append(_hysteresis_word_from_reports(reports, coordinate=coordinate, word_mode=word_mode))
     validation_words = []
     for scenario_name in validation_scenarios:
         scenario, trajectory = integrate_reference_scenario(
@@ -280,7 +286,7 @@ def select_hysteresis_markov_order(
             samples=samples,
         )
         reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
-        validation_words.append(return_map_word_from_reports(reports, coordinate=coordinate))
+        validation_words.append(_hysteresis_word_from_reports(reports, coordinate=coordinate, word_mode=word_mode))
     return select_markov_order(
         tuple(training_words),
         tuple(validation_words),
@@ -297,6 +303,7 @@ def run_verification_report(
     stride: int = 20,
     inner_pair: tuple[int, int] = (0, 1),
     target_contraction: float = 0.35,
+    word_mode: WordMode = "refined",
 ) -> dict[str, object]:
     """Return a JSON-ready end-to-end engine verification report."""
 
@@ -317,6 +324,7 @@ def run_verification_report(
         periods=periods,
         samples=samples,
         stride=stride,
+        word_mode=word_mode,
     )
     order_selection = select_hysteresis_markov_order(
         (scenario,),
@@ -324,6 +332,7 @@ def run_verification_report(
         periods=periods,
         samples=samples,
         stride=stride,
+        word_mode=word_mode,
     )
     comparison = bootstrap_comparison.comparison
     return {
@@ -335,6 +344,7 @@ def run_verification_report(
             "samples": samples,
             "stride": stride,
             "target_contraction": target_contraction,
+            "word_mode": word_mode,
         },
         "jacobi": jacobi_report,
         "hysteresis_markov": {
@@ -354,6 +364,21 @@ def run_verification_report(
             "hysteresis_memory_order_selected": order_selection.memory_selected,
         },
     }
+
+
+def _hysteresis_word_from_reports(
+    reports: tuple[object, ...],
+    *,
+    coordinate: str,
+    word_mode: WordMode,
+):
+    if word_mode == "refined":
+        return refined_chart_word_from_reports(reports)
+    if word_mode == "return":
+        return return_map_word_from_reports(reports, coordinate=coordinate)
+    if word_mode == "poincare":
+        return poincare_section_word_from_reports(reports, coordinate=coordinate)
+    raise ValueError("word_mode must be 'refined', 'return', or 'poincare'.")
 
 
 def _reference_scenario(
