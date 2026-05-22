@@ -11,6 +11,7 @@ import plotly.io as pio
 
 from threebody.analysis import (
     AnalysisAtlas,
+    bootstrap_markov_baseline_comparison,
     compare_markov_chain_to_independent_baseline,
     jacobi_future_tail_bound,
     jacobi_inflated_margin_certificate,
@@ -158,6 +159,13 @@ def _render_page(
     return_word = return_map_word_from_reports(grammar_reports, coordinate="hierarchy_perturbation_strength")
     markov_chain = markov_chain_from_words(training_words)
     markov_comparison = compare_markov_chain_to_independent_baseline(markov_chain, training_words, (validation_word,))
+    markov_bootstrap = bootstrap_markov_baseline_comparison(
+        markov_chain,
+        training_words,
+        (validation_word,),
+        resamples=512,
+        random_seed=11,
+    )
     jacobi_summary = {
         "future_tail": jacobi_future.as_dict(),
         "inflated_margin": jacobi_inflated.as_dict(),
@@ -172,6 +180,7 @@ def _render_page(
             "validation_word_length": validation_word.length,
             "chain": markov_chain.as_dict(),
             "baseline_comparison": markov_comparison.as_dict(),
+            "bootstrap_comparison": markov_bootstrap.as_dict(),
         },
         "parameter_box_latest": {
             "case_count": 27,
@@ -230,7 +239,9 @@ def _render_page(
         "picard_certified": jacobi_picard.picard_flow_certified,
         "picard_contraction_reserve": jacobi_tuning.contraction_reserve,
         "hysteresis_beats_independent_baseline": markov_comparison.beats_baseline,
+        "hysteresis_significant_baseline_win": markov_bootstrap.significant_baseline_win,
         "hysteresis_log_likelihood_gain": markov_comparison.log_likelihood_gain,
+        "hysteresis_log_likelihood_gain_ci": markov_bootstrap.log_likelihood_gain_ci,
     }
     gate_cards = "\n".join(
         [
@@ -242,9 +253,9 @@ def _render_page(
             ),
             _gate_card(
                 "Hysteresis baseline",
-                "pass" if promotion_gates["hysteresis_beats_independent_baseline"] else "wait",
+                "pass" if promotion_gates["hysteresis_significant_baseline_win"] else "wait",
                 f"beats_baseline: {str(promotion_gates['hysteresis_beats_independent_baseline']).lower()}",
-                f"log gain {promotion_gates['hysteresis_log_likelihood_gain']:.3e}",
+                f"95% gain CI [{promotion_gates['hysteresis_log_likelihood_gain_ci'][0]:.2e}, {promotion_gates['hysteresis_log_likelihood_gain_ci'][1]:.2e}]",
             ),
             _gate_card(
                 "Engine export",

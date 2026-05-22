@@ -65,6 +65,7 @@ The research implementation remains importable as `threebody`, while the stable 
 from threebody_engine import (
     build_hysteresis_markov_chain,
     compare_hysteresis_markov_to_baseline,
+    compare_hysteresis_markov_to_baseline_with_uncertainty,
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,

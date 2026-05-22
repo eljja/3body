@@ -4,6 +4,7 @@ from threebody.analysis import (
     AnalysisReport,
     ChartScore,
     ChartType,
+    bootstrap_markov_baseline_comparison,
     chart_word_from_reports,
     chart_word_signature,
     compare_markov_chain_to_independent_baseline,
@@ -179,3 +180,51 @@ def test_markov_chain_baseline_comparison_detects_memory_gain() -> None:
     assert comparison.beats_baseline is True
     assert comparison.log_likelihood_gain > 0.0
     assert comparison.perplexity_ratio < 1.0
+
+
+def test_markov_chain_bootstrap_comparison_reports_uncertainty() -> None:
+    training_words = (
+        chart_word_from_reports(
+            [
+                _report(ChartType.TWO_BODY_HIERARCHY),
+                _report(ChartType.CHAOTIC_TRANSPORT),
+                _report(ChartType.ESCAPE_TRANSPORT),
+                _report(ChartType.CHAOTIC_TRANSPORT),
+                _report(ChartType.ESCAPE_TRANSPORT),
+            ]
+        ),
+        chart_word_from_reports(
+            [
+                _report(ChartType.PERIODIC_ORBIT_NEIGHBORHOOD),
+                _report(ChartType.CHAOTIC_TRANSPORT),
+                _report(ChartType.ESCAPE_TRANSPORT),
+                _report(ChartType.CHAOTIC_TRANSPORT),
+                _report(ChartType.ESCAPE_TRANSPORT),
+            ]
+        ),
+    )
+    heldout = chart_word_from_reports(
+        [
+            _report(ChartType.TWO_BODY_HIERARCHY),
+            _report(ChartType.CHAOTIC_TRANSPORT),
+            _report(ChartType.ESCAPE_TRANSPORT),
+            _report(ChartType.CHAOTIC_TRANSPORT),
+            _report(ChartType.ESCAPE_TRANSPORT),
+        ]
+    )
+
+    chain = markov_chain_from_words(training_words)
+    bootstrap = bootstrap_markov_baseline_comparison(
+        chain,
+        training_words,
+        (heldout,),
+        resamples=64,
+        random_seed=7,
+    )
+
+    assert bootstrap.comparison.beats_baseline is True
+    assert bootstrap.resample_count == 64
+    assert bootstrap.log_likelihood_gain_ci[0] <= bootstrap.log_likelihood_gain_ci[1]
+    assert bootstrap.perplexity_ratio_ci[0] <= bootstrap.perplexity_ratio_ci[1]
+    assert bootstrap.beats_baseline_fraction > 0.5
+    assert "significant_baseline_win" in bootstrap.as_dict()

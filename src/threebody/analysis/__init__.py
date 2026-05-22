@@ -113,10 +113,12 @@ from .variational import (
 )
 from .word_algebra import (
     ChartWord,
+    ChartWordMarkovBootstrapComparison,
     ChartWordMarkovChain,
     ChartWordMarkovBaselineComparison,
     ChartWordMarkovValidation,
     ChartWordSignature,
+    bootstrap_markov_baseline_comparison,
     chart_word_from_reports,
     chart_word_signature,
     compare_markov_chain_to_independent_baseline,
@@ -142,6 +144,7 @@ __all__ = [
     "ChartScore",
     "ChartTransition",
     "ChartWord",
+    "ChartWordMarkovBootstrapComparison",
     "ChartWordMarkovChain",
     "ChartWordMarkovBaselineComparison",
     "ChartWordMarkovValidation",
@@ -219,6 +222,7 @@ __all__ = [
     "chart_word_from_reports",
     "collision_regularization_certificate",
     "compare_markov_chain_to_independent_baseline",
+    "bootstrap_markov_baseline_comparison",
     "chart_word_signature",
     "hysteresis_markov_chain_from_reports",
     "markov_chain_from_words",

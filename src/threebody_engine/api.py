@@ -6,7 +6,9 @@ from threebody.analysis import (
     AnalysisAtlas,
     ChartWordMarkovChain,
     ChartWordMarkovBaselineComparison,
+    ChartWordMarkovBootstrapComparison,
     ChartWordMarkovValidation,
+    bootstrap_markov_baseline_comparison,
     JacobiIntervalPicardFlowCertificate,
     JacobiPicardTuningCertificate,
     compare_markov_chain_to_independent_baseline,
@@ -199,6 +201,52 @@ def compare_hysteresis_markov_to_baseline(
     )
 
 
+def compare_hysteresis_markov_to_baseline_with_uncertainty(
+    train_scenarios: tuple[ReferenceScenario, ...] = ("hierarchical-flyby",),
+    validation_scenarios: tuple[ReferenceScenario, ...] = ("hierarchical-flyby",),
+    *,
+    periods: float = 8.0,
+    samples: int = 240,
+    stride: int = 20,
+    coordinate: str = "hierarchy_perturbation_strength",
+    resamples: int = 512,
+    confidence_level: float = 0.95,
+    random_seed: int = 0,
+) -> tuple[ChartWordMarkovChain, ChartWordMarkovBootstrapComparison]:
+    """Fit hysteresis Markov dynamics and bootstrap its baseline gain."""
+
+    atlas = AnalysisAtlas()
+    training_words = []
+    reports_by_name = {}
+    for scenario_name in train_scenarios:
+        scenario, trajectory = integrate_reference_scenario(
+            scenario_name,
+            periods=periods,
+            samples=samples,
+        )
+        reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
+        reports_by_name[scenario.name] = reports
+        training_words.append(return_map_word_from_reports(reports, coordinate=coordinate))
+    chain = hysteresis_markov_chain_from_reports(reports_by_name, coordinate=coordinate)
+    validation_words = []
+    for scenario_name in validation_scenarios:
+        scenario, trajectory = integrate_reference_scenario(
+            scenario_name,
+            periods=periods,
+            samples=samples,
+        )
+        reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
+        validation_words.append(return_map_word_from_reports(reports, coordinate=coordinate))
+    return chain, bootstrap_markov_baseline_comparison(
+        chain,
+        tuple(training_words),
+        tuple(validation_words),
+        resamples=resamples,
+        confidence_level=confidence_level,
+        random_seed=random_seed,
+    )
+
+
 def run_verification_report(
     *,
     scenario: ReferenceScenario = "hierarchical-flyby",
@@ -221,13 +269,14 @@ def run_verification_report(
         inner_pair=inner_pair,
         target_contraction=target_contraction,
     )
-    chain, comparison = compare_hysteresis_markov_to_baseline(
+    chain, bootstrap_comparison = compare_hysteresis_markov_to_baseline_with_uncertainty(
         (scenario,),
         (scenario,),
         periods=periods,
         samples=samples,
         stride=stride,
     )
+    comparison = bootstrap_comparison.comparison
     return {
         "metadata": {
             "engine": "threebody-engine",
@@ -242,12 +291,15 @@ def run_verification_report(
         "hysteresis_markov": {
             "chain": chain.as_dict(),
             "baseline_comparison": comparison.as_dict(),
+            "bootstrap_comparison": bootstrap_comparison.as_dict(),
         },
         "promotion_gates": {
             "picard_certified": bool(jacobi_report["picard_tuning"]["certified"]),
             "picard_contraction_reserve": jacobi_report["picard_tuning"]["contraction_reserve"],
             "hysteresis_beats_independent_baseline": comparison.beats_baseline,
+            "hysteresis_significant_baseline_win": bootstrap_comparison.significant_baseline_win,
             "hysteresis_log_likelihood_gain": comparison.log_likelihood_gain,
+            "hysteresis_log_likelihood_gain_ci": list(bootstrap_comparison.log_likelihood_gain_ci),
         },
     }
 

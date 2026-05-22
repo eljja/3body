@@ -3,6 +3,7 @@ from __future__ import annotations
 from threebody_engine import (
     build_hysteresis_markov_chain,
     compare_hysteresis_markov_to_baseline,
+    compare_hysteresis_markov_to_baseline_with_uncertainty,
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
@@ -79,6 +80,22 @@ def test_engine_api_compares_hysteresis_markov_to_baseline() -> None:
     assert comparison.baseline_perplexity >= 1.0
 
 
+def test_engine_api_compares_hysteresis_markov_with_uncertainty() -> None:
+    _chain, bootstrap = compare_hysteresis_markov_to_baseline_with_uncertainty(
+        ("hierarchical-flyby",),
+        ("hierarchical-flyby",),
+        periods=2.0,
+        samples=80,
+        stride=10,
+        resamples=32,
+        random_seed=3,
+    )
+
+    assert bootstrap.resample_count == 32
+    assert bootstrap.comparison.baseline_perplexity >= 1.0
+    assert bootstrap.log_likelihood_gain_ci[0] <= bootstrap.log_likelihood_gain_ci[1]
+
+
 def test_engine_api_runs_integrated_verification_report() -> None:
     report = run_verification_report(
         scenario="hierarchical-flyby",
@@ -91,3 +108,5 @@ def test_engine_api_runs_integrated_verification_report() -> None:
     assert report["promotion_gates"]["picard_certified"] is True
     assert report["promotion_gates"]["picard_contraction_reserve"] > 0.0
     assert "baseline_comparison" in report["hysteresis_markov"]
+    assert "bootstrap_comparison" in report["hysteresis_markov"]
+    assert "hysteresis_log_likelihood_gain_ci" in report["promotion_gates"]

@@ -116,6 +116,32 @@ class ChartWordMarkovBaselineComparison:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class ChartWordMarkovBootstrapComparison:
+    """Bootstrap uncertainty estimate for a Markov-vs-independent comparison."""
+
+    comparison: ChartWordMarkovBaselineComparison
+    resample_count: int
+    confidence_level: float
+    random_seed: int
+    log_likelihood_gain_ci: tuple[float, float]
+    perplexity_ratio_ci: tuple[float, float]
+    beats_baseline_fraction: float
+    significant_baseline_win: bool
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "comparison": self.comparison.as_dict(),
+            "resample_count": self.resample_count,
+            "confidence_level": self.confidence_level,
+            "random_seed": self.random_seed,
+            "log_likelihood_gain_ci": list(self.log_likelihood_gain_ci),
+            "perplexity_ratio_ci": list(self.perplexity_ratio_ci),
+            "beats_baseline_fraction": self.beats_baseline_fraction,
+            "significant_baseline_win": self.significant_baseline_win,
+        }
+
+
 def chart_word_from_reports(reports: tuple[AnalysisReport, ...] | list[AnalysisReport]) -> ChartWord:
     symbols: list[object] = []
     previous: object | None = None
@@ -369,6 +395,88 @@ def compare_markov_chain_to_independent_baseline(
     )
 
 
+def bootstrap_markov_baseline_comparison(
+    chain: ChartWordMarkovChain,
+    training_words: tuple[ChartWord, ...] | list[ChartWord],
+    validation_words: tuple[ChartWord, ...] | list[ChartWord],
+    *,
+    resamples: int = 512,
+    confidence_level: float = 0.95,
+    random_seed: int = 0,
+    unseen_probability: float = 1.0e-12,
+) -> ChartWordMarkovBootstrapComparison:
+    """Estimate uncertainty in the Markov gain by resampling held-out transitions."""
+
+    comparison = compare_markov_chain_to_independent_baseline(
+        chain,
+        training_words,
+        validation_words,
+        unseen_probability=unseen_probability,
+    )
+    pairs = _transition_pairs_from_words(validation_words)
+    if not pairs or resamples <= 0:
+        return ChartWordMarkovBootstrapComparison(
+            comparison=comparison,
+            resample_count=max(int(resamples), 0),
+            confidence_level=float(confidence_level),
+            random_seed=int(random_seed),
+            log_likelihood_gain_ci=(comparison.log_likelihood_gain, comparison.log_likelihood_gain),
+            perplexity_ratio_ci=(comparison.perplexity_ratio, comparison.perplexity_ratio),
+            beats_baseline_fraction=float(comparison.beats_baseline),
+            significant_baseline_win=comparison.beats_baseline,
+        )
+
+    index_by_state = {state: index for index, state in enumerate(chain.states)}
+    probabilities = np.asarray(chain.transition_probabilities, dtype=float)
+    baseline_probabilities = _next_symbol_baseline_probabilities(training_words)
+    gains = np.asarray(
+        [
+            _markov_transition_log_probability(
+                previous,
+                current,
+                index_by_state=index_by_state,
+                probabilities=probabilities,
+                unseen_probability=unseen_probability,
+            )
+            - _baseline_transition_log_probability(
+                current,
+                baseline_probabilities=baseline_probabilities,
+                unseen_probability=unseen_probability,
+            )
+            for previous, current in pairs
+        ],
+        dtype=float,
+    )
+    generator = np.random.default_rng(random_seed)
+    means = np.empty(int(resamples), dtype=float)
+    for sample_index in range(int(resamples)):
+        draw = generator.integers(0, len(gains), size=len(gains))
+        means[sample_index] = float(np.mean(gains[draw]))
+    alpha = float(np.clip(1.0 - confidence_level, 0.0, 1.0))
+    lower_q = 100.0 * (alpha / 2.0)
+    upper_q = 100.0 * (1.0 - alpha / 2.0)
+    gain_ci = (
+        float(np.percentile(means, lower_q)),
+        float(np.percentile(means, upper_q)),
+    )
+    ratio_samples = np.exp(-means)
+    ratio_ci = (
+        float(np.percentile(ratio_samples, lower_q)),
+        float(np.percentile(ratio_samples, upper_q)),
+    )
+    beats_fraction = float(np.mean(means > 0.0))
+    return ChartWordMarkovBootstrapComparison(
+        comparison=comparison,
+        resample_count=int(resamples),
+        confidence_level=float(confidence_level),
+        random_seed=int(random_seed),
+        log_likelihood_gain_ci=gain_ci,
+        perplexity_ratio_ci=ratio_ci,
+        beats_baseline_fraction=beats_fraction,
+        significant_baseline_win=bool(gain_ci[0] > 0.0 and ratio_ci[1] < 1.0),
+    )
+
+
 def word_signature_rows(
     reports_by_name: dict[str, tuple[AnalysisReport, ...]],
 ) -> list[dict[str, float | int | str | bool]]:
@@ -479,6 +587,39 @@ def _next_symbol_baseline_probabilities(words: tuple[ChartWord, ...] | list[Char
     if total == 0:
         return {}
     return {symbol: count / total for symbol, count in counts.items()}
+
+
+def _transition_pairs_from_words(words: tuple[ChartWord, ...] | list[ChartWord]) -> list[tuple[object, object]]:
+    pairs: list[tuple[object, object]] = []
+    for word in words:
+        pairs.extend(word.transition_pairs())
+    return pairs
+
+
+def _markov_transition_log_probability(
+    previous: object,
+    current: object,
+    *,
+    index_by_state: dict[object, int],
+    probabilities: np.ndarray,
+    unseen_probability: float,
+) -> float:
+    previous_index = index_by_state.get(previous)
+    current_index = index_by_state.get(current)
+    if previous_index is None or current_index is None:
+        return float(np.log(unseen_probability))
+    probability = float(probabilities[previous_index, current_index])
+    return float(np.log(max(probability, unseen_probability)))
+
+
+def _baseline_transition_log_probability(
+    current: object,
+    *,
+    baseline_probabilities: dict[object, float],
+    unseen_probability: float,
+) -> float:
+    probability = baseline_probabilities.get(current, unseen_probability)
+    return float(np.log(max(probability, unseen_probability)))
 
 
 def _linear_bin(value: float, *, width: float, maximum: int) -> int:

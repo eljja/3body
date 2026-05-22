@@ -17,5 +17,7 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "Picard contraction tuning" in content
     assert "Markov baseline test" in content
     assert "promotion_gates" in content
+    assert "hysteresis_significant_baseline_win" in content
+    assert "bootstrap_comparison" in content
     assert "jacobi_parameter_interval_box_margin" not in content
     assert "interval_box_margin_lower" in content
