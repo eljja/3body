@@ -70,6 +70,7 @@ from threebody_engine import (
     certify_jacobi_escape_report,
     integrate_reference_scenario,
     run_verification_report,
+    select_hysteresis_markov_order,
     tune_jacobi_picard,
     validate_hysteresis_markov_chain,
 )

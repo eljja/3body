@@ -11,6 +11,7 @@ from threebody.analysis import (
     markov_chain_from_words,
     refined_chart_symbol,
     return_map_word_from_reports,
+    select_markov_order,
     validate_markov_chain,
     word_distance,
 )
@@ -228,3 +229,43 @@ def test_markov_chain_bootstrap_comparison_reports_uncertainty() -> None:
     assert bootstrap.perplexity_ratio_ci[0] <= bootstrap.perplexity_ratio_ci[1]
     assert bootstrap.beats_baseline_fraction > 0.5
     assert "significant_baseline_win" in bootstrap.as_dict()
+
+
+def test_markov_order_selection_prefers_memory_when_bic_improves() -> None:
+    training_words = (
+        chart_word_from_reports(
+            [
+                _report(ChartType.TWO_BODY_HIERARCHY),
+                _report(ChartType.CHAOTIC_TRANSPORT),
+                _report(ChartType.ESCAPE_TRANSPORT),
+                _report(ChartType.CHAOTIC_TRANSPORT),
+                _report(ChartType.ESCAPE_TRANSPORT),
+            ]
+        ),
+        chart_word_from_reports(
+            [
+                _report(ChartType.PERIODIC_ORBIT_NEIGHBORHOOD),
+                _report(ChartType.CHAOTIC_TRANSPORT),
+                _report(ChartType.ESCAPE_TRANSPORT),
+                _report(ChartType.CHAOTIC_TRANSPORT),
+                _report(ChartType.ESCAPE_TRANSPORT),
+            ]
+        ),
+    )
+    heldout = chart_word_from_reports(
+        [
+            _report(ChartType.TWO_BODY_HIERARCHY),
+            _report(ChartType.CHAOTIC_TRANSPORT),
+            _report(ChartType.ESCAPE_TRANSPORT),
+            _report(ChartType.CHAOTIC_TRANSPORT),
+            _report(ChartType.ESCAPE_TRANSPORT),
+        ]
+    )
+
+    selection = select_markov_order(training_words, (heldout,), max_order=2)
+
+    assert selection.selected_order >= 1
+    assert selection.memory_selected is True
+    assert selection.selected_score_margin >= 0.0
+    assert len(selection.scores) == 3
+    assert "selected_order" in selection.as_dict()

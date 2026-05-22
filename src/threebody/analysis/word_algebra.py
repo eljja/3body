@@ -142,6 +142,54 @@ class ChartWordMarkovBootstrapComparison:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class ChartWordMarkovOrderScore:
+    """Held-out score for one symbolic Markov order."""
+
+    order: int
+    transition_count: int
+    covered_transition_count: int
+    coverage_fraction: float
+    parameter_count: int
+    mean_log_likelihood: float
+    perplexity: float
+    aic: float
+    bic: float
+
+    def as_dict(self) -> dict[str, float | int]:
+        return {
+            "order": self.order,
+            "transition_count": self.transition_count,
+            "covered_transition_count": self.covered_transition_count,
+            "coverage_fraction": self.coverage_fraction,
+            "parameter_count": self.parameter_count,
+            "mean_log_likelihood": self.mean_log_likelihood,
+            "perplexity": self.perplexity,
+            "aic": self.aic,
+            "bic": self.bic,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ChartWordMarkovOrderSelection:
+    """Compare independent and memory-based symbolic dynamics orders."""
+
+    selected_order: int
+    criterion: str
+    scores: tuple[ChartWordMarkovOrderScore, ...]
+    memory_selected: bool
+    selected_score_margin: float
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "selected_order": self.selected_order,
+            "criterion": self.criterion,
+            "scores": [score.as_dict() for score in self.scores],
+            "memory_selected": self.memory_selected,
+            "selected_score_margin": self.selected_score_margin,
+        }
+
+
 def chart_word_from_reports(reports: tuple[AnalysisReport, ...] | list[AnalysisReport]) -> ChartWord:
     symbols: list[object] = []
     previous: object | None = None
@@ -477,6 +525,43 @@ def bootstrap_markov_baseline_comparison(
     )
 
 
+def select_markov_order(
+    training_words: tuple[ChartWord, ...] | list[ChartWord],
+    validation_words: tuple[ChartWord, ...] | list[ChartWord],
+    *,
+    max_order: int = 2,
+    criterion: str = "bic",
+    unseen_probability: float = 1.0e-12,
+) -> ChartWordMarkovOrderSelection:
+    """Select symbolic memory depth against independent and higher-order alternatives."""
+
+    max_order = max(int(max_order), 0)
+    scores = tuple(
+        _score_markov_order(
+            training_words,
+            validation_words,
+            order=order,
+            unseen_probability=unseen_probability,
+        )
+        for order in range(max_order + 1)
+    )
+    criterion_key = criterion.lower()
+    if criterion_key not in {"aic", "bic"}:
+        raise ValueError("criterion must be 'aic' or 'bic'.")
+    values = [getattr(score, criterion_key) for score in scores]
+    selected_index = int(np.argmin(values)) if values else 0
+    selected = scores[selected_index]
+    ordered_values = sorted(values)
+    margin = float(ordered_values[1] - ordered_values[0]) if len(ordered_values) > 1 else 0.0
+    return ChartWordMarkovOrderSelection(
+        selected_order=selected.order,
+        criterion=criterion_key,
+        scores=scores,
+        memory_selected=bool(selected.order > 0),
+        selected_score_margin=margin,
+    )
+
+
 def word_signature_rows(
     reports_by_name: dict[str, tuple[AnalysisReport, ...]],
 ) -> list[dict[str, float | int | str | bool]]:
@@ -594,6 +679,92 @@ def _transition_pairs_from_words(words: tuple[ChartWord, ...] | list[ChartWord])
     for word in words:
         pairs.extend(word.transition_pairs())
     return pairs
+
+
+def _score_markov_order(
+    training_words: tuple[ChartWord, ...] | list[ChartWord],
+    validation_words: tuple[ChartWord, ...] | list[ChartWord],
+    *,
+    order: int,
+    unseen_probability: float,
+) -> ChartWordMarkovOrderScore:
+    counts = _ngram_transition_counts(training_words, order=order)
+    states = {symbol for word in training_words for symbol in word.symbols}
+    states.update(symbol for word in validation_words for symbol in word.symbols)
+    state_count = max(len(states), 1)
+    parameter_count = _ngram_parameter_count(counts, state_count=state_count)
+    log_likelihood = 0.0
+    transition_count = 0
+    covered = 0
+    for context, current in _ngram_validation_events(validation_words, order=order):
+        transition_count += 1
+        context_counts = counts.get(context)
+        if context_counts is None:
+            log_likelihood += float(np.log(unseen_probability))
+            continue
+        total = sum(context_counts.values())
+        count = context_counts.get(current, 0)
+        if total > 0 and count > 0:
+            covered += 1
+            probability = count / total
+        else:
+            probability = unseen_probability
+        log_likelihood += float(np.log(max(probability, unseen_probability)))
+    if transition_count == 0:
+        mean = 0.0
+        perplexity = 1.0
+        aic = float(2 * parameter_count)
+        bic = float(parameter_count * np.log(1.0))
+    else:
+        mean = float(log_likelihood / transition_count)
+        perplexity = float(np.exp(-mean))
+        aic = float(2 * parameter_count - 2 * log_likelihood)
+        bic = float(parameter_count * np.log(transition_count) - 2 * log_likelihood)
+    return ChartWordMarkovOrderScore(
+        order=order,
+        transition_count=transition_count,
+        covered_transition_count=covered,
+        coverage_fraction=float(covered / transition_count) if transition_count else 0.0,
+        parameter_count=parameter_count,
+        mean_log_likelihood=mean,
+        perplexity=perplexity,
+        aic=aic,
+        bic=bic,
+    )
+
+
+def _ngram_transition_counts(
+    words: tuple[ChartWord, ...] | list[ChartWord],
+    *,
+    order: int,
+) -> dict[tuple[object, ...], dict[object, int]]:
+    counts: dict[tuple[object, ...], dict[object, int]] = {}
+    for context, current in _ngram_validation_events(words, order=order):
+        context_counts = counts.setdefault(context, {})
+        context_counts[current] = context_counts.get(current, 0) + 1
+    return counts
+
+
+def _ngram_validation_events(
+    words: tuple[ChartWord, ...] | list[ChartWord],
+    *,
+    order: int,
+) -> list[tuple[tuple[object, ...], object]]:
+    events: list[tuple[tuple[object, ...], object]] = []
+    for word in words:
+        start = max(order, 1)
+        if word.length <= start:
+            continue
+        for index in range(start, word.length):
+            context = tuple(word.symbols[index - order : index]) if order > 0 else ()
+            events.append((context, word.symbols[index]))
+    return events
+
+
+def _ngram_parameter_count(counts: dict[tuple[object, ...], dict[object, int]], *, state_count: int) -> int:
+    if not counts:
+        return 0
+    return int(sum(max(min(len(next_counts), state_count) - 1, 0) for next_counts in counts.values()))
 
 
 def _markov_transition_log_probability(

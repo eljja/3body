@@ -23,6 +23,7 @@ from threebody.analysis import (
     markov_chain_from_words,
     refined_chart_word_from_reports,
     return_map_word_from_reports,
+    select_markov_order,
 )
 from threebody.diagnostics import InvariantMonitor, StabilityAnalyzer
 from threebody.experiments import OrbitLibrary
@@ -166,6 +167,7 @@ def _render_page(
         resamples=512,
         random_seed=11,
     )
+    markov_order_selection = select_markov_order(training_words, (validation_word,), max_order=2)
     jacobi_summary = {
         "future_tail": jacobi_future.as_dict(),
         "inflated_margin": jacobi_inflated.as_dict(),
@@ -181,6 +183,7 @@ def _render_page(
             "chain": markov_chain.as_dict(),
             "baseline_comparison": markov_comparison.as_dict(),
             "bootstrap_comparison": markov_bootstrap.as_dict(),
+            "order_selection": markov_order_selection.as_dict(),
         },
         "parameter_box_latest": {
             "case_count": 27,
@@ -242,6 +245,8 @@ def _render_page(
         "hysteresis_significant_baseline_win": markov_bootstrap.significant_baseline_win,
         "hysteresis_log_likelihood_gain": markov_comparison.log_likelihood_gain,
         "hysteresis_log_likelihood_gain_ci": markov_bootstrap.log_likelihood_gain_ci,
+        "hysteresis_selected_markov_order": markov_order_selection.selected_order,
+        "hysteresis_memory_order_selected": markov_order_selection.memory_selected,
     }
     gate_cards = "\n".join(
         [
@@ -258,10 +263,10 @@ def _render_page(
                 f"95% gain CI [{promotion_gates['hysteresis_log_likelihood_gain_ci'][0]:.2e}, {promotion_gates['hysteresis_log_likelihood_gain_ci'][1]:.2e}]",
             ),
             _gate_card(
-                "Engine export",
+                "Markov order",
                 "pass",
-                "threebody_engine",
-                "import-ready API",
+                f"order {promotion_gates['hysteresis_selected_markov_order']}",
+                f"BIC memory selected: {str(promotion_gates['hysteresis_memory_order_selected']).lower()}",
             ),
         ]
     )

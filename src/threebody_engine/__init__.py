@@ -8,6 +8,7 @@ from .api import (
     certify_jacobi_escape,
     integrate_reference_scenario,
     run_verification_report,
+    select_hysteresis_markov_order,
     tune_jacobi_picard,
     validate_hysteresis_markov_chain,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "certify_jacobi_escape",
     "integrate_reference_scenario",
     "run_verification_report",
+    "select_hysteresis_markov_order",
     "tune_jacobi_picard",
     "validate_hysteresis_markov_chain",
 ]

@@ -8,6 +8,7 @@ from threebody.analysis import (
     ChartWordMarkovBaselineComparison,
     ChartWordMarkovBootstrapComparison,
     ChartWordMarkovValidation,
+    ChartWordMarkovOrderSelection,
     bootstrap_markov_baseline_comparison,
     JacobiIntervalPicardFlowCertificate,
     JacobiPicardTuningCertificate,
@@ -16,6 +17,7 @@ from threebody.analysis import (
     jacobi_interval_picard_flow_certificate,
     jacobi_picard_tuning_certificate,
     return_map_word_from_reports,
+    select_markov_order,
     validate_markov_chain,
 )
 from threebody.experiments import OrbitLibrary
@@ -247,6 +249,46 @@ def compare_hysteresis_markov_to_baseline_with_uncertainty(
     )
 
 
+def select_hysteresis_markov_order(
+    train_scenarios: tuple[ReferenceScenario, ...] = ("hierarchical-flyby",),
+    validation_scenarios: tuple[ReferenceScenario, ...] = ("hierarchical-flyby",),
+    *,
+    periods: float = 8.0,
+    samples: int = 240,
+    stride: int = 20,
+    coordinate: str = "hierarchy_perturbation_strength",
+    max_order: int = 2,
+    criterion: str = "bic",
+) -> ChartWordMarkovOrderSelection:
+    """Select independent, first-order, or higher-order hysteresis memory depth."""
+
+    atlas = AnalysisAtlas()
+    training_words = []
+    for scenario_name in train_scenarios:
+        scenario, trajectory = integrate_reference_scenario(
+            scenario_name,
+            periods=periods,
+            samples=samples,
+        )
+        reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
+        training_words.append(return_map_word_from_reports(reports, coordinate=coordinate))
+    validation_words = []
+    for scenario_name in validation_scenarios:
+        scenario, trajectory = integrate_reference_scenario(
+            scenario_name,
+            periods=periods,
+            samples=samples,
+        )
+        reports = atlas.analyze_trajectory(scenario.system, trajectory, stride=stride)
+        validation_words.append(return_map_word_from_reports(reports, coordinate=coordinate))
+    return select_markov_order(
+        tuple(training_words),
+        tuple(validation_words),
+        max_order=max_order,
+        criterion=criterion,
+    )
+
+
 def run_verification_report(
     *,
     scenario: ReferenceScenario = "hierarchical-flyby",
@@ -276,6 +318,13 @@ def run_verification_report(
         samples=samples,
         stride=stride,
     )
+    order_selection = select_hysteresis_markov_order(
+        (scenario,),
+        (scenario,),
+        periods=periods,
+        samples=samples,
+        stride=stride,
+    )
     comparison = bootstrap_comparison.comparison
     return {
         "metadata": {
@@ -292,6 +341,7 @@ def run_verification_report(
             "chain": chain.as_dict(),
             "baseline_comparison": comparison.as_dict(),
             "bootstrap_comparison": bootstrap_comparison.as_dict(),
+            "order_selection": order_selection.as_dict(),
         },
         "promotion_gates": {
             "picard_certified": bool(jacobi_report["picard_tuning"]["certified"]),
@@ -300,6 +350,8 @@ def run_verification_report(
             "hysteresis_significant_baseline_win": bootstrap_comparison.significant_baseline_win,
             "hysteresis_log_likelihood_gain": comparison.log_likelihood_gain,
             "hysteresis_log_likelihood_gain_ci": list(bootstrap_comparison.log_likelihood_gain_ci),
+            "hysteresis_selected_markov_order": order_selection.selected_order,
+            "hysteresis_memory_order_selected": order_selection.memory_selected,
         },
     }
 

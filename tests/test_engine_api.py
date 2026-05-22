@@ -8,6 +8,7 @@ from threebody_engine import (
     certify_jacobi_escape_report,
     integrate_reference_scenario,
     run_verification_report,
+    select_hysteresis_markov_order,
     tune_jacobi_picard,
     validate_hysteresis_markov_chain,
 )
@@ -96,6 +97,21 @@ def test_engine_api_compares_hysteresis_markov_with_uncertainty() -> None:
     assert bootstrap.log_likelihood_gain_ci[0] <= bootstrap.log_likelihood_gain_ci[1]
 
 
+def test_engine_api_selects_hysteresis_markov_order() -> None:
+    selection = select_hysteresis_markov_order(
+        ("hierarchical-flyby",),
+        ("hierarchical-flyby",),
+        periods=2.0,
+        samples=80,
+        stride=10,
+        max_order=2,
+    )
+
+    assert selection.selected_order in {0, 1, 2}
+    assert selection.scores
+    assert selection.criterion == "bic"
+
+
 def test_engine_api_runs_integrated_verification_report() -> None:
     report = run_verification_report(
         scenario="hierarchical-flyby",
@@ -109,4 +125,6 @@ def test_engine_api_runs_integrated_verification_report() -> None:
     assert report["promotion_gates"]["picard_contraction_reserve"] > 0.0
     assert "baseline_comparison" in report["hysteresis_markov"]
     assert "bootstrap_comparison" in report["hysteresis_markov"]
+    assert "order_selection" in report["hysteresis_markov"]
     assert "hysteresis_log_likelihood_gain_ci" in report["promotion_gates"]
+    assert "hysteresis_selected_markov_order" in report["promotion_gates"]
