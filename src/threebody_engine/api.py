@@ -325,11 +325,14 @@ def run_verification_report(
     )
     atlas = AnalysisAtlas()
     reports = atlas.analyze_trajectory(reference.system, trajectory, stride=stride)
-    heldout_training_reports = _heldout_phase_training_reports(
+    heldout_training_runs = _heldout_phase_training_runs(
         scenario,
         periods=periods,
         samples=samples,
-        stride=stride,
+    )
+    heldout_training_reports = tuple(
+        atlas.analyze_trajectory(system, phase_trajectory, stride=stride)
+        for system, phase_trajectory in heldout_training_runs
     )
     if heldout_training_reports:
         training_words = tuple(
@@ -403,6 +406,13 @@ def run_verification_report(
         minimum_pass_count=1,
         minimum_pass_fraction=0.1,
     )
+    symbolic_stride_robustness = _symbolic_stride_robustness(
+        atlas,
+        validation_run=(reference.system, trajectory),
+        training_runs=heldout_training_runs,
+        stride_values=_stride_probe_values(stride),
+        word_mode=word_mode,
+    )
     comparison = bootstrap_comparison.comparison
     return {
         "metadata": {
@@ -433,6 +443,7 @@ def run_verification_report(
                 "order_selection": poincare_order_selection.as_dict(),
                 "permutation_control": poincare_permutation_control.as_dict(),
                 "section_robustness": poincare_section_robustness.as_dict(),
+                "stride_robustness": symbolic_stride_robustness,
             },
         },
         "promotion_gates": {
@@ -459,6 +470,9 @@ def run_verification_report(
             "poincare_section_robust_pass_count": poincare_section_robustness.pass_count,
             "poincare_section_robust_pass_fraction": poincare_section_robustness.pass_fraction,
             "poincare_passes_section_robustness": poincare_section_robustness.passes_robustness,
+            "symbolic_stride_robust_pass_count": symbolic_stride_robustness["pass_count"],
+            "symbolic_stride_robust_pass_fraction": symbolic_stride_robustness["pass_fraction"],
+            "symbolic_passes_stride_robustness": symbolic_stride_robustness["passes_stride_robustness"],
         },
     }
 
@@ -478,19 +492,17 @@ def _hysteresis_word_from_reports(
     raise ValueError("word_mode must be 'refined', 'return', or 'poincare'.")
 
 
-def _heldout_phase_training_reports(
+def _heldout_phase_training_runs(
     scenario: ReferenceScenario,
     *,
     periods: float,
     samples: int,
-    stride: int,
-) -> tuple[tuple[object, ...], ...]:
+) -> tuple[tuple[object, TrajectoryResult], ...]:
     if scenario != "hierarchical-flyby":
         return ()
     library = OrbitLibrary()
     integrator = AdaptiveIntegrator()
-    atlas = AnalysisAtlas()
-    report_sets = []
+    runs = []
     for binary_phase in (0.5 * math.pi, math.pi):
         phase_scenario = library.general_hierarchical_flyby(
             binary_phase=binary_phase,
@@ -504,8 +516,127 @@ def _heldout_phase_training_reports(
             phase_scenario.initial_state,
             t_eval=phase_scenario.t_eval,
         )
-        report_sets.append(atlas.analyze_trajectory(phase_scenario.system, phase_trajectory, stride=stride))
-    return tuple(report_sets)
+        runs.append((phase_scenario.system, phase_trajectory))
+    return tuple(runs)
+
+
+def _stride_probe_values(base_stride: int) -> tuple[int, ...]:
+    base = max(int(base_stride), 1)
+    return tuple(sorted({max(1, int(round(0.8 * base))), base, max(1, int(round(1.5 * base)))}))
+
+
+def _symbolic_stride_robustness(
+    atlas: AnalysisAtlas,
+    *,
+    validation_run: tuple[object, TrajectoryResult],
+    training_runs: tuple[tuple[object, TrajectoryResult], ...],
+    stride_values: tuple[int, ...],
+    word_mode: WordMode,
+) -> dict[str, object]:
+    if not training_runs:
+        return {
+            "stride_values": [int(stride) for stride in stride_values],
+            "evaluated_count": 0,
+            "pass_count": 0,
+            "pass_fraction": 0.0,
+            "minimum_pass_fraction": 1.0,
+            "passes_stride_robustness": False,
+            "candidates": [],
+        }
+    rows = []
+    for index, stride in enumerate(stride_values):
+        validation_reports = atlas.analyze_trajectory(validation_run[0], validation_run[1], stride=stride)
+        training_reports = tuple(
+            atlas.analyze_trajectory(system, trajectory, stride=stride)
+            for system, trajectory in training_runs
+        )
+        training_words = tuple(
+            _hysteresis_word_from_reports(
+                report_set,
+                coordinate="hierarchy_perturbation_strength",
+                word_mode=word_mode,
+            )
+            for report_set in training_reports
+        )
+        validation_word = _hysteresis_word_from_reports(
+            validation_reports,
+            coordinate="hierarchy_perturbation_strength",
+            word_mode=word_mode,
+        )
+        chain = markov_chain_from_words(training_words)
+        bootstrap = bootstrap_markov_baseline_comparison(
+            chain,
+            training_words,
+            (validation_word,),
+            resamples=64,
+            random_seed=101 + index,
+        )
+        order_selection = select_markov_order(training_words, (validation_word,), max_order=2)
+        coordinate_sweep = poincare_coordinate_sweep_from_reports(training_reports[0])
+        poincare_training_words = tuple(_poincare_word_from_sweep(report_set, coordinate_sweep) for report_set in training_reports)
+        poincare_validation_words = (_poincare_word_from_sweep(validation_reports, coordinate_sweep),)
+        poincare_chain = markov_chain_from_words(poincare_training_words)
+        poincare_bootstrap = bootstrap_markov_baseline_comparison(
+            poincare_chain,
+            poincare_training_words,
+            poincare_validation_words,
+            resamples=64,
+            random_seed=151 + index,
+        )
+        poincare_order = select_markov_order(poincare_training_words, poincare_validation_words, max_order=2)
+        permutation = permutation_control_markov_validation(
+            poincare_chain,
+            poincare_validation_words,
+            permutations=64,
+            random_seed=181 + index,
+        )
+        section_robustness = poincare_markov_section_robustness(
+            training_reports,
+            coordinate_sweep.best,
+            validation_report_sets=(validation_reports,),
+            resamples=32,
+            permutations=32,
+            random_seed=211 + index,
+            minimum_pass_count=1,
+            minimum_pass_fraction=0.1,
+        )
+        passes = bool(
+            bootstrap.significant_baseline_win
+            and order_selection.memory_selected
+            and coordinate_sweep.has_sufficient_section
+            and poincare_bootstrap.significant_baseline_win
+            and poincare_order.memory_selected
+            and permutation.passes_permutation_control
+            and section_robustness.passes_robustness
+        )
+        rows.append(
+            {
+                "stride": int(stride),
+                "hysteresis_significant_baseline_win": bootstrap.significant_baseline_win,
+                "hysteresis_memory_order_selected": order_selection.memory_selected,
+                "poincare_best_coordinate": coordinate_sweep.best.coordinate,
+                "poincare_best_crossing_count": coordinate_sweep.best.best.crossing_count,
+                "poincare_training_word_lengths": [word.length for word in poincare_training_words],
+                "poincare_validation_word_length": poincare_validation_words[0].length,
+                "poincare_markov_significant_baseline_win": poincare_bootstrap.significant_baseline_win,
+                "poincare_memory_order_selected": poincare_order.memory_selected,
+                "poincare_passes_permutation_control": permutation.passes_permutation_control,
+                "poincare_passes_section_robustness": section_robustness.passes_robustness,
+                "passes": passes,
+            }
+        )
+    pass_count = sum(1 for row in rows if row["passes"])
+    evaluated_count = len(rows)
+    pass_fraction = float(pass_count / evaluated_count) if evaluated_count else 0.0
+    return {
+        "stride_values": [int(stride) for stride in stride_values],
+        "evaluated_count": evaluated_count,
+        "pass_count": pass_count,
+        "pass_fraction": pass_fraction,
+        "minimum_pass_fraction": 1.0,
+        "passes_stride_robustness": bool(evaluated_count > 0 and pass_fraction >= 1.0),
+        "candidates": rows,
+    }
 
 
 def _poincare_word_from_sweep(reports: tuple[object, ...], sweep: object):

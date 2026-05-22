@@ -227,6 +227,16 @@ def _render_page(
         permutations=128,
         random_seed=31,
     )
+    grammar_base_stride = max(1, len(grammar_flyby.t) // 120)
+    symbolic_stride_robustness = _symbolic_stride_robustness(
+        atlas,
+        validation_run=(grammar_flyby_system, grammar_flyby),
+        training_runs=(
+            (grammar_phase_flyby_system, grammar_phase_flyby),
+            (grammar_phase_extra_flyby_system, grammar_phase_extra_flyby),
+        ),
+        stride_values=_stride_probe_values(grammar_base_stride),
+    )
     markov_chain = markov_chain_from_words(training_words)
     markov_comparison = compare_markov_chain_to_independent_baseline(markov_chain, training_words, (validation_word,))
     markov_bootstrap = bootstrap_markov_baseline_comparison(
@@ -261,6 +271,7 @@ def _render_page(
                 "order_selection": poincare_order_selection.as_dict(),
                 "permutation_control": poincare_permutation_control.as_dict(),
                 "section_robustness": poincare_section_robustness.as_dict(),
+                "stride_robustness": symbolic_stride_robustness,
             },
             "training_word_lengths": [word.length for word in training_words],
             "validation_word_length": validation_word.length,
@@ -346,6 +357,9 @@ def _render_page(
         "poincare_section_robust_pass_count": poincare_section_robustness.pass_count,
         "poincare_section_robust_pass_fraction": poincare_section_robustness.pass_fraction,
         "poincare_passes_section_robustness": poincare_section_robustness.passes_robustness,
+        "symbolic_stride_robust_pass_count": symbolic_stride_robustness["pass_count"],
+        "symbolic_stride_robust_pass_fraction": symbolic_stride_robustness["pass_fraction"],
+        "symbolic_passes_stride_robustness": symbolic_stride_robustness["passes_stride_robustness"],
     }
     gate_cards = "\n".join(
         [
@@ -376,6 +390,7 @@ def _render_page(
                     and promotion_gates["poincare_memory_order_selected"]
                     and promotion_gates["poincare_passes_permutation_control"]
                     and promotion_gates["poincare_passes_section_robustness"]
+                    and promotion_gates["symbolic_passes_stride_robustness"]
                 )
                 else "wait",
                 f"{promotion_gates['poincare_best_coordinate']}: {promotion_gates['poincare_best_coordinate_crossing_count']}",
@@ -386,6 +401,12 @@ def _render_page(
                 "pass" if promotion_gates["poincare_passes_section_robustness"] else "wait",
                 f"{promotion_gates['poincare_section_robust_pass_count']} section passes",
                 f"fraction {promotion_gates['poincare_section_robust_pass_fraction']:.2f}",
+            ),
+            _gate_card(
+                "Stride robustness",
+                "pass" if promotion_gates["symbolic_passes_stride_robustness"] else "wait",
+                f"{promotion_gates['symbolic_stride_robust_pass_count']} stride passes",
+                f"fraction {promotion_gates['symbolic_stride_robust_pass_fraction']:.2f}",
             ),
         ]
     )
@@ -443,7 +464,7 @@ def _render_page(
     .grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 20px 0 24px; }}
     .upgrade-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }}
     .gate-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }}
-    .progress-track {{ display: grid; grid-template-columns: repeat(7, minmax(120px, 1fr)); gap: 10px; margin-top: 18px; }}
+    .progress-track {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 10px; margin-top: 18px; }}
     .progress-step {{
       position: relative;
       display: grid;
@@ -473,7 +494,7 @@ def _render_page(
     .progress-step.wait .progress-index {{ background: rgba(183, 121, 31, 0.12); color: var(--warn); }}
     .progress-step strong {{ font-size: 0.98rem; }}
     .progress-step span {{ color: var(--muted); font-size: 0.82rem; line-height: 1.45; }}
-    .evidence-grid {{ display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }}
+    .evidence-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 16px; }}
     .evidence {{
       display: grid;
       gap: 8px;
@@ -712,6 +733,12 @@ def _progress_map(
             "nearby sections repeat",
         ),
         (
+            "Stride robustness",
+            bool(promotion_gates["symbolic_passes_stride_robustness"]),
+            f"{promotion_gates['symbolic_stride_robust_pass_count']} strides",
+            "atlas sampling perturbation",
+        ),
+        (
             "Engine API",
             True,
             "threebody-engine",
@@ -725,12 +752,14 @@ def _progress_map(
     baseline_strength = float(baseline_bootstrap["beats_baseline_fraction"])
     permutation_strength = float(1.0 - permutation["control_exceedance_fraction"])
     robustness_fraction = float(section_robustness["pass_fraction"])
+    stride_fraction = float(promotion_gates["symbolic_stride_robust_pass_fraction"])
     evidence = "".join(
         [
             _evidence_card("Picard maximum", f"{metrics['picard_max_contraction']:.3e}", 1.0 if picard_pass else 0.0),
             _evidence_card("Baseline confidence", f"{baseline_strength:.2f}", baseline_strength),
             _evidence_card("Permutation confidence", f"{permutation_strength:.2f}", permutation_strength),
             _evidence_card("Section robustness", f"{robustness_fraction:.2f}", robustness_fraction),
+            _evidence_card("Stride robustness", f"{stride_fraction:.2f}", stride_fraction),
             _evidence_card("Poincare crossings", str(promotion_gates["poincare_best_coordinate_crossing_count"]), 1.0),
         ]
     )
@@ -742,6 +771,116 @@ def _progress_map(
         f"{evidence}"
         "</div>"
     )
+
+
+def _stride_probe_values(base_stride: int) -> tuple[int, ...]:
+    base = max(int(base_stride), 1)
+    return tuple(sorted({max(1, int(round(0.75 * base))), base, max(1, int(round(1.5 * base)))}))
+
+
+def _symbolic_stride_robustness(
+    atlas: AnalysisAtlas,
+    *,
+    validation_run: tuple[object, TrajectoryResult],
+    training_runs: tuple[tuple[object, TrajectoryResult], ...],
+    stride_values: tuple[int, ...],
+) -> dict[str, object]:
+    rows = []
+    for index, stride in enumerate(stride_values):
+        validation_reports = atlas.analyze_trajectory(validation_run[0], validation_run[1], stride=stride)
+        training_reports = tuple(
+            atlas.analyze_trajectory(system, trajectory, stride=stride)
+            for system, trajectory in training_runs
+        )
+        training_words = tuple(refined_chart_word_from_reports(reports) for reports in training_reports)
+        validation_word = refined_chart_word_from_reports(validation_reports)
+        chain = markov_chain_from_words(training_words)
+        bootstrap = bootstrap_markov_baseline_comparison(
+            chain,
+            training_words,
+            (validation_word,),
+            resamples=64,
+            random_seed=101 + index,
+        )
+        order_selection = select_markov_order(training_words, (validation_word,), max_order=2)
+        coordinate_sweep = poincare_coordinate_sweep_from_reports(training_reports[0])
+        poincare_training_words = tuple(
+            poincare_section_word_from_reports(
+                reports,
+                coordinate=coordinate_sweep.best.coordinate,
+                section_value=coordinate_sweep.best.best.section_value,
+                direction=coordinate_sweep.best.direction,
+            )
+            for reports in training_reports
+        )
+        poincare_validation_words = (
+            poincare_section_word_from_reports(
+                validation_reports,
+                coordinate=coordinate_sweep.best.coordinate,
+                section_value=coordinate_sweep.best.best.section_value,
+                direction=coordinate_sweep.best.direction,
+            ),
+        )
+        poincare_chain = markov_chain_from_words(poincare_training_words)
+        poincare_bootstrap = bootstrap_markov_baseline_comparison(
+            poincare_chain,
+            poincare_training_words,
+            poincare_validation_words,
+            resamples=64,
+            random_seed=151 + index,
+        )
+        poincare_order = select_markov_order(poincare_training_words, poincare_validation_words, max_order=2)
+        permutation = permutation_control_markov_validation(
+            poincare_chain,
+            poincare_validation_words,
+            permutations=64,
+            random_seed=181 + index,
+        )
+        section_robustness = poincare_markov_section_robustness(
+            training_reports,
+            coordinate_sweep.best,
+            validation_report_sets=(validation_reports,),
+            resamples=32,
+            permutations=32,
+            random_seed=211 + index,
+        )
+        passes = bool(
+            bootstrap.significant_baseline_win
+            and order_selection.memory_selected
+            and coordinate_sweep.has_sufficient_section
+            and poincare_bootstrap.significant_baseline_win
+            and poincare_order.memory_selected
+            and permutation.passes_permutation_control
+            and section_robustness.passes_robustness
+        )
+        rows.append(
+            {
+                "stride": int(stride),
+                "hysteresis_significant_baseline_win": bootstrap.significant_baseline_win,
+                "hysteresis_memory_order_selected": order_selection.memory_selected,
+                "poincare_best_coordinate": coordinate_sweep.best.coordinate,
+                "poincare_best_crossing_count": coordinate_sweep.best.best.crossing_count,
+                "poincare_training_word_lengths": [word.length for word in poincare_training_words],
+                "poincare_validation_word_length": poincare_validation_words[0].length,
+                "poincare_markov_significant_baseline_win": poincare_bootstrap.significant_baseline_win,
+                "poincare_memory_order_selected": poincare_order.memory_selected,
+                "poincare_passes_permutation_control": permutation.passes_permutation_control,
+                "poincare_passes_section_robustness": section_robustness.passes_robustness,
+                "passes": passes,
+            }
+        )
+    pass_count = sum(1 for row in rows if row["passes"])
+    evaluated_count = len(rows)
+    pass_fraction = float(pass_count / evaluated_count) if evaluated_count else 0.0
+    return {
+        "stride_values": [int(stride) for stride in stride_values],
+        "evaluated_count": evaluated_count,
+        "pass_count": pass_count,
+        "pass_fraction": pass_fraction,
+        "minimum_pass_fraction": 1.0,
+        "passes_stride_robustness": bool(evaluated_count > 0 and pass_fraction >= 1.0),
+        "candidates": rows,
+    }
 
 
 def _progress_step(index: int, title: str, status: str, value: str, detail: str) -> str:
