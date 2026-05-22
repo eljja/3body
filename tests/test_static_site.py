@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from threebody.ui.static_site import build_static_site
 
 
@@ -9,6 +11,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert index_path.name == "index.html"
     assert index_path.exists()
     assert (tmp_path / ".nojekyll").exists()
+    certificate_path = tmp_path / "certificate.json"
+    assert certificate_path.exists()
     content = index_path.read_text(encoding="utf-8")
     assert "ThreeBody Dynamics Lab" in content
     assert "General three-body figure-eight" in content
@@ -46,5 +50,12 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "Build provenance" in content
     assert "build_provenance" in content
     assert "generated_at_utc" in content
+    assert "Open machine-readable certificate JSON" in content
     assert "jacobi_parameter_interval_box_margin" not in content
     assert "interval_box_margin_lower" in content
+    certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
+    assert certificate["certificate_schema_version"] == 1
+    assert certificate["artifact"] == "threebody-static-research-certificate"
+    assert certificate["promotion_gates"]["symbolic_passes_stride_robustness"] is True
+    assert certificate["build_provenance"]["generator"] == "threebody.ui.static_site"
+    assert "analysis_atlas_snapshot" in certificate

@@ -9,9 +9,11 @@ The static build performs these steps during GitHub Actions deployment:
 2. Integrate representative two-body, restricted three-body, and general figure-eight trajectories.
 3. Compute invariant drift, stability, analysis-atlas distribution, representative Jacobi escape-cone certificates, Picard contraction tuning, hysteresis grammar Markov diagnostics with bootstrap uncertainty, Markov order selection, and Poincare-section word diagnostics.
 4. Embed the resulting Plotly figures, certificate bars, promotion gates, progress-map timeline, and metrics into `site/index.html`.
-5. Publish the generated `site` directory through GitHub Pages.
+5. Write the same machine-readable evidence bundle to `site/certificate.json`.
+6. Publish the generated `site` directory through GitHub Pages.
 
-The workflow opts JavaScript actions into the Node 24 runner path and embeds build provenance in the generated HTML:
+The workflow opts JavaScript actions into the Node 24 runner path and embeds build provenance in the generated HTML
+and `certificate.json`:
 commit SHA, workflow run, ref name, Python version, and UTC generation time are included beside the research
 certificate JSON.
 

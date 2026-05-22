@@ -90,7 +90,7 @@ def build_static_site(output_dir: str | Path) -> Path:
         t_eval=grammar_phase_extra_flyby.t_eval,
     )
 
-    page = _render_page(
+    page, certificate_bundle = _render_page(
         two_body=two_body_traj,
         two_body_system=two_body.system,
         restricted=restricted_traj,
@@ -110,6 +110,10 @@ def build_static_site(output_dir: str | Path) -> Path:
 
     index_path = output_path / "index.html"
     index_path.write_text(page, encoding="utf-8")
+    (output_path / "certificate.json").write_text(
+        json.dumps(certificate_bundle, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
     (output_path / ".nojekyll").write_text("", encoding="utf-8")
     return index_path
 
@@ -131,7 +135,7 @@ def _render_page(
     grammar_phase_extra_flyby: TrajectoryResult,
     grammar_phase_extra_flyby_system: object,
     provenance: dict[str, object],
-) -> str:
+) -> tuple[str, dict[str, object]]:
     two_invariants = InvariantMonitor(two_body_system).evaluate(two_body)
     restricted_invariants = InvariantMonitor(restricted_system).evaluate(restricted)
     general_invariants = InvariantMonitor(general_system).evaluate(general)
@@ -427,6 +431,20 @@ def _render_page(
         }
         for transition in general_transitions[:12]
     ]
+    certificate_bundle = {
+        "certificate_schema_version": 1,
+        "artifact": "threebody-static-research-certificate",
+        "metrics": metrics,
+        "promotion_gates": promotion_gates,
+        "jacobi_escape_cone": jacobi_summary,
+        "analysis_atlas_snapshot": {
+            "chart_distribution": chart_distribution,
+            "transition_rows": transition_rows,
+        },
+        "build_provenance": provenance,
+        "note": "Full theorem-suite benchmarks remain a local/CI research check; this artifact embeds a representative certificate and latest parameter-box summary.",
+    }
+    certificate_json = html.escape(json.dumps(certificate_bundle, indent=2, sort_keys=True))
 
     return f"""<!doctype html>
 <html lang="en">
@@ -682,16 +700,17 @@ def _render_page(
       {_provenance_card("Run", str(provenance["run_id"]), str(provenance["run_attempt"]))}
       {_provenance_card("Generated UTC", str(provenance["generated_at_utc"]), str(provenance["python_version"]))}
     </div>
+    <p><a href="certificate.json">Open machine-readable certificate JSON</a></p>
   </section>
 
   <section>
     <h2>Research certificate status</h2>
-    <pre>{html.escape(json.dumps({"metrics": metrics, "promotion_gates": promotion_gates, "jacobi_escape_cone": jacobi_summary, "build_provenance": provenance, "note": "Full theorem-suite benchmarks remain a local/CI research check; this page embeds a representative certificate and latest parameter-box summary."}, indent=2, sort_keys=True))}</pre>
+    <pre>{certificate_json}</pre>
   </section>
 </main>
 </body>
 </html>
-"""
+""", certificate_bundle
 
 
 def _build_provenance() -> dict[str, object]:
