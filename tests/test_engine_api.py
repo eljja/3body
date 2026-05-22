@@ -151,5 +151,7 @@ def test_engine_api_runs_integrated_verification_report() -> None:
     assert "baseline_comparison" in report["hysteresis_markov"]
     assert "bootstrap_comparison" in report["hysteresis_markov"]
     assert "order_selection" in report["hysteresis_markov"]
+    assert "poincare_section_sweep" in report["hysteresis_markov"]
     assert "hysteresis_log_likelihood_gain_ci" in report["promotion_gates"]
     assert "hysteresis_selected_markov_order" in report["promotion_gates"]
+    assert "poincare_best_crossing_count" in report["promotion_gates"]

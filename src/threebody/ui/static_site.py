@@ -22,6 +22,7 @@ from threebody.analysis import (
     jacobi_self_consistent_escape_cone,
     markov_chain_from_words,
     poincare_section_word_from_reports,
+    poincare_section_sweep_from_reports,
     refined_chart_word_from_reports,
     return_map_word_from_reports,
     select_markov_order,
@@ -160,6 +161,7 @@ def _render_page(
     validation_word = training_words[0]
     return_word = training_words[0]
     poincare_word = poincare_section_word_from_reports(grammar_reports, coordinate="hierarchy_perturbation_strength")
+    poincare_sweep = poincare_section_sweep_from_reports(grammar_reports, coordinate="hierarchy_perturbation_strength")
     markov_chain = markov_chain_from_words(training_words)
     markov_comparison = compare_markov_chain_to_independent_baseline(markov_chain, training_words, (validation_word,))
     markov_bootstrap = bootstrap_markov_baseline_comparison(
@@ -183,6 +185,7 @@ def _render_page(
             "poincare_section_word": poincare_word.as_string(),
             "word_mode": "refined",
             "poincare_section_word_length": poincare_word.length,
+            "poincare_section_sweep": poincare_sweep.as_dict(),
             "training_word_lengths": [word.length for word in training_words],
             "validation_word_length": validation_word.length,
             "chain": markov_chain.as_dict(),
@@ -252,6 +255,8 @@ def _render_page(
         "hysteresis_log_likelihood_gain_ci": markov_bootstrap.log_likelihood_gain_ci,
         "hysteresis_selected_markov_order": markov_order_selection.selected_order,
         "hysteresis_memory_order_selected": markov_order_selection.memory_selected,
+        "poincare_has_sufficient_section": poincare_sweep.has_sufficient_section,
+        "poincare_best_crossing_count": poincare_sweep.best.crossing_count,
     }
     gate_cards = "\n".join(
         [

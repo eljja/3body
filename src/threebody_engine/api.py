@@ -16,6 +16,7 @@ from threebody.analysis import (
     jacobi_interval_picard_flow_certificate,
     jacobi_picard_tuning_certificate,
     markov_chain_from_words,
+    poincare_section_sweep_from_reports,
     poincare_section_word_from_reports,
     refined_chart_word_from_reports,
     return_map_word_from_reports,
@@ -334,6 +335,12 @@ def run_verification_report(
         stride=stride,
         word_mode=word_mode,
     )
+    atlas = AnalysisAtlas()
+    reports = atlas.analyze_trajectory(reference.system, trajectory, stride=stride)
+    poincare_sweep = poincare_section_sweep_from_reports(
+        reports,
+        coordinate="hierarchy_perturbation_strength",
+    )
     comparison = bootstrap_comparison.comparison
     return {
         "metadata": {
@@ -352,6 +359,7 @@ def run_verification_report(
             "baseline_comparison": comparison.as_dict(),
             "bootstrap_comparison": bootstrap_comparison.as_dict(),
             "order_selection": order_selection.as_dict(),
+            "poincare_section_sweep": poincare_sweep.as_dict(),
         },
         "promotion_gates": {
             "picard_certified": bool(jacobi_report["picard_tuning"]["certified"]),
@@ -362,6 +370,8 @@ def run_verification_report(
             "hysteresis_log_likelihood_gain_ci": list(bootstrap_comparison.log_likelihood_gain_ci),
             "hysteresis_selected_markov_order": order_selection.selected_order,
             "hysteresis_memory_order_selected": order_selection.memory_selected,
+            "poincare_has_sufficient_section": poincare_sweep.has_sufficient_section,
+            "poincare_best_crossing_count": poincare_sweep.best.crossing_count,
         },
     }
 

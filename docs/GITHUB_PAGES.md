@@ -25,5 +25,5 @@ Limitations:
 - Parameter sliders remain in the Streamlit app.
 - The Jacobi escape-cone panel shows a representative flyby plus the latest parameter-box summary; the full theorem suite remains a local/CI research check.
 - The Picard and symbolic-dynamics panel shows representative promotion gates: contraction reserve, hysteresis Markov-vs-baseline diagnostics, bootstrap gain interval, and BIC-selected memory order.
-- The promotion gate uses refined chart words because the representative Poincare-section word currently has too few crossings for a stable Markov claim; the section word is still embedded in the JSON certificate as a falsification diagnostic.
+- The promotion gate uses refined chart words because the representative Poincare-section sweep currently finds only two crossings, below the stable Markov threshold; the best section word and every quantile candidate are embedded in the JSON certificate as falsification diagnostics.
 - New public scenarios require adding them to `threebody.ui.static_site` and rebuilding.

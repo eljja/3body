@@ -190,6 +190,58 @@ class ChartWordMarkovOrderSelection:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class PoincareSectionCandidate:
+    """One candidate diagnostic section for symbolic crossing words."""
+
+    coordinate: str
+    quantile: float
+    section_value: float
+    direction: str
+    word: ChartWord
+    crossing_count: int
+    distinct_symbol_count: int
+    sufficient_crossings: bool
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "coordinate": self.coordinate,
+            "quantile": self.quantile,
+            "section_value": self.section_value,
+            "direction": self.direction,
+            "word": self.word.as_string(),
+            "word_length": self.word.length,
+            "crossing_count": self.crossing_count,
+            "distinct_symbol_count": self.distinct_symbol_count,
+            "sufficient_crossings": self.sufficient_crossings,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class PoincareSectionSweep:
+    """Quantile sweep used to find usable Poincare-section crossing words."""
+
+    coordinate: str
+    direction: str
+    minimum_crossings: int
+    best: PoincareSectionCandidate
+    candidates: tuple[PoincareSectionCandidate, ...]
+
+    @property
+    def has_sufficient_section(self) -> bool:
+        return self.best.sufficient_crossings
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "coordinate": self.coordinate,
+            "direction": self.direction,
+            "minimum_crossings": self.minimum_crossings,
+            "has_sufficient_section": self.has_sufficient_section,
+            "best": self.best.as_dict(),
+            "candidates": [candidate.as_dict() for candidate in self.candidates],
+        }
+
+
 def chart_word_from_reports(reports: tuple[AnalysisReport, ...] | list[AnalysisReport]) -> ChartWord:
     symbols: list[object] = []
     previous: object | None = None
@@ -295,6 +347,69 @@ def poincare_section_word_from_reports(
     if not symbols:
         return refined_chart_word_from_reports(reports)
     return ChartWord(tuple(symbols))
+
+
+def poincare_section_sweep_from_reports(
+    reports: tuple[AnalysisReport, ...] | list[AnalysisReport],
+    *,
+    coordinate: str = "hierarchy_perturbation_strength",
+    quantiles: tuple[float, ...] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
+    direction: str = "both",
+    minimum_crossings: int = 4,
+) -> PoincareSectionSweep:
+    """Sweep diagnostic section levels and select the richest crossing word."""
+
+    values = np.asarray([_feature_value(report, coordinate) for report in reports], dtype=float)
+    finite_values = values[np.isfinite(values)]
+    if finite_values.size == 0:
+        empty = PoincareSectionCandidate(
+            coordinate=coordinate,
+            quantile=float("nan"),
+            section_value=float("nan"),
+            direction=direction,
+            word=ChartWord(()),
+            crossing_count=0,
+            distinct_symbol_count=0,
+            sufficient_crossings=False,
+        )
+        return PoincareSectionSweep(
+            coordinate=coordinate,
+            direction=direction,
+            minimum_crossings=minimum_crossings,
+            best=empty,
+            candidates=(empty,),
+        )
+    candidates = []
+    for quantile in quantiles:
+        clipped = float(np.clip(quantile, 0.0, 1.0))
+        section_value = float(np.quantile(finite_values, clipped))
+        word = poincare_section_word_from_reports(
+            reports,
+            coordinate=coordinate,
+            section_value=section_value,
+            direction=direction,
+        )
+        crossing_count = word.length
+        candidates.append(
+            PoincareSectionCandidate(
+                coordinate=coordinate,
+                quantile=clipped,
+                section_value=section_value,
+                direction=direction,
+                word=word,
+                crossing_count=crossing_count,
+                distinct_symbol_count=len(set(word.symbols)),
+                sufficient_crossings=crossing_count >= minimum_crossings,
+            )
+        )
+    best = max(candidates, key=lambda candidate: (candidate.crossing_count, candidate.distinct_symbol_count, -abs(candidate.quantile - 0.5)))
+    return PoincareSectionSweep(
+        coordinate=coordinate,
+        direction=direction,
+        minimum_crossings=minimum_crossings,
+        best=best,
+        candidates=tuple(candidates),
+    )
 
 
 def return_map_symbol(report: AnalysisReport, *, coordinate: str, event: str) -> str:
@@ -689,6 +804,28 @@ def poincare_word_signature_rows(
         row["coordinate"] = coordinate
         row["section_value"] = float("nan") if section_value is None else float(section_value)
         row["direction"] = direction
+        rows.append(row)
+    return rows
+
+
+def poincare_section_sweep_rows(
+    reports_by_name: dict[str, tuple[AnalysisReport, ...]],
+    *,
+    coordinate: str = "hierarchy_perturbation_strength",
+    direction: str = "both",
+    minimum_crossings: int = 4,
+) -> list[dict[str, object]]:
+    rows = []
+    for name, reports in reports_by_name.items():
+        sweep = poincare_section_sweep_from_reports(
+            reports,
+            coordinate=coordinate,
+            direction=direction,
+            minimum_crossings=minimum_crossings,
+        )
+        row = sweep.best.as_dict()
+        row["scenario"] = name
+        row["has_sufficient_section"] = sweep.has_sufficient_section
         rows.append(row)
     return rows
 
