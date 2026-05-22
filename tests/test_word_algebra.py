@@ -6,8 +6,11 @@ from threebody.analysis import (
     ChartType,
     chart_word_from_reports,
     chart_word_signature,
+    compare_markov_chain_to_independent_baseline,
+    markov_chain_from_words,
     refined_chart_symbol,
     return_map_word_from_reports,
+    validate_markov_chain,
     word_distance,
 )
 
@@ -93,3 +96,86 @@ def test_return_map_word_uses_coordinate_extrema() -> None:
 
     assert word.length >= 2
     assert "return:hierarchy_ratio" in word.as_string()
+
+
+def test_markov_chain_from_words_reports_symbolic_transition_probabilities() -> None:
+    first = chart_word_from_reports(
+        [
+            _report(ChartType.TWO_BODY_HIERARCHY),
+            _report(ChartType.CHAOTIC_TRANSPORT),
+            _report(ChartType.TWO_BODY_HIERARCHY),
+        ]
+    )
+    second = chart_word_from_reports(
+        [
+            _report(ChartType.TWO_BODY_HIERARCHY),
+            _report(ChartType.CHAOTIC_TRANSPORT),
+            _report(ChartType.ESCAPE_TRANSPORT),
+        ]
+    )
+
+    chain = markov_chain_from_words((first, second))
+
+    assert ChartType.TWO_BODY_HIERARCHY in chain.states
+    assert ChartType.CHAOTIC_TRANSPORT in chain.states
+    assert chain.transition_entropy_rate >= 0.0
+    assert abs(sum(chain.stationary_distribution) - 1.0) < 1.0e-12
+    assert chain.as_dict()["transition_probabilities"]
+
+
+def test_markov_chain_validation_scores_heldout_words() -> None:
+    training = chart_word_from_reports(
+        [
+            _report(ChartType.TWO_BODY_HIERARCHY),
+            _report(ChartType.CHAOTIC_TRANSPORT),
+            _report(ChartType.ESCAPE_TRANSPORT),
+        ]
+    )
+    heldout = chart_word_from_reports(
+        [
+            _report(ChartType.TWO_BODY_HIERARCHY),
+            _report(ChartType.CHAOTIC_TRANSPORT),
+            _report(ChartType.ESCAPE_TRANSPORT),
+        ]
+    )
+
+    chain = markov_chain_from_words((training,))
+    validation = validate_markov_chain(chain, (heldout,))
+
+    assert validation.transition_count == 2
+    assert validation.coverage_fraction == 1.0
+    assert validation.perplexity >= 1.0
+    assert validation.deterministic_accuracy == 1.0
+
+
+def test_markov_chain_baseline_comparison_detects_memory_gain() -> None:
+    training_words = (
+        chart_word_from_reports(
+            [
+                _report(ChartType.TWO_BODY_HIERARCHY),
+                _report(ChartType.CHAOTIC_TRANSPORT),
+                _report(ChartType.ESCAPE_TRANSPORT),
+            ]
+        ),
+        chart_word_from_reports(
+            [
+                _report(ChartType.PERIODIC_ORBIT_NEIGHBORHOOD),
+                _report(ChartType.CHAOTIC_TRANSPORT),
+                _report(ChartType.ESCAPE_TRANSPORT),
+            ]
+        ),
+    )
+    heldout = chart_word_from_reports(
+        [
+            _report(ChartType.TWO_BODY_HIERARCHY),
+            _report(ChartType.CHAOTIC_TRANSPORT),
+            _report(ChartType.ESCAPE_TRANSPORT),
+        ]
+    )
+
+    chain = markov_chain_from_words(training_words)
+    comparison = compare_markov_chain_to_independent_baseline(chain, training_words, (heldout,))
+
+    assert comparison.beats_baseline is True
+    assert comparison.log_likelihood_gain > 0.0
+    assert comparison.perplexity_ratio < 1.0

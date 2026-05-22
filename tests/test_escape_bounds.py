@@ -9,6 +9,7 @@ from threebody.analysis import (
     jacobi_interval_picard_flow_certificate,
     jacobi_interval_escape_certificate,
     jacobi_open_escape_cone_certificate,
+    jacobi_picard_tuning_certificate,
     jacobi_quadrupole_acceleration_certificate,
     jacobi_self_consistent_escape_cone,
     jacobi_tail_interval_reserve_certificate,
@@ -243,10 +244,35 @@ def test_jacobi_interval_picard_flow_certificate_propagates_tail_boxes() -> None
     assert certificate.endpoint_inclusion_passed is True
     assert certificate.interval_escape_certified is True
     assert certificate.picard_flow_certified is True
-    assert certificate.lipschitz_bound_method == "interval_newtonian_rhs_jacobian_inf_row_sum"
+    assert certificate.lipschitz_bound_method == "scaled_phase_space_interval_newtonian_rhs_jacobian"
     assert certificate.maximum_propagated_endpoint_radius > certificate.tube_radius
     assert certificate.maximum_observed_contraction < certificate.target_contraction
     assert certificate.interval_escape_margin_lower > 0.0
+
+
+def test_jacobi_picard_tuning_certificate_selects_certified_configuration() -> None:
+    scenario = OrbitLibrary().general_hierarchical_flyby(
+        intruder_velocity=(0.8, 1.6),
+        duration=8.0,
+        samples=500,
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    certificate = jacobi_picard_tuning_certificate(scenario.system, trajectory, inner_pair=(0, 1))
+
+    assert certificate.certified is True
+    assert certificate.attempted_count >= 1
+    assert certificate.selected_scaled_phase_norm is True
+    assert certificate.best_observed_contraction < certificate.target_contraction
+    assert certificate.contraction_reserve > 0.0
+    assert certificate.mean_substeps_per_segment > 0.0
+    assert certificate.certification_efficiency > 0.0
+    assert certificate.best_interval_escape_margin_lower > 0.0
 
 
 def test_jacobi_interval_escape_certificate_rejects_uncertain_tail_box() -> None:

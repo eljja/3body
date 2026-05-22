@@ -28,7 +28,9 @@ They can miss at least four mechanisms:
 
 ## Near-Term Research Priority
 
-The immediate priority is the phase-resolved scattering map because it directly targets the current residual cluster.
+The immediate priority is no longer the phase-resolved scalar scattering map.
+The stricter held-out branch tests make the safer research pivot a symbolic dynamics model centered on hysteresis memory.
+Scattering diagnostics remain useful as physical measurements, but they should not be promoted as the primary smooth predictor until they beat impulse, grammar, and negative-control competitors.
 The required evidence is a held-out phase sweep:
 
 ```powershell
@@ -46,6 +48,12 @@ If they fail, the project should pivot to manifold routing and regularized close
 The current implementation measures `binary_phase_at_periapsis` from the trajectory rather than relying only on initial phase.
 That is necessary but not sufficient.
 A real scattering map must predict outgoing energy, angular momentum, deflection angle, and chart transition probability jointly, not just reuse phase as another multiplicative power-law feature.
+
+For the hysteresis branch, the compact model should instead be a Markov model over return-map chart words.
+The public API entry point is `threebody_engine.build_hysteresis_markov_chain`, which builds a first-order symbolic transition matrix, stationary distribution, absorbing-state report, and entropy rate from atlas return words.
+Use `threebody_engine.validate_hysteresis_markov_chain` for held-out symbolic validation; it reports transition coverage, unseen transitions, mean log likelihood, perplexity, and deterministic next-symbol accuracy.
+Use `threebody_engine.compare_hysteresis_markov_to_baseline` before promoting a grammar claim; it requires the state-conditioned transition model to beat an independent next-symbol frequency baseline, not merely fit its own training words.
+Use `threebody_engine.run_verification_report` for an end-to-end API artifact that bundles Picard tuning, Jacobi escape certification, hysteresis Markov baseline comparison, and promotion gates into one JSON-ready dictionary.
 The first smoke result is encouraging only for low-crossing boundary collapse; high-crossing selection still prefers a simpler impulse model after complexity penalty.
 
 Current atlas additions:

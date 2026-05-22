@@ -48,6 +48,74 @@ class ChartWordSignature:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class ChartWordMarkovChain:
+    """First-order symbolic dynamics model over chart-word symbols."""
+
+    states: tuple[object, ...]
+    transition_counts: tuple[tuple[int, ...], ...]
+    transition_probabilities: tuple[tuple[float, ...], ...]
+    stationary_distribution: tuple[float, ...]
+    absorbing_states: tuple[object, ...]
+    transition_entropy_rate: float
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "states": [str(state) for state in self.states],
+            "transition_counts": [list(row) for row in self.transition_counts],
+            "transition_probabilities": [list(row) for row in self.transition_probabilities],
+            "stationary_distribution": list(self.stationary_distribution),
+            "absorbing_states": [str(state) for state in self.absorbing_states],
+            "transition_entropy_rate": self.transition_entropy_rate,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ChartWordMarkovValidation:
+    """Held-out likelihood validation for a symbolic Markov chain."""
+
+    transition_count: int
+    covered_transition_count: int
+    unseen_transition_count: int
+    coverage_fraction: float
+    mean_log_likelihood: float
+    perplexity: float
+    deterministic_accuracy: float
+
+    def as_dict(self) -> dict[str, float | int]:
+        return {
+            "transition_count": self.transition_count,
+            "covered_transition_count": self.covered_transition_count,
+            "unseen_transition_count": self.unseen_transition_count,
+            "coverage_fraction": self.coverage_fraction,
+            "mean_log_likelihood": self.mean_log_likelihood,
+            "perplexity": self.perplexity,
+            "deterministic_accuracy": self.deterministic_accuracy,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ChartWordMarkovBaselineComparison:
+    """Compare Markov validation against an independent-symbol baseline."""
+
+    markov_validation: ChartWordMarkovValidation
+    baseline_mean_log_likelihood: float
+    baseline_perplexity: float
+    log_likelihood_gain: float
+    perplexity_ratio: float
+    beats_baseline: bool
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "markov_validation": self.markov_validation.as_dict(),
+            "baseline_mean_log_likelihood": self.baseline_mean_log_likelihood,
+            "baseline_perplexity": self.baseline_perplexity,
+            "log_likelihood_gain": self.log_likelihood_gain,
+            "perplexity_ratio": self.perplexity_ratio,
+            "beats_baseline": self.beats_baseline,
+        }
+
+
 def chart_word_from_reports(reports: tuple[AnalysisReport, ...] | list[AnalysisReport]) -> ChartWord:
     symbols: list[object] = []
     previous: object | None = None
@@ -167,6 +235,140 @@ def chart_word_signature(word: ChartWord) -> ChartWordSignature:
     )
 
 
+def markov_chain_from_words(words: tuple[ChartWord, ...] | list[ChartWord]) -> ChartWordMarkovChain:
+    """Fit a first-order Markov chain to symbolic chart words."""
+
+    states = tuple(sorted({symbol for word in words for symbol in word.symbols}, key=str))
+    if not states:
+        return ChartWordMarkovChain((), (), (), (), (), 0.0)
+    index_by_state = {state: index for index, state in enumerate(states)}
+    counts = np.zeros((len(states), len(states)), dtype=int)
+    for word in words:
+        for previous, current in word.transition_pairs():
+            counts[index_by_state[previous], index_by_state[current]] += 1
+    probabilities = np.zeros(counts.shape, dtype=float)
+    for row_index, row in enumerate(counts):
+        total = int(np.sum(row))
+        if total > 0:
+            probabilities[row_index] = row / total
+        else:
+            probabilities[row_index, row_index] = 1.0
+    stationary = _stationary_distribution(probabilities)
+    absorbing = tuple(
+        state
+        for state_index, state in enumerate(states)
+        if probabilities[state_index, state_index] >= 1.0 - 1.0e-12
+    )
+    entropy_rate = 0.0
+    for state_index, row in enumerate(probabilities):
+        nonzero = row[row > 0.0]
+        entropy_rate += stationary[state_index] * float(-np.sum(nonzero * np.log2(nonzero)))
+    return ChartWordMarkovChain(
+        states=states,
+        transition_counts=tuple(tuple(int(value) for value in row) for row in counts),
+        transition_probabilities=tuple(tuple(float(value) for value in row) for row in probabilities),
+        stationary_distribution=tuple(float(value) for value in stationary),
+        absorbing_states=absorbing,
+        transition_entropy_rate=float(entropy_rate),
+    )
+
+
+def hysteresis_markov_chain_from_reports(
+    reports_by_name: dict[str, tuple[AnalysisReport, ...]],
+    *,
+    coordinate: str = "hierarchy_perturbation_strength",
+) -> ChartWordMarkovChain:
+    """Build the Markov model used for hysteresis-memory grammar analysis."""
+
+    words = tuple(return_map_word_from_reports(reports, coordinate=coordinate) for reports in reports_by_name.values())
+    return markov_chain_from_words(words)
+
+
+def validate_markov_chain(
+    chain: ChartWordMarkovChain,
+    words: tuple[ChartWord, ...] | list[ChartWord],
+    *,
+    unseen_probability: float = 1.0e-12,
+) -> ChartWordMarkovValidation:
+    """Evaluate held-out chart words under a fitted symbolic Markov chain."""
+
+    if not chain.states:
+        return ChartWordMarkovValidation(0, 0, 0, 0.0, float("-inf"), float("inf"), 0.0)
+    index_by_state = {state: index for index, state in enumerate(chain.states)}
+    probabilities = np.asarray(chain.transition_probabilities, dtype=float)
+    transition_count = 0
+    covered = 0
+    unseen = 0
+    log_likelihood = 0.0
+    deterministic_hits = 0
+    for word in words:
+        for previous, current in word.transition_pairs():
+            transition_count += 1
+            previous_index = index_by_state.get(previous)
+            current_index = index_by_state.get(current)
+            if previous_index is None or current_index is None:
+                unseen += 1
+                log_likelihood += float(np.log(unseen_probability))
+                continue
+            probability = float(probabilities[previous_index, current_index])
+            if probability > 0.0:
+                covered += 1
+                log_likelihood += float(np.log(probability))
+            else:
+                unseen += 1
+                log_likelihood += float(np.log(unseen_probability))
+            if int(np.argmax(probabilities[previous_index])) == current_index:
+                deterministic_hits += 1
+    if transition_count == 0:
+        return ChartWordMarkovValidation(0, 0, 0, 0.0, 0.0, 1.0, 0.0)
+    mean_log_likelihood = float(log_likelihood / transition_count)
+    return ChartWordMarkovValidation(
+        transition_count=transition_count,
+        covered_transition_count=covered,
+        unseen_transition_count=unseen,
+        coverage_fraction=float(covered / transition_count),
+        mean_log_likelihood=mean_log_likelihood,
+        perplexity=float(np.exp(-mean_log_likelihood)),
+        deterministic_accuracy=float(deterministic_hits / transition_count),
+    )
+
+
+def compare_markov_chain_to_independent_baseline(
+    chain: ChartWordMarkovChain,
+    training_words: tuple[ChartWord, ...] | list[ChartWord],
+    validation_words: tuple[ChartWord, ...] | list[ChartWord],
+    *,
+    unseen_probability: float = 1.0e-12,
+) -> ChartWordMarkovBaselineComparison:
+    """Compare first-order grammar memory against a next-symbol frequency baseline."""
+
+    validation = validate_markov_chain(chain, validation_words, unseen_probability=unseen_probability)
+    baseline_probabilities = _next_symbol_baseline_probabilities(training_words)
+    log_likelihood = 0.0
+    transition_count = 0
+    for word in validation_words:
+        for _previous, current in word.transition_pairs():
+            transition_count += 1
+            probability = baseline_probabilities.get(current, unseen_probability)
+            log_likelihood += float(np.log(max(probability, unseen_probability)))
+    if transition_count == 0:
+        baseline_mean = 0.0
+        baseline_perplexity = 1.0
+    else:
+        baseline_mean = float(log_likelihood / transition_count)
+        baseline_perplexity = float(np.exp(-baseline_mean))
+    gain = float(validation.mean_log_likelihood - baseline_mean)
+    ratio = float(validation.perplexity / baseline_perplexity) if baseline_perplexity > 0.0 else float("inf")
+    return ChartWordMarkovBaselineComparison(
+        markov_validation=validation,
+        baseline_mean_log_likelihood=baseline_mean,
+        baseline_perplexity=baseline_perplexity,
+        log_likelihood_gain=gain,
+        perplexity_ratio=ratio,
+        beats_baseline=bool(gain > 0.0 and ratio < 1.0),
+    )
+
+
 def word_signature_rows(
     reports_by_name: dict[str, tuple[AnalysisReport, ...]],
 ) -> list[dict[str, float | int | str | bool]]:
@@ -250,6 +452,33 @@ def _primitive_period(symbols: tuple[object, ...]) -> int:
         if tiled == symbols:
             return period
     return len(symbols)
+
+
+def _stationary_distribution(probabilities: np.ndarray) -> np.ndarray:
+    if probabilities.size == 0:
+        return np.zeros(0, dtype=float)
+    values, vectors = np.linalg.eig(probabilities.T)
+    index = int(np.argmin(np.abs(values - 1.0)))
+    stationary = np.real(vectors[:, index])
+    if np.all(stationary <= 0.0):
+        stationary = -stationary
+    stationary = np.maximum(stationary, 0.0)
+    total = float(np.sum(stationary))
+    if total <= 0.0 or not np.isfinite(total):
+        return np.ones(probabilities.shape[0], dtype=float) / probabilities.shape[0]
+    return stationary / total
+
+
+def _next_symbol_baseline_probabilities(words: tuple[ChartWord, ...] | list[ChartWord]) -> dict[object, float]:
+    counts: dict[object, int] = {}
+    total = 0
+    for word in words:
+        for _previous, current in word.transition_pairs():
+            counts[current] = counts.get(current, 0) + 1
+            total += 1
+    if total == 0:
+        return {}
+    return {symbol: count / total for symbol, count in counts.items()}
 
 
 def _linear_bin(value: float, *, width: float, maximum: int) -> int:

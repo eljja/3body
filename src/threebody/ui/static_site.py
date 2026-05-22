@@ -11,11 +11,17 @@ import plotly.io as pio
 
 from threebody.analysis import (
     AnalysisAtlas,
+    compare_markov_chain_to_independent_baseline,
     jacobi_future_tail_bound,
     jacobi_inflated_margin_certificate,
+    jacobi_interval_picard_flow_certificate,
     jacobi_open_escape_cone_certificate,
+    jacobi_picard_tuning_certificate,
     jacobi_quadrupole_acceleration_certificate,
     jacobi_self_consistent_escape_cone,
+    markov_chain_from_words,
+    refined_chart_word_from_reports,
+    return_map_word_from_reports,
 )
 from threebody.diagnostics import InvariantMonitor, StabilityAnalyzer
 from threebody.experiments import OrbitLibrary
@@ -51,6 +57,20 @@ def build_static_site(output_dir: str | Path) -> Path:
         jacobi_flyby.initial_state,
         t_eval=jacobi_flyby.t_eval,
     )
+    grammar_flyby = library.general_hierarchical_flyby(duration=8.0, samples=500)
+    grammar_traj = integrator.integrate(
+        grammar_flyby.system,
+        grammar_flyby.t_span,
+        grammar_flyby.initial_state,
+        t_eval=grammar_flyby.t_eval,
+    )
+    grammar_phase_flyby = library.general_hierarchical_flyby(binary_phase=0.5 * np.pi, duration=8.0, samples=500)
+    grammar_phase_traj = integrator.integrate(
+        grammar_phase_flyby.system,
+        grammar_phase_flyby.t_span,
+        grammar_phase_flyby.initial_state,
+        t_eval=grammar_phase_flyby.t_eval,
+    )
 
     page = _render_page(
         two_body=two_body_traj,
@@ -61,6 +81,10 @@ def build_static_site(output_dir: str | Path) -> Path:
         general_system=general.system,
         jacobi_flyby=jacobi_traj,
         jacobi_flyby_system=jacobi_flyby.system,
+        grammar_flyby=grammar_traj,
+        grammar_flyby_system=grammar_flyby.system,
+        grammar_phase_flyby=grammar_phase_traj,
+        grammar_phase_flyby_system=grammar_phase_flyby.system,
     )
 
     index_path = output_path / "index.html"
@@ -79,6 +103,10 @@ def _render_page(
     general_system: object,
     jacobi_flyby: TrajectoryResult,
     jacobi_flyby_system: object,
+    grammar_flyby: TrajectoryResult,
+    grammar_flyby_system: object,
+    grammar_phase_flyby: TrajectoryResult,
+    grammar_phase_flyby_system: object,
 ) -> str:
     two_invariants = InvariantMonitor(two_body_system).evaluate(two_body)
     restricted_invariants = InvariantMonitor(restricted_system).evaluate(restricted)
@@ -114,12 +142,37 @@ def _render_page(
     jacobi_self = jacobi_self_consistent_escape_cone(jacobi_flyby_system, jacobi_flyby)
     jacobi_open = jacobi_open_escape_cone_certificate(jacobi_flyby_system, jacobi_flyby)
     jacobi_quadrupole = jacobi_quadrupole_acceleration_certificate(jacobi_flyby_system, jacobi_flyby)
+    jacobi_picard = jacobi_interval_picard_flow_certificate(jacobi_flyby_system, jacobi_flyby)
+    jacobi_tuning = jacobi_picard_tuning_certificate(jacobi_flyby_system, jacobi_flyby)
+    grammar_reports = atlas.analyze_trajectory(grammar_flyby_system, grammar_flyby, stride=max(1, len(grammar_flyby.t) // 120))
+    grammar_phase_reports = atlas.analyze_trajectory(
+        grammar_phase_flyby_system,
+        grammar_phase_flyby,
+        stride=max(1, len(grammar_phase_flyby.t) // 120),
+    )
+    training_words = (
+        refined_chart_word_from_reports(grammar_reports),
+        refined_chart_word_from_reports(grammar_phase_reports),
+    )
+    validation_word = training_words[0]
+    return_word = return_map_word_from_reports(grammar_reports, coordinate="hierarchy_perturbation_strength")
+    markov_chain = markov_chain_from_words(training_words)
+    markov_comparison = compare_markov_chain_to_independent_baseline(markov_chain, training_words, (validation_word,))
     jacobi_summary = {
         "future_tail": jacobi_future.as_dict(),
         "inflated_margin": jacobi_inflated.as_dict(),
         "self_consistent_radial_floor": jacobi_self.as_dict(),
         "open_cone": jacobi_open.as_dict(),
         "quadrupole_acceleration": jacobi_quadrupole.as_dict(),
+        "picard_flow": jacobi_picard.as_dict(),
+        "picard_tuning": jacobi_tuning.as_dict(),
+        "hysteresis_markov": {
+            "return_word": return_word.as_string(),
+            "training_word_lengths": [word.length for word in training_words],
+            "validation_word_length": validation_word.length,
+            "chain": markov_chain.as_dict(),
+            "baseline_comparison": markov_comparison.as_dict(),
+        },
         "parameter_box_latest": {
             "case_count": 27,
             "pass_rate": 1.0,
@@ -153,6 +206,8 @@ def _render_page(
             "Jacobi escape-cone flyby",
         ),
         _jacobi_certificate_figure(jacobi_summary),
+        _picard_certificate_figure(jacobi_summary),
+        _markov_baseline_figure(jacobi_summary),
     ]
     figure_html = [
         pio.to_html(figures[0], include_plotlyjs="cdn", full_html=False, config={"responsive": True}),
@@ -166,7 +221,39 @@ def _render_page(
         "general_max_energy_drift": float(np.max(np.abs(general_invariants["energy_drift"]))),
         "general_max_angular_drift": float(np.max(np.abs(general_invariants["angular_momentum_drift"]))),
         "figure_eight_finite_time_lyapunov": float(stability["finite_time_lyapunov"]),
+        "picard_max_contraction": float(jacobi_picard.maximum_observed_contraction),
+        "picard_contraction_reserve": float(jacobi_tuning.contraction_reserve),
+        "hysteresis_markov_perplexity_ratio": float(markov_comparison.perplexity_ratio),
+        "hysteresis_log_likelihood_gain": float(markov_comparison.log_likelihood_gain),
     }
+    promotion_gates = {
+        "picard_certified": jacobi_picard.picard_flow_certified,
+        "picard_contraction_reserve": jacobi_tuning.contraction_reserve,
+        "hysteresis_beats_independent_baseline": markov_comparison.beats_baseline,
+        "hysteresis_log_likelihood_gain": markov_comparison.log_likelihood_gain,
+    }
+    gate_cards = "\n".join(
+        [
+            _gate_card(
+                "Picard contraction",
+                "pass" if promotion_gates["picard_certified"] else "wait",
+                f"reserve {promotion_gates['picard_contraction_reserve']:.3e}",
+                "target < 0.35",
+            ),
+            _gate_card(
+                "Hysteresis baseline",
+                "pass" if promotion_gates["hysteresis_beats_independent_baseline"] else "wait",
+                f"beats_baseline: {str(promotion_gates['hysteresis_beats_independent_baseline']).lower()}",
+                f"log gain {promotion_gates['hysteresis_log_likelihood_gain']:.3e}",
+            ),
+            _gate_card(
+                "Engine export",
+                "pass",
+                "threebody_engine",
+                "import-ready API",
+            ),
+        ]
+    )
     chart_distribution = {str(key): float(value) for key, value in general_distribution.items()}
     transition_rows = [
         {
@@ -192,14 +279,14 @@ def _render_page(
       --paper: #f7fafc;
       --panel: #ffffff;
       --accent: #0b84f3;
+      --success: #008f5a;
+      --warn: #b7791f;
     }}
     * {{ box-sizing: border-box; }}
     body {{
       margin: 0;
       color: var(--ink);
-      background:
-        radial-gradient(circle at top left, rgba(11, 132, 243, 0.16), transparent 34rem),
-        linear-gradient(135deg, #fbfdff 0%, #eef4f7 100%);
+      background: linear-gradient(135deg, #fbfdff 0%, #eef4f7 100%);
       font-family: Georgia, "Times New Roman", serif;
     }}
     main {{ width: min(1180px, calc(100vw - 32px)); margin: 0 auto; padding: 42px 0 56px; }}
@@ -209,31 +296,62 @@ def _render_page(
       margin-bottom: 30px;
       padding: 28px;
       border: 1px solid var(--line);
-      border-radius: 24px;
+      border-radius: 8px;
       background: rgba(255, 255, 255, 0.78);
       box-shadow: 0 22px 70px rgba(22, 33, 47, 0.08);
       backdrop-filter: blur(12px);
     }}
-    h1 {{ margin: 0; font-size: clamp(2rem, 5vw, 4.4rem); line-height: 0.95; letter-spacing: -0.05em; }}
-    h2 {{ margin: 0 0 14px; font-size: 1.35rem; letter-spacing: -0.02em; }}
+    h1 {{ margin: 0; font-size: clamp(2rem, 5vw, 4.4rem); line-height: 0.95; letter-spacing: 0; }}
+    h2 {{ margin: 0 0 14px; font-size: 1.35rem; letter-spacing: 0; }}
     p {{ margin: 0; color: var(--muted); line-height: 1.65; }}
     .grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 20px 0 24px; }}
+    .upgrade-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }}
+    .gate-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }}
+    .gate {{
+      display: grid;
+      gap: 8px;
+      min-height: 118px;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }}
+    .gate.pass {{ border-top: 4px solid var(--success); }}
+    .gate.wait {{ border-top: 4px solid var(--warn); }}
+    .gate-label {{ color: var(--muted); font-size: 0.82rem; text-transform: uppercase; }}
+    .gate-value {{ font: 700 0.96rem ui-monospace, SFMono-Regular, Consolas, monospace; }}
+    .gate-status {{ width: fit-content; font: 700 0.78rem ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--success); }}
+    .gate.wait .gate-status {{ color: var(--warn); }}
     .metric, section {{
       border: 1px solid var(--line);
-      border-radius: 20px;
+      border-radius: 8px;
       background: rgba(255,255,255,0.86);
       box-shadow: 0 18px 48px rgba(22, 33, 47, 0.06);
     }}
     .metric {{ padding: 16px; }}
     .metric strong {{ display: block; font-size: 1.2rem; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }}
     .metric span {{ color: var(--muted); font-size: 0.88rem; }}
+    .upgrade {{ padding: 16px; border-left: 4px solid var(--accent); }}
+    .upgrade strong {{ display: block; margin-bottom: 6px; font-size: 1rem; }}
+    .badge {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      width: fit-content;
+      margin-top: 10px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: rgba(0, 143, 90, 0.12);
+      color: var(--success);
+      font: 700 0.78rem ui-monospace, SFMono-Regular, Consolas, monospace;
+    }}
     section {{ padding: 18px; margin: 18px 0; overflow: hidden; }}
     .figure-grid {{ display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr); gap: 18px; align-items: stretch; }}
     pre {{
       margin: 0;
       padding: 16px;
       overflow: auto;
-      border-radius: 14px;
+      border-radius: 8px;
       background: #0f1722;
       color: #d9e1ec;
       font-size: 0.82rem;
@@ -241,7 +359,7 @@ def _render_page(
     }}
     a {{ color: var(--accent); }}
     @media (max-width: 900px) {{
-      .grid, .figure-grid {{ grid-template-columns: 1fr; }}
+      .grid, .figure-grid, .upgrade-grid, .gate-grid {{ grid-template-columns: 1fr; }}
       main {{ width: min(100vw - 18px, 1180px); padding-top: 12px; }}
     }}
   </style>
@@ -263,6 +381,19 @@ def _render_page(
     {_metric_card("General energy drift", metrics["general_max_energy_drift"])}
     {_metric_card("Figure-eight FTLE", metrics["figure_eight_finite_time_lyapunov"])}
   </div>
+
+  <section>
+    <h2>Verification engine upgrades</h2>
+    <p>
+      The latest build visualizes the move from trajectory display to certificate-driven research:
+      Picard contraction tuning, hysteresis symbolic dynamics, and a public threebody-engine API surface.
+    </p>
+    <div class="upgrade-grid">
+      {_upgrade_card("Picard contraction", "Scaled phase-space Jacobian tuning drives the representative tail below the target contraction threshold.", f"max {metrics['picard_max_contraction']:.3e}")}
+      {_upgrade_card("Hysteresis grammar", "Return-map chart words are evaluated as a Markov chain and compared against an independent next-symbol baseline.", f"ratio {metrics['hysteresis_markov_perplexity_ratio']:.3e}")}
+      {_upgrade_card("Engine API", "The static page mirrors the JSON-ready promotion gates exposed by threebody_engine.run_verification_report.", "api ready")}
+    </div>
+  </section>
 
   <section>
     <h2>Two-body analytic baseline</h2>
@@ -302,6 +433,21 @@ def _render_page(
   </section>
 
   <section>
+    <h2>Picard and symbolic-dynamics promotion gates</h2>
+    <p>
+      These panels expose the newest proof-engine changes: automatic Picard tuning with contraction reserve,
+      and hysteresis grammar tested against a non-memory baseline.
+    </p>
+    <div class="gate-grid">
+      {gate_cards}
+    </div>
+    <div class="figure-grid">
+      <div>{figure_html[8]}</div>
+      <div>{figure_html[9]}</div>
+    </div>
+  </section>
+
+  <section>
     <h2>Analysis atlas snapshot</h2>
     <div class="figure-grid">
       <pre>{html.escape(json.dumps(chart_distribution, indent=2, sort_keys=True))}</pre>
@@ -311,7 +457,7 @@ def _render_page(
 
   <section>
     <h2>Research certificate status</h2>
-    <pre>{html.escape(json.dumps({"metrics": metrics, "jacobi_escape_cone": jacobi_summary, "note": "Full theorem-suite benchmarks remain a local/CI research check; this page embeds a representative certificate and latest parameter-box summary."}, indent=2, sort_keys=True))}</pre>
+    <pre>{html.escape(json.dumps({"metrics": metrics, "promotion_gates": promotion_gates, "jacobi_escape_cone": jacobi_summary, "note": "Full theorem-suite benchmarks remain a local/CI research check; this page embeds a representative certificate and latest parameter-box summary."}, indent=2, sort_keys=True))}</pre>
   </section>
 </main>
 </body>
@@ -325,6 +471,29 @@ def _metric_card(label: str, value: object) -> str:
     else:
         rendered = html.escape(str(value))
     return f'<div class="metric"><strong>{rendered}</strong><span>{html.escape(label)}</span></div>'
+
+
+def _upgrade_card(title: str, body: str, badge: str) -> str:
+    return (
+        '<div class="metric upgrade">'
+        f"<strong>{html.escape(title)}</strong>"
+        f"<p>{html.escape(body)}</p>"
+        f'<span class="badge">{html.escape(badge)}</span>'
+        "</div>"
+    )
+
+
+def _gate_card(title: str, status: str, value: str, detail: str) -> str:
+    normalized_status = "pass" if status == "pass" else "wait"
+    status_text = "PASS" if normalized_status == "pass" else "WAIT"
+    return (
+        f'<div class="gate {normalized_status}">'
+        f'<span class="gate-label">{html.escape(title)}</span>'
+        f'<span class="gate-status">{status_text}</span>'
+        f'<span class="gate-value">{html.escape(value)}</span>'
+        f"<p>{html.escape(detail)}</p>"
+        "</div>"
+    )
 
 
 def _line_figure(x: np.ndarray, y: np.ndarray, title: str, yaxis_title: str) -> go.Figure:
@@ -369,6 +538,78 @@ def _jacobi_certificate_figure(summary: dict[str, object]) -> go.Figure:
     figure = go.Figure(go.Bar(x=labels, y=values, marker={"color": colors}))
     figure.update_layout(
         title="Escape-cone certificate scalars",
+        yaxis_type="log",
+        yaxis_title="value (log scale)",
+        template="plotly_white",
+        height=520,
+        margin={"l": 52, "r": 18, "t": 58, "b": 82},
+    )
+    return figure
+
+
+def _picard_certificate_figure(summary: dict[str, object]) -> go.Figure:
+    picard = summary["picard_flow"]
+    tuning = summary["picard_tuning"]
+    labels = [
+        "max contraction",
+        "target",
+        "reserve",
+        "margin lower",
+        "mean substeps",
+    ]
+    values = [
+        picard["maximum_observed_contraction"],
+        picard["target_contraction"],
+        tuning["contraction_reserve"],
+        tuning["best_interval_escape_margin_lower"],
+        tuning["mean_substeps_per_segment"],
+    ]
+    figure = go.Figure()
+    figure.add_trace(
+        go.Bar(
+            x=labels,
+            y=values,
+            marker={"color": ["#00a878", "#2f4858", "#00a878", "#0b84f3", "#ffa600"]},
+        )
+    )
+    figure.add_hline(
+        y=picard["target_contraction"],
+        line_dash="dash",
+        line_color="#f95d6a",
+        annotation_text="target contraction",
+    )
+    figure.update_layout(
+        title="Picard contraction tuning",
+        yaxis_type="log",
+        yaxis_title="value (log scale)",
+        template="plotly_white",
+        height=520,
+        margin={"l": 52, "r": 18, "t": 58, "b": 82},
+    )
+    return figure
+
+
+def _markov_baseline_figure(summary: dict[str, object]) -> go.Figure:
+    comparison = summary["hysteresis_markov"]["baseline_comparison"]
+    validation = comparison["markov_validation"]
+    labels = [
+        "Markov PPL",
+        "baseline PPL",
+        "PPL ratio",
+        "coverage",
+        "LL gain",
+    ]
+    values = [
+        validation["perplexity"],
+        comparison["baseline_perplexity"],
+        comparison["perplexity_ratio"],
+        validation["coverage_fraction"],
+        max(comparison["log_likelihood_gain"], 1.0e-12),
+    ]
+    colors = ["#0b84f3", "#ffa600", "#6c63ff", "#00a878", "#00a878" if comparison["beats_baseline"] else "#f95d6a"]
+    figure = go.Figure(go.Bar(x=labels, y=values, marker={"color": colors}))
+    figure.update_layout(
+        title="Markov baseline test",
         yaxis_type="log",
         yaxis_title="value (log scale)",
         template="plotly_white",

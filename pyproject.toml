@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "threebody"
+name = "threebody-engine"
 version = "0.1.0"
 description = "High-precision three-body simulation, diagnostics, and interactive visualization."
 readme = "README.md"

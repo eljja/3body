@@ -430,6 +430,48 @@ class JacobiIntervalPicardFlowCertificate:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class JacobiPicardTuningCertificate:
+    """Automatic Picard tuning result across contraction-bound settings."""
+
+    inner_pair: tuple[int, int]
+    outer_body: int
+    attempted_count: int
+    selected_maximum_substeps_per_segment: int
+    selected_scaled_phase_norm: bool
+    selected_lipschitz_bound_method: str
+    best_observed_contraction: float
+    contraction_reserve: float
+    best_interval_escape_margin_lower: float
+    best_substep_count: int
+    mean_substeps_per_segment: float
+    certification_efficiency: float
+    target_contraction: float
+    certified: bool
+    attempts: tuple[dict[str, float | int | bool | str], ...]
+    warning: str
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "inner_pair": self.inner_pair,
+            "outer_body": self.outer_body,
+            "attempted_count": self.attempted_count,
+            "selected_maximum_substeps_per_segment": self.selected_maximum_substeps_per_segment,
+            "selected_scaled_phase_norm": self.selected_scaled_phase_norm,
+            "selected_lipschitz_bound_method": self.selected_lipschitz_bound_method,
+            "best_observed_contraction": self.best_observed_contraction,
+            "contraction_reserve": self.contraction_reserve,
+            "best_interval_escape_margin_lower": self.best_interval_escape_margin_lower,
+            "best_substep_count": self.best_substep_count,
+            "mean_substeps_per_segment": self.mean_substeps_per_segment,
+            "certification_efficiency": self.certification_efficiency,
+            "target_contraction": self.target_contraction,
+            "certified": self.certified,
+            "attempts": list(self.attempts),
+            "warning": self.warning,
+        }
+
+
 def jacobi_energy_decomposition(
     system: object,
     state: np.ndarray,
@@ -1178,6 +1220,7 @@ def jacobi_interval_picard_flow_certificate(
     target_contraction: float = 0.35,
     initial_state_radius: float = 1.0e-12,
     maximum_substeps_per_segment: int = 256,
+    use_scaled_phase_norm: bool = True,
 ) -> JacobiIntervalPicardFlowCertificate:
     """Propagate tail interval boxes by a segment-wise Picard inclusion test.
 
@@ -1223,11 +1266,11 @@ def jacobi_interval_picard_flow_certificate(
             continue
         segment_lower = np.minimum(states[index], states[index + 1]) - tube_radius
         segment_upper = np.maximum(states[index], states[index + 1]) + tube_radius
-        segment_lipschitz = _rhs_lipschitz_inf_bound(system, segment_lower, segment_upper)
-        if not np.isfinite(segment_lipschitz) or segment_lipschitz <= 0.0:
+        segment_subdivision_lipschitz = _rhs_interval_jacobian_inf_bound(system, segment_lower, segment_upper)
+        if not np.isfinite(segment_subdivision_lipschitz) or segment_subdivision_lipschitz <= 0.0:
             substeps = maximum_substeps_per_segment
         else:
-            substeps = max(1, int(np.ceil(dt * segment_lipschitz / (0.75 * target_contraction))))
+            substeps = max(1, int(np.ceil(dt * segment_subdivision_lipschitz / (0.75 * target_contraction))))
             substeps = min(substeps, maximum_substeps_per_segment)
         current_lower = states[index] - initial_state_radius
         current_upper = states[index] + initial_state_radius
@@ -1247,7 +1290,12 @@ def jacobi_interval_picard_flow_certificate(
                 picard_passes += 1
             else:
                 segment_inclusion_ok = False
-            lipschitz = _rhs_lipschitz_inf_bound(system, z_lower, z_upper)
+            lipschitz = _rhs_lipschitz_bound(
+                system,
+                z_lower,
+                z_upper,
+                use_scaled_phase_norm=use_scaled_phase_norm,
+            )
             maximum_lipschitz = max(maximum_lipschitz, lipschitz)
             maximum_contraction = max(maximum_contraction, sub_dt * lipschitz)
             current_lower, current_upper = image_lower, image_upper
@@ -1292,7 +1340,11 @@ def jacobi_interval_picard_flow_certificate(
         initial_state_radius=float(initial_state_radius),
         maximum_propagated_endpoint_radius=float(maximum_propagated_endpoint_radius),
         maximum_lipschitz_bound=float(maximum_lipschitz),
-        lipschitz_bound_method="interval_newtonian_rhs_jacobian_inf_row_sum",
+        lipschitz_bound_method=(
+            "scaled_phase_space_interval_newtonian_rhs_jacobian"
+            if use_scaled_phase_norm
+            else "interval_newtonian_rhs_jacobian_inf_row_sum"
+        ),
         maximum_observed_contraction=float(maximum_contraction),
         target_contraction=float(target_contraction),
         picard_inclusion_fraction=picard_fraction,
@@ -1303,6 +1355,93 @@ def jacobi_interval_picard_flow_certificate(
         interval_escape_margin_lower=interval_escape.asymptotic_margin_lower,
         interval_escape_certified=interval_escape.interval_escape_certified,
         picard_flow_certified=certified,
+        warning=warning,
+    )
+
+
+def jacobi_picard_tuning_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    inner_pair: tuple[int, int] = (0, 1),
+    tail_fraction: float = 0.25,
+    target_contraction: float = 0.35,
+    maximum_substep_candidates: tuple[int, ...] = (64, 128, 256),
+    norm_candidates: tuple[bool, ...] = (True, False),
+) -> JacobiPicardTuningCertificate:
+    """Try Picard contraction settings and select the cheapest certified one."""
+
+    attempts: list[dict[str, float | int | bool | str]] = []
+    best: JacobiIntervalPicardFlowCertificate | None = None
+    best_cap = 0
+    best_scaled = False
+    selected: JacobiIntervalPicardFlowCertificate | None = None
+    selected_cap = 0
+    selected_scaled = False
+    for scaled in norm_candidates:
+        for cap in maximum_substep_candidates:
+            certificate = jacobi_interval_picard_flow_certificate(
+                system,
+                trajectory,
+                inner_pair=inner_pair,
+                tail_fraction=tail_fraction,
+                target_contraction=target_contraction,
+                maximum_substeps_per_segment=cap,
+                use_scaled_phase_norm=scaled,
+            )
+            attempts.append(
+                {
+                    "maximum_substeps_per_segment": int(cap),
+                    "use_scaled_phase_norm": bool(scaled),
+                    "lipschitz_bound_method": certificate.lipschitz_bound_method,
+                    "observed_contraction": certificate.maximum_observed_contraction,
+                    "substep_count": certificate.substep_count,
+                    "interval_escape_margin_lower": certificate.interval_escape_margin_lower,
+                    "certified": certificate.picard_flow_certified,
+                    "warning": certificate.warning,
+                }
+            )
+            if best is None or (
+                certificate.picard_flow_certified,
+                certificate.interval_escape_margin_lower,
+                -certificate.maximum_observed_contraction,
+            ) > (
+                best.picard_flow_certified,
+                best.interval_escape_margin_lower,
+                -best.maximum_observed_contraction,
+            ):
+                best = certificate
+                best_cap = cap
+                best_scaled = scaled
+            if certificate.picard_flow_certified and selected is None:
+                selected = certificate
+                selected_cap = cap
+                selected_scaled = scaled
+                break
+        if selected is not None:
+            break
+    chosen = selected or best
+    if chosen is None:
+        raise RuntimeError("Picard tuning produced no attempts.")
+    certified = bool(chosen.picard_flow_certified)
+    warning = "" if certified else "no Picard tuning candidate certified the interval flow"
+    mean_substeps = float(chosen.substep_count / max(chosen.segment_count, 1))
+    reserve = float(target_contraction - chosen.maximum_observed_contraction)
+    return JacobiPicardTuningCertificate(
+        inner_pair=inner_pair,
+        outer_body=chosen.outer_body,
+        attempted_count=len(attempts),
+        selected_maximum_substeps_per_segment=int(selected_cap if selected is not None else best_cap),
+        selected_scaled_phase_norm=bool(selected_scaled if selected is not None else best_scaled),
+        selected_lipschitz_bound_method=chosen.lipschitz_bound_method,
+        best_observed_contraction=chosen.maximum_observed_contraction,
+        contraction_reserve=reserve,
+        best_interval_escape_margin_lower=chosen.interval_escape_margin_lower,
+        best_substep_count=chosen.substep_count,
+        mean_substeps_per_segment=mean_substeps,
+        certification_efficiency=float(max(reserve, 0.0) / max(mean_substeps, 1.0e-12)),
+        target_contraction=target_contraction,
+        certified=certified,
+        attempts=tuple(attempts),
         warning=warning,
     )
 
@@ -1576,7 +1715,45 @@ def _rhs_lipschitz_inf_bound(system: object, state_lower: np.ndarray, state_uppe
     return _rhs_interval_jacobian_inf_bound(system, state_lower, state_upper)
 
 
+def _rhs_lipschitz_bound(
+    system: object,
+    state_lower: np.ndarray,
+    state_upper: np.ndarray,
+    *,
+    use_scaled_phase_norm: bool,
+) -> float:
+    if use_scaled_phase_norm:
+        return _rhs_interval_jacobian_scaled_phase_bound(system, state_lower, state_upper)
+    return _rhs_interval_jacobian_inf_bound(system, state_lower, state_upper)
+
+
 def _rhs_interval_jacobian_inf_bound(system: object, state_lower: np.ndarray, state_upper: np.ndarray) -> float:
+    maximum_acceleration_row_sum = _maximum_acceleration_jacobian_row_sum(system, state_lower, state_upper)
+    if not np.isfinite(maximum_acceleration_row_sum):
+        return float("inf")
+    return float(max(1.0, maximum_acceleration_row_sum))
+
+
+def _rhs_interval_jacobian_scaled_phase_bound(
+    system: object,
+    state_lower: np.ndarray,
+    state_upper: np.ndarray,
+) -> float:
+    """Scaled phase-space bound for `q'=v, v'=a(q)`.
+
+    In coordinates with different position and velocity scales, the Jacobian
+    block bound becomes `max(s, A/s)`, where `A` bounds the acceleration
+    Jacobian row sum. Choosing `s=sqrt(A)` gives a tighter local normal-form-like
+    contraction proxy while preserving an explicit coordinate transform.
+    """
+
+    maximum_acceleration_row_sum = _maximum_acceleration_jacobian_row_sum(system, state_lower, state_upper)
+    if not np.isfinite(maximum_acceleration_row_sum):
+        return float("inf")
+    return float(max(1.0e-12, np.sqrt(max(maximum_acceleration_row_sum, 1.0e-24))))
+
+
+def _maximum_acceleration_jacobian_row_sum(system: object, state_lower: np.ndarray, state_upper: np.ndarray) -> float:
     dimension = int(system.body_count * system.dimension)
     position_lower = np.asarray(state_lower[:dimension], dtype=float).reshape(system.body_count, system.dimension)
     position_upper = np.asarray(state_upper[:dimension], dtype=float).reshape(system.body_count, system.dimension)

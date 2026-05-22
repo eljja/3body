@@ -58,6 +58,22 @@ Install the package in editable mode:
 & 'D:\Codex\.venv\Scripts\python.exe' -m pip install -e .[dev]
 ```
 
+The distribution package is `threebody-engine`.
+The research implementation remains importable as `threebody`, while the stable verification API is exposed as `threebody_engine`:
+
+```python
+from threebody_engine import (
+    build_hysteresis_markov_chain,
+    compare_hysteresis_markov_to_baseline,
+    certify_jacobi_escape,
+    certify_jacobi_escape_report,
+    integrate_reference_scenario,
+    run_verification_report,
+    tune_jacobi_picard,
+    validate_hysteresis_markov_chain,
+)
+```
+
 Run the test suite:
 
 ```powershell
