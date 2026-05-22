@@ -416,6 +416,7 @@ def run_verification_report(
     comparison = bootstrap_comparison.comparison
     return {
         "metadata": {
+            "report_schema_version": 2,
             "engine": "threebody-engine",
             "scenario": reference.name,
             "source_scenario": scenario,
@@ -424,6 +425,12 @@ def run_verification_report(
             "stride": stride,
             "target_contraction": target_contraction,
             "word_mode": word_mode,
+            "random_seeds": {
+                "hysteresis_bootstrap": 11,
+                "poincare_bootstrap": 29,
+                "poincare_permutation_control": 37,
+                "symbolic_stride_robustness": 43,
+            },
         },
         "jacobi": jacobi_report,
         "hysteresis_markov": {

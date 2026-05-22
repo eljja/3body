@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import argparse
+from datetime import UTC, datetime
 import html
 import json
+import os
+import platform
 from pathlib import Path
 
 import numpy as np
@@ -44,6 +47,7 @@ def build_static_site(output_dir: str | Path) -> Path:
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
+    provenance = _build_provenance()
 
     library = OrbitLibrary()
     integrator = AdaptiveIntegrator(rtol=1.0e-10, atol=1.0e-12)
@@ -101,6 +105,7 @@ def build_static_site(output_dir: str | Path) -> Path:
         grammar_phase_flyby_system=grammar_phase_flyby.system,
         grammar_phase_extra_flyby=grammar_phase_extra_traj,
         grammar_phase_extra_flyby_system=grammar_phase_extra_flyby.system,
+        provenance=provenance,
     )
 
     index_path = output_path / "index.html"
@@ -125,6 +130,7 @@ def _render_page(
     grammar_phase_flyby_system: object,
     grammar_phase_extra_flyby: TrajectoryResult,
     grammar_phase_extra_flyby_system: object,
+    provenance: dict[str, object],
 ) -> str:
     two_invariants = InvariantMonitor(two_body_system).evaluate(two_body)
     restricted_invariants = InvariantMonitor(restricted_system).evaluate(restricted)
@@ -667,12 +673,41 @@ def _render_page(
 
   <section>
     <h2>Research certificate status</h2>
-    <pre>{html.escape(json.dumps({"metrics": metrics, "promotion_gates": promotion_gates, "jacobi_escape_cone": jacobi_summary, "note": "Full theorem-suite benchmarks remain a local/CI research check; this page embeds a representative certificate and latest parameter-box summary."}, indent=2, sort_keys=True))}</pre>
+    <pre>{html.escape(json.dumps({"metrics": metrics, "promotion_gates": promotion_gates, "jacobi_escape_cone": jacobi_summary, "build_provenance": provenance, "note": "Full theorem-suite benchmarks remain a local/CI research check; this page embeds a representative certificate and latest parameter-box summary."}, indent=2, sort_keys=True))}</pre>
+  </section>
+
+  <section>
+    <h2>Build provenance</h2>
+    <p>
+      This block records the deployment identity behind the embedded numerical evidence, so public figures can be
+      traced back to a commit, workflow run, Python runtime, and generation timestamp.
+    </p>
+    <div class="gate-grid">
+      {_provenance_card("Commit", str(provenance["commit_sha_short"]), str(provenance["ref_name"]))}
+      {_provenance_card("Run", str(provenance["run_id"]), str(provenance["run_attempt"]))}
+      {_provenance_card("Generated UTC", str(provenance["generated_at_utc"]), str(provenance["python_version"]))}
+    </div>
   </section>
 </main>
 </body>
 </html>
 """
+
+
+def _build_provenance() -> dict[str, object]:
+    commit_sha = os.environ.get("GITHUB_SHA", "local")
+    return {
+        "schema_version": 1,
+        "generated_at_utc": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "commit_sha": commit_sha,
+        "commit_sha_short": commit_sha[:7] if commit_sha != "local" else "local",
+        "ref_name": os.environ.get("GITHUB_REF_NAME", "local"),
+        "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
+        "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", "local"),
+        "workflow": os.environ.get("GITHUB_WORKFLOW", "local"),
+        "python_version": platform.python_version(),
+        "generator": "threebody.ui.static_site",
+    }
 
 
 def _progress_map(
@@ -936,6 +971,16 @@ def _gate_card(title: str, status: str, value: str, detail: str) -> str:
         f'<span class="gate-status">{status_text}</span>'
         f'<span class="gate-value">{html.escape(value)}</span>'
         f"<p>{html.escape(detail)}</p>"
+        "</div>"
+    )
+
+
+def _provenance_card(title: str, value: str, detail: str) -> str:
+    return (
+        '<div class="gate pass">'
+        f'<span class="gate-label">{html.escape(title)}</span>'
+        f'<span class="gate-status">{html.escape(value)}</span>'
+        f'<span class="gate-value">{html.escape(detail)}</span>'
         "</div>"
     )
 

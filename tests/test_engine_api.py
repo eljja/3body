@@ -145,7 +145,9 @@ def test_engine_api_runs_integrated_verification_report() -> None:
     )
 
     assert report["metadata"]["engine"] == "threebody-engine"
+    assert report["metadata"]["report_schema_version"] == 2
     assert report["metadata"]["word_mode"] == "refined"
+    assert report["metadata"]["random_seeds"]["symbolic_stride_robustness"] == 43
     assert report["promotion_gates"]["picard_certified"] is True
     assert report["promotion_gates"]["picard_contraction_reserve"] > 0.0
     assert "baseline_comparison" in report["hysteresis_markov"]

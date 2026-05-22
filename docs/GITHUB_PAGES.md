@@ -11,6 +11,10 @@ The static build performs these steps during GitHub Actions deployment:
 4. Embed the resulting Plotly figures, certificate bars, promotion gates, progress-map timeline, and metrics into `site/index.html`.
 5. Publish the generated `site` directory through GitHub Pages.
 
+The workflow opts JavaScript actions into the Node 24 runner path and embeds build provenance in the generated HTML:
+commit SHA, workflow run, ref name, Python version, and UTC generation time are included beside the research
+certificate JSON.
+
 Build locally:
 
 ```powershell

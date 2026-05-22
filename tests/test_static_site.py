@@ -43,5 +43,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "stride_robustness" in content
     assert "symbolic_passes_stride_robustness" in content
     assert "Stride robustness" in content
+    assert "Build provenance" in content
+    assert "build_provenance" in content
+    assert "generated_at_utc" in content
     assert "jacobi_parameter_interval_box_margin" not in content
     assert "interval_box_margin_lower" in content
