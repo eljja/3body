@@ -97,6 +97,8 @@ Build the static GitHub Pages visualizer:
 & 'D:\Codex\.venv\Scripts\python.exe' -m threebody.ui.static_site --output site
 ```
 
+The static build includes a visual evidence publication pipeline plus machine-readable `certificate.json` and `manifest.json` artifacts for reproducible public review.
+
 Run a transition survey:
 
 ```powershell

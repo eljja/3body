@@ -50,6 +50,10 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "stride_robustness" in content
     assert "symbolic_passes_stride_robustness" in content
     assert "Stride robustness" in content
+    assert "Evidence publication pipeline" in content
+    assert "Python engine" in content
+    assert "Gate suite" in content
+    assert "Integrity manifest" in content
     assert "Build provenance" in content
     assert "build_provenance" in content
     assert "generated_at_utc" in content
@@ -61,6 +65,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert certificate["certificate_schema_version"] == 1
     assert certificate["artifact"] == "threebody-static-research-certificate"
     assert certificate["artifact_manifest"] == "manifest.json"
+    assert certificate["publication_pipeline"]["promotion_gate_pass_count"] == 7
+    assert certificate["publication_pipeline"]["integrity_manifest"] == "manifest.json"
     assert certificate["promotion_gates"]["symbolic_passes_stride_robustness"] is True
     assert certificate["build_provenance"]["generator"] == "threebody.ui.static_site"
     assert "analysis_atlas_snapshot" in certificate

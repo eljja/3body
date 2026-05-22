@@ -438,10 +438,18 @@ def _render_page(
         }
         for transition in general_transitions[:12]
     ]
+    public_gate_summary = _public_gate_summary(promotion_gates)
     certificate_bundle = {
         "certificate_schema_version": 1,
         "artifact": "threebody-static-research-certificate",
         "artifact_manifest": "manifest.json",
+        "publication_pipeline": {
+            "engine": "threebody.ui.static_site",
+            "promotion_gate_pass_count": public_gate_summary["pass_count"],
+            "promotion_gate_total": public_gate_summary["total"],
+            "machine_readable_certificate": "certificate.json",
+            "integrity_manifest": "manifest.json",
+        },
         "metrics": metrics,
         "promotion_gates": promotion_gates,
         "jacobi_escape_cone": jacobi_summary,
@@ -453,6 +461,7 @@ def _render_page(
         "note": "Full theorem-suite benchmarks remain a local/CI research check; this artifact embeds a representative certificate and latest parameter-box summary.",
     }
     certificate_json = html.escape(json.dumps(certificate_bundle, indent=2, sort_keys=True))
+    evidence_pipeline = _evidence_pipeline(public_gate_summary, metrics, provenance)
 
     return f"""<!doctype html>
 <html lang="en">
@@ -526,6 +535,37 @@ def _render_page(
     .progress-step.wait .progress-index {{ background: rgba(183, 121, 31, 0.12); color: var(--warn); }}
     .progress-step strong {{ font-size: 0.98rem; }}
     .progress-step span {{ color: var(--muted); font-size: 0.82rem; line-height: 1.45; }}
+    .pipeline {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }}
+    .pipeline-node {{
+      position: relative;
+      display: grid;
+      gap: 8px;
+      min-height: 132px;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--accent);
+      border-radius: 8px;
+      background: #fff;
+    }}
+    .pipeline-node.pass {{ border-top-color: var(--success); }}
+    .pipeline-node:not(:last-child)::after {{
+      content: "";
+      position: absolute;
+      top: 50%;
+      right: -12px;
+      width: 12px;
+      height: 2px;
+      background: var(--line);
+    }}
+    .pipeline-kicker {{ color: var(--muted); font-size: 0.76rem; text-transform: uppercase; }}
+    .pipeline-node strong {{ font-size: 1rem; }}
+    .pipeline-node code {{ font: 700 0.86rem ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }}
+    .pipeline-node span {{ color: var(--muted); font-size: 0.84rem; line-height: 1.45; }}
     .evidence-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 16px; }}
     .evidence {{
       display: grid;
@@ -591,7 +631,8 @@ def _render_page(
     }}
     a {{ color: var(--accent); }}
     @media (max-width: 900px) {{
-      .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .evidence-grid {{ grid-template-columns: 1fr; }}
+      .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .pipeline, .evidence-grid {{ grid-template-columns: 1fr; }}
+      .pipeline-node:not(:last-child)::after {{ display: none; }}
       main {{ width: min(100vw - 18px, 1180px); padding-top: 12px; }}
     }}
   </style>
@@ -622,6 +663,15 @@ def _render_page(
       backed by the current build output.
     </p>
     {progress_map}
+  </section>
+
+  <section>
+    <h2>Evidence publication pipeline</h2>
+    <p>
+      The public page now separates computation, promotion, publication, and integrity checks so the research result
+      can be read visually and audited programmatically.
+    </p>
+    {evidence_pipeline}
   </section>
 
   <section>
@@ -739,6 +789,67 @@ def _build_provenance() -> dict[str, object]:
         "python_version": platform.python_version(),
         "generator": "threebody.ui.static_site",
     }
+
+
+def _public_gate_summary(promotion_gates: dict[str, object]) -> dict[str, int]:
+    gates = (
+        bool(promotion_gates["picard_certified"]),
+        bool(promotion_gates["hysteresis_significant_baseline_win"]),
+        bool(promotion_gates["hysteresis_memory_order_selected"]),
+        bool(promotion_gates["poincare_coordinate_has_sufficient_section"]),
+        bool(promotion_gates["poincare_passes_permutation_control"]),
+        bool(promotion_gates["poincare_passes_section_robustness"]),
+        bool(promotion_gates["symbolic_passes_stride_robustness"]),
+    )
+    return {"pass_count": sum(gates), "total": len(gates)}
+
+
+def _evidence_pipeline(
+    public_gate_summary: dict[str, int],
+    metrics: dict[str, float],
+    provenance: dict[str, object],
+) -> str:
+    nodes = (
+        (
+            "Compute",
+            "Python engine",
+            f"drift {metrics['general_max_energy_drift']:.2e}",
+            "trajectories, invariants, atlas reports",
+        ),
+        (
+            "Promote",
+            "Gate suite",
+            f"{public_gate_summary['pass_count']} / {public_gate_summary['total']} pass",
+            "Picard, Markov, Poincare, robustness",
+        ),
+        (
+            "Publish",
+            "Certificate JSON",
+            "schema 1",
+            "machine-readable promotion evidence",
+        ),
+        (
+            "Verify",
+            "Integrity manifest",
+            str(provenance["commit_sha_short"]),
+            "SHA-256 bundle check",
+        ),
+    )
+    return (
+        '<div class="pipeline">'
+        + "\n".join(
+            (
+                '<div class="pipeline-node pass">'
+                f'<span class="pipeline-kicker">{html.escape(kicker)}</span>'
+                f"<strong>{html.escape(title)}</strong>"
+                f"<code>{html.escape(value)}</code>"
+                f"<span>{html.escape(detail)}</span>"
+                "</div>"
+            )
+            for kicker, title, value, detail in nodes
+        )
+        + "</div>"
+    )
 
 
 def _artifact_manifest(output_path: Path, provenance: dict[str, object]) -> dict[str, object]:
