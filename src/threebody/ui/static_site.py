@@ -672,11 +672,6 @@ def _render_page(
   </section>
 
   <section>
-    <h2>Research certificate status</h2>
-    <pre>{html.escape(json.dumps({"metrics": metrics, "promotion_gates": promotion_gates, "jacobi_escape_cone": jacobi_summary, "build_provenance": provenance, "note": "Full theorem-suite benchmarks remain a local/CI research check; this page embeds a representative certificate and latest parameter-box summary."}, indent=2, sort_keys=True))}</pre>
-  </section>
-
-  <section>
     <h2>Build provenance</h2>
     <p>
       This block records the deployment identity behind the embedded numerical evidence, so public figures can be
@@ -687,6 +682,11 @@ def _render_page(
       {_provenance_card("Run", str(provenance["run_id"]), str(provenance["run_attempt"]))}
       {_provenance_card("Generated UTC", str(provenance["generated_at_utc"]), str(provenance["python_version"]))}
     </div>
+  </section>
+
+  <section>
+    <h2>Research certificate status</h2>
+    <pre>{html.escape(json.dumps({"metrics": metrics, "promotion_gates": promotion_gates, "jacobi_escape_cone": jacobi_summary, "build_provenance": provenance, "note": "Full theorem-suite benchmarks remain a local/CI research check; this page embeds a representative certificate and latest parameter-box summary."}, indent=2, sort_keys=True))}</pre>
   </section>
 </main>
 </body>
