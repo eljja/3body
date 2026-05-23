@@ -59,6 +59,7 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "generated_at_utc" in content
     assert "Open machine-readable certificate JSON" in content
     assert "Open artifact integrity manifest" in content
+    assert "verify-static-artifacts --site-dir site" in content
     assert "jacobi_parameter_interval_box_margin" not in content
     assert "interval_box_margin_lower" in content
     certificate = json.loads(certificate_path.read_text(encoding="utf-8"))

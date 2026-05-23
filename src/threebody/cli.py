@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from datetime import UTC, datetime
 from math import pi
@@ -183,6 +184,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-atlas-benchmark.json.",
     )
     benchmark.set_defaults(func=run_atlas_benchmark_command)
+    verify_static = subparsers.add_parser(
+        "verify-static-artifacts",
+        help="Verify static Pages certificate and manifest artifact integrity.",
+    )
+    verify_static.add_argument(
+        "--site-dir",
+        type=Path,
+        default=Path("site"),
+        help="Directory containing index.html, certificate.json, and manifest.json.",
+    )
+    verify_static.set_defaults(func=run_verify_static_artifacts_command)
     return parser
 
 
@@ -496,6 +508,53 @@ def run_atlas_benchmark_command(args: argparse.Namespace) -> int:
     print(f"wrote {output}")
     print(f"cases={len(cases)}")
     return 0
+
+
+def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
+    result = verify_static_artifacts(args.site_dir)
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0 if result["verified"] else 1
+
+
+def verify_static_artifacts(site_dir: Path) -> dict[str, object]:
+    manifest_path = site_dir / "manifest.json"
+    certificate_path = site_dir / "certificate.json"
+    index_path = site_dir / "index.html"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
+    checks = {
+        "manifest_schema": manifest.get("manifest_schema_version") == 1,
+        "certificate_schema": certificate.get("certificate_schema_version") == 1,
+        "certificate_manifest_link": certificate.get("artifact_manifest") == "manifest.json",
+        "provenance_commit_match": (
+            certificate.get("build_provenance", {}).get("commit_sha")
+            == manifest.get("build_provenance", {}).get("commit_sha")
+        ),
+        "index_hash": _manifest_hash_matches(manifest, "index.html", index_path),
+        "certificate_hash": _manifest_hash_matches(manifest, "certificate.json", certificate_path),
+        "index_size": _manifest_size_matches(manifest, "index.html", index_path),
+        "certificate_size": _manifest_size_matches(manifest, "certificate.json", certificate_path),
+    }
+    return {
+        "verified": all(checks.values()),
+        "site_dir": str(site_dir),
+        "commit_sha_short": certificate.get("build_provenance", {}).get("commit_sha_short"),
+        "checks": checks,
+    }
+
+
+def _manifest_hash_matches(manifest: dict[str, object], artifact_name: str, path: Path) -> bool:
+    artifact = manifest.get("artifacts", {}).get(artifact_name, {})
+    return artifact.get("sha256") == _sha256(path)
+
+
+def _manifest_size_matches(manifest: dict[str, object], artifact_name: str, path: Path) -> bool:
+    artifact = manifest.get("artifacts", {}).get(artifact_name, {})
+    return artifact.get("bytes") == path.stat().st_size
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _scenario_from_args(args: argparse.Namespace) -> Scenario:

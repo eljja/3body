@@ -99,6 +99,12 @@ Build the static GitHub Pages visualizer:
 
 The static build includes a visual evidence publication pipeline plus machine-readable `certificate.json` and `manifest.json` artifacts for reproducible public review.
 
+Verify a generated static evidence bundle:
+
+```powershell
+& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --site-dir site
+```
+
 Run a transition survey:
 
 ```powershell

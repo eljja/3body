@@ -50,6 +50,7 @@ Runs repeatable research jobs from the command line.
 
 - `threebody survey`
 - `python -m threebody.cli survey`
+- `python -m threebody.cli verify-static-artifacts --site-dir site`
 
 ### `src/threebody/experiments`
 

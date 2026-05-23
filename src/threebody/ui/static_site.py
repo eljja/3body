@@ -763,6 +763,7 @@ def _render_page(
       ·
       <a href="manifest.json">Open artifact integrity manifest</a>
     </p>
+    <pre>python -m threebody.cli verify-static-artifacts --site-dir site</pre>
   </section>
 
   <section>

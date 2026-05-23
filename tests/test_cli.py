@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 
 from threebody.cli import main
@@ -101,3 +102,47 @@ def test_atlas_benchmark_cli_writes_reproducible_cases(tmp_path) -> None:
     assert payload["cases"][0]["initial_state"]
     assert payload["cases"][0]["chart_distribution"]
     assert "threebody interpret" in payload["cases"][0]["reproduce"]
+
+
+def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
+    index_path = tmp_path / "index.html"
+    certificate_path = tmp_path / "certificate.json"
+    manifest_path = tmp_path / "manifest.json"
+    index_path.write_text("<html>ThreeBody Dynamics Lab</html>", encoding="utf-8")
+    certificate = {
+        "certificate_schema_version": 1,
+        "artifact": "threebody-static-research-certificate",
+        "artifact_manifest": "manifest.json",
+        "build_provenance": {
+            "commit_sha": "abc123",
+            "commit_sha_short": "abc123",
+        },
+    }
+    certificate_path.write_text(json.dumps(certificate, indent=2, sort_keys=True), encoding="utf-8")
+    manifest = {
+        "manifest_schema_version": 1,
+        "artifact": "threebody-static-site-manifest",
+        "build_provenance": {
+            "commit_sha": "abc123",
+            "commit_sha_short": "abc123",
+        },
+        "artifacts": {
+            "index.html": {
+                "sha256": _sha256(index_path),
+                "bytes": index_path.stat().st_size,
+            },
+            "certificate.json": {
+                "sha256": _sha256(certificate_path),
+                "bytes": certificate_path.stat().st_size,
+            },
+        },
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+    exit_code = main(["verify-static-artifacts", "--site-dir", str(tmp_path)])
+
+    assert exit_code == 0
+
+
+def _sha256(path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()

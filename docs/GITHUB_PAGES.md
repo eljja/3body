@@ -18,6 +18,7 @@ and `certificate.json`:
 commit SHA, workflow run, ref name, Python version, and UTC generation time are included beside the research
 certificate JSON.
 `manifest.json` records SHA-256 digests so downstream checks can confirm which files belong to one generated evidence bundle.
+Run `python -m threebody.cli verify-static-artifacts --site-dir site` to verify a local or downloaded Pages artifact directory.
 
 Build locally:
 
