@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 
+import threebody.cli as cli_module
 from threebody.cli import main
 
 
@@ -105,9 +106,57 @@ def test_atlas_benchmark_cli_writes_reproducible_cases(tmp_path) -> None:
 
 
 def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
-    index_path = tmp_path / "index.html"
-    certificate_path = tmp_path / "certificate.json"
-    manifest_path = tmp_path / "manifest.json"
+    _write_static_artifact_bundle(tmp_path)
+
+    exit_code = main(["verify-static-artifacts", "--site-dir", str(tmp_path)])
+
+    assert exit_code == 0
+
+
+def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    artifacts = {
+        "index.html": (tmp_path / "index.html").read_bytes(),
+        "certificate.json": (tmp_path / "certificate.json").read_bytes(),
+        "manifest.json": (tmp_path / "manifest.json").read_bytes(),
+    }
+    requested_urls: list[str] = []
+
+    class FakeResponse:
+        def __init__(self, data: bytes) -> None:
+            self.data = data
+
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return self.data
+
+    def fake_urlopen(request, timeout: int) -> FakeResponse:
+        requested_urls.append(request.full_url)
+        artifact_name = request.full_url.rstrip("/").rsplit("/", 1)[-1]
+        return FakeResponse(artifacts[artifact_name])
+
+    monkeypatch.setattr(cli_module, "urlopen", fake_urlopen)
+
+    result = cli_module.verify_static_artifacts_from_url("https://example.test/3body")
+
+    assert result["verified"] is True
+    assert result["source"] == "https://example.test/3body/"
+    assert requested_urls == [
+        "https://example.test/3body/index.html",
+        "https://example.test/3body/certificate.json",
+        "https://example.test/3body/manifest.json",
+    ]
+
+
+def _write_static_artifact_bundle(site_dir) -> None:
+    index_path = site_dir / "index.html"
+    certificate_path = site_dir / "certificate.json"
+    manifest_path = site_dir / "manifest.json"
     index_path.write_text("<html>ThreeBody Dynamics Lab</html>", encoding="utf-8")
     certificate = {
         "certificate_schema_version": 1,
@@ -138,10 +187,6 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
         },
     }
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
-
-    exit_code = main(["verify-static-artifacts", "--site-dir", str(tmp_path)])
-
-    assert exit_code == 0
 
 
 def _sha256(path) -> str:

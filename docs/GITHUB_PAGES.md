@@ -19,6 +19,7 @@ commit SHA, workflow run, ref name, Python version, and UTC generation time are 
 certificate JSON.
 `manifest.json` records SHA-256 digests so downstream checks can confirm which files belong to one generated evidence bundle.
 Run `python -m threebody.cli verify-static-artifacts --site-dir site` to verify a local or downloaded Pages artifact directory.
+Run `python -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/` to verify the public Pages bundle directly by URL.
 
 Build locally:
 

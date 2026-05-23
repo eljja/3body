@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from math import pi
 from pathlib import Path
 from typing import Sequence
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
 
 from .analysis import AnalysisAtlas, ResearchPipeline, ThreeBodyInterpreter
 from .experiments import (
@@ -193,6 +195,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("site"),
         help="Directory containing index.html, certificate.json, and manifest.json.",
+    )
+    verify_static.add_argument(
+        "--base-url",
+        default=None,
+        help="Base URL containing index.html, certificate.json, and manifest.json.",
     )
     verify_static.set_defaults(func=run_verify_static_artifacts_command)
     return parser
@@ -511,17 +518,32 @@ def run_atlas_benchmark_command(args: argparse.Namespace) -> int:
 
 
 def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
-    result = verify_static_artifacts(args.site_dir)
+    result = verify_static_artifacts_from_url(args.base_url) if args.base_url else verify_static_artifacts(args.site_dir)
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["verified"] else 1
 
 
 def verify_static_artifacts(site_dir: Path) -> dict[str, object]:
-    manifest_path = site_dir / "manifest.json"
-    certificate_path = site_dir / "certificate.json"
-    index_path = site_dir / "index.html"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
+    artifacts = {
+        "index.html": (site_dir / "index.html").read_bytes(),
+        "certificate.json": (site_dir / "certificate.json").read_bytes(),
+        "manifest.json": (site_dir / "manifest.json").read_bytes(),
+    }
+    return verify_static_artifact_bytes(artifacts, source=str(site_dir))
+
+
+def verify_static_artifacts_from_url(base_url: str) -> dict[str, object]:
+    normalized_base_url = base_url if base_url.endswith("/") else f"{base_url}/"
+    artifacts = {
+        name: _fetch_url_bytes(urljoin(normalized_base_url, name))
+        for name in ("index.html", "certificate.json", "manifest.json")
+    }
+    return verify_static_artifact_bytes(artifacts, source=normalized_base_url)
+
+
+def verify_static_artifact_bytes(artifacts: dict[str, bytes], source: str) -> dict[str, object]:
+    manifest = json.loads(artifacts["manifest.json"].decode("utf-8"))
+    certificate = json.loads(artifacts["certificate.json"].decode("utf-8"))
     checks = {
         "manifest_schema": manifest.get("manifest_schema_version") == 1,
         "certificate_schema": certificate.get("certificate_schema_version") == 1,
@@ -530,31 +552,37 @@ def verify_static_artifacts(site_dir: Path) -> dict[str, object]:
             certificate.get("build_provenance", {}).get("commit_sha")
             == manifest.get("build_provenance", {}).get("commit_sha")
         ),
-        "index_hash": _manifest_hash_matches(manifest, "index.html", index_path),
-        "certificate_hash": _manifest_hash_matches(manifest, "certificate.json", certificate_path),
-        "index_size": _manifest_size_matches(manifest, "index.html", index_path),
-        "certificate_size": _manifest_size_matches(manifest, "certificate.json", certificate_path),
+        "index_hash": _manifest_hash_matches(manifest, "index.html", artifacts["index.html"]),
+        "certificate_hash": _manifest_hash_matches(manifest, "certificate.json", artifacts["certificate.json"]),
+        "index_size": _manifest_size_matches(manifest, "index.html", artifacts["index.html"]),
+        "certificate_size": _manifest_size_matches(manifest, "certificate.json", artifacts["certificate.json"]),
     }
     return {
         "verified": all(checks.values()),
-        "site_dir": str(site_dir),
+        "source": source,
         "commit_sha_short": certificate.get("build_provenance", {}).get("commit_sha_short"),
         "checks": checks,
     }
 
 
-def _manifest_hash_matches(manifest: dict[str, object], artifact_name: str, path: Path) -> bool:
+def _manifest_hash_matches(manifest: dict[str, object], artifact_name: str, artifact_bytes: bytes) -> bool:
     artifact = manifest.get("artifacts", {}).get(artifact_name, {})
-    return artifact.get("sha256") == _sha256(path)
+    return artifact.get("sha256") == _sha256_bytes(artifact_bytes)
 
 
-def _manifest_size_matches(manifest: dict[str, object], artifact_name: str, path: Path) -> bool:
+def _manifest_size_matches(manifest: dict[str, object], artifact_name: str, artifact_bytes: bytes) -> bool:
     artifact = manifest.get("artifacts", {}).get(artifact_name, {})
-    return artifact.get("bytes") == path.stat().st_size
+    return artifact.get("bytes") == len(artifact_bytes)
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def _fetch_url_bytes(url: str) -> bytes:
+    request = Request(url, headers={"User-Agent": "threebody-cli/1.0"})
+    with urlopen(request, timeout=30) as response:
+        return response.read()
+
+
+def _sha256_bytes(artifact_bytes: bytes) -> str:
+    return hashlib.sha256(artifact_bytes).hexdigest()
 
 
 def _scenario_from_args(args: argparse.Namespace) -> Scenario:
