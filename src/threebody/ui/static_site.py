@@ -1278,6 +1278,7 @@ def _markov_baseline_figure(summary: dict[str, object]) -> go.Figure:
 
 def _orbit_figure_2d(paths: list[np.ndarray], labels: list[str], title: str) -> go.Figure:
     figure = go.Figure()
+    _add_autoscale_trace(figure, paths)
     for index, (path, label) in enumerate(zip(paths, labels, strict=True)):
         figure.add_trace(
             go.Scatter(
@@ -1292,7 +1293,8 @@ def _orbit_figure_2d(paths: list[np.ndarray], labels: list[str], title: str) -> 
         title=title,
         xaxis_title="x",
         yaxis_title="y",
-        yaxis={"scaleanchor": "x", "scaleratio": 1.0},
+        xaxis={"autorange": True},
+        yaxis={"autorange": True},
         template="plotly_white",
         height=460,
         margin={"l": 40, "r": 18, "t": 52, "b": 38},
@@ -1330,6 +1332,7 @@ def _animated_orbit_figure_2d(
                 marker={"size": 12, "color": "#2f4858", "symbol": "diamond"},
             )
         )
+    _add_autoscale_trace(figure, paths, static_points=static_points)
 
     frames = []
     for frame_index in indices:
@@ -1356,7 +1359,8 @@ def _animated_orbit_figure_2d(
         title={"text": title, "x": 0.18, "xanchor": "left"},
         xaxis_title="x",
         yaxis_title="y",
-        yaxis={"scaleanchor": "x", "scaleratio": 1.0},
+        xaxis={"autorange": True},
+        yaxis={"autorange": True},
         template="plotly_white",
         height=520,
         margin={"l": 40, "r": 18, "t": 58, "b": 38},
@@ -1384,6 +1388,29 @@ def _animated_orbit_figure_2d(
         ],
     )
     return figure
+
+
+def _add_autoscale_trace(
+    figure: go.Figure,
+    paths: list[np.ndarray],
+    *,
+    static_points: np.ndarray | None = None,
+) -> None:
+    points = [np.asarray(path, dtype=float)[:, :2] for path in paths]
+    if static_points is not None:
+        points.append(np.asarray(static_points, dtype=float)[:, :2])
+    combined = np.vstack(points)
+    figure.add_trace(
+        go.Scatter(
+            x=combined[:, 0],
+            y=combined[:, 1],
+            mode="markers",
+            marker={"size": 1, "opacity": 0.0},
+            hoverinfo="skip",
+            showlegend=False,
+            name="autoscale extent",
+        )
+    )
 
 
 def main() -> None:

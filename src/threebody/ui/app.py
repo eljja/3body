@@ -37,6 +37,7 @@ def line_figure(x: np.ndarray, y: np.ndarray, title: str, yaxis_title: str) -> g
 
 def orbit_figure_2d(paths: list[np.ndarray], labels: list[str], title: str) -> go.Figure:
     figure = go.Figure()
+    add_autoscale_trace(figure, paths)
     for index, (path, label) in enumerate(zip(paths, labels, strict=True)):
         color = PALETTE[index % len(PALETTE)]
         figure.add_trace(
@@ -61,7 +62,8 @@ def orbit_figure_2d(paths: list[np.ndarray], labels: list[str], title: str) -> g
         title=title,
         xaxis_title="x",
         yaxis_title="y",
-        yaxis={"scaleanchor": "x", "scaleratio": 1.0},
+        xaxis={"autorange": True},
+        yaxis={"autorange": True},
         template="plotly_white",
         margin={"l": 30, "r": 20, "t": 50, "b": 30},
         height=600,
@@ -96,55 +98,27 @@ def animation_indices(sample_count: int, target_frames: int = 180) -> np.ndarray
     return np.unique(np.linspace(0, sample_count - 1, frame_count, dtype=int))
 
 
-def padded_axis_ranges(
+def add_autoscale_trace(
+    figure: go.Figure,
     paths: list[np.ndarray],
-    frame_index: int,
+    *,
     static_points: np.ndarray | None = None,
-    padding_ratio: float = 0.12,
-    min_span: float = 0.5,
-) -> tuple[list[float], list[float]]:
-    visible_points = [path[: frame_index + 1] for path in paths]
+) -> None:
+    points = [np.asarray(path, dtype=float)[:, :2] for path in paths]
     if static_points is not None:
-        visible_points.append(np.asarray(static_points, dtype=float))
-    points = np.vstack(visible_points)
-
-    x_min = float(np.min(points[:, 0]))
-    x_max = float(np.max(points[:, 0]))
-    y_min = float(np.min(points[:, 1]))
-    y_max = float(np.max(points[:, 1]))
-
-    x_span = max(x_max - x_min, min_span)
-    y_span = max(y_max - y_min, min_span)
-    span = max(x_span, y_span)
-    padding = span * padding_ratio
-
-    x_center = 0.5 * (x_min + x_max)
-    y_center = 0.5 * (y_min + y_max)
-    half_span = 0.5 * span + padding
-
-    return [x_center - half_span, x_center + half_span], [y_center - half_span, y_center + half_span]
-
-
-def smooth_axis_ranges(
-    raw_ranges: list[tuple[list[float], list[float]]],
-    easing: float = 0.18,
-) -> list[tuple[list[float], list[float]]]:
-    if not raw_ranges:
-        return []
-
-    smoothed: list[tuple[list[float], list[float]]] = []
-    current_x = np.asarray(raw_ranges[0][0], dtype=float)
-    current_y = np.asarray(raw_ranges[0][1], dtype=float)
-    smoothed.append((current_x.tolist(), current_y.tolist()))
-
-    for x_range, y_range in raw_ranges[1:]:
-        target_x = np.asarray(x_range, dtype=float)
-        target_y = np.asarray(y_range, dtype=float)
-        current_x = current_x + easing * (target_x - current_x)
-        current_y = current_y + easing * (target_y - current_y)
-        smoothed.append((current_x.tolist(), current_y.tolist()))
-
-    return smoothed
+        points.append(np.asarray(static_points, dtype=float)[:, :2])
+    combined = np.vstack(points)
+    figure.add_trace(
+        go.Scatter(
+            x=combined[:, 0],
+            y=combined[:, 1],
+            mode="markers",
+            marker={"size": 1, "opacity": 0.0},
+            hoverinfo="skip",
+            showlegend=False,
+            name="autoscale extent",
+        )
+    )
 
 
 def animated_orbit_figure_2d(
@@ -158,9 +132,6 @@ def animated_orbit_figure_2d(
 ) -> go.Figure:
     indices = animation_indices(len(times), target_frames=frame_count)
     figure = go.Figure()
-    raw_ranges = [padded_axis_ranges(paths, int(frame_index), static_points=static_points) for frame_index in indices]
-    smoothed_ranges = smooth_axis_ranges(raw_ranges)
-    initial_x_range, initial_y_range = smoothed_ranges[0]
 
     for index, (path, label) in enumerate(zip(paths, labels, strict=True)):
         color = PALETTE[index % len(PALETTE)]
@@ -196,9 +167,10 @@ def animated_orbit_figure_2d(
                 marker={"size": 12, "color": "#2f4858", "symbol": "diamond"},
             )
         )
+    add_autoscale_trace(figure, paths, static_points=static_points)
 
     frames: list[go.Frame] = []
-    for range_index, frame_index in enumerate(indices):
+    for frame_index in indices:
         traces: list[go.Scatter] = []
         for index, path in enumerate(paths):
             color = PALETTE[index % len(PALETTE)]
@@ -229,22 +201,15 @@ def animated_orbit_figure_2d(
                     marker={"size": 12, "color": "#2f4858", "symbol": "diamond"},
                 )
             )
-        x_range, y_range = smoothed_ranges[range_index]
-        frames.append(
-            go.Frame(
-                data=traces,
-                name=str(frame_index),
-                layout=go.Layout(xaxis={"range": x_range}, yaxis={"range": y_range}),
-            )
-        )
+        frames.append(go.Frame(data=traces, name=str(frame_index)))
 
     figure.frames = frames
     figure.update_layout(
         title={"text": title, "x": 0.18, "xanchor": "left"},
         xaxis_title="x",
         yaxis_title="y",
-        xaxis={"range": initial_x_range},
-        yaxis={"scaleanchor": "x", "scaleratio": 1.0, "range": initial_y_range},
+        xaxis={"autorange": True},
+        yaxis={"autorange": True},
         template="plotly_white",
         height=620,
         margin={"l": 30, "r": 20, "t": 60, "b": 30},
