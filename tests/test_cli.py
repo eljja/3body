@@ -136,6 +136,7 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["verified_at_utc"].endswith("Z")
     assert receipt["verified"] is True
     assert receipt["checks"]["manifest_json"] is True
+    assert receipt["checks"]["manifest_hash_algorithm"] is True
     assert receipt["checks"]["certificate_json"] is True
     assert receipt["parse_errors"] == {"certificate.json": None, "manifest.json": None}
     assert receipt["artifact_errors"] == {
@@ -168,6 +169,37 @@ def test_verify_static_artifacts_cli_rejects_unexpected_commit(tmp_path) -> None
     exit_code = main(["verify-static-artifacts", "--site-dir", str(tmp_path), "--require-commit", "wrong"])
 
     assert exit_code == 1
+
+
+def test_verify_static_artifacts_cli_rejects_manifest_hash_algorithm_mismatch(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    manifest_path = tmp_path / "manifest.json"
+    receipt_path = tmp_path / "hash-algorithm-receipt.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["hash_algorithm"] = "sha1"
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-commit",
+            "abc123",
+            "--require-profile",
+            "public-claims-v1",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert receipt["verified"] is False
+    assert receipt["checks"]["manifest_hash_algorithm"] is False
+    assert receipt["checks"]["index_hash"] is True
+    assert receipt["checks"]["certificate_hash"] is True
+    assert receipt["checks"]["favicon_hash"] is True
 
 
 def test_verify_static_artifacts_cli_rejects_missing_required_gate(tmp_path) -> None:
@@ -592,6 +624,7 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["verification_schema_version"] == 1
     assert result["verified_at_utc"].endswith("Z")
     assert result["checks"]["manifest_artifact"] is True
+    assert result["checks"]["manifest_hash_algorithm"] is True
     assert result["checks"]["certificate_artifact"] is True
     assert result["checks"]["publication_pipeline_links"] is True
     assert result["required_profiles"] == ["public-claims-v1"]
@@ -667,6 +700,7 @@ def _write_static_artifact_bundle(site_dir) -> None:
     manifest = {
         "manifest_schema_version": 1,
         "artifact": "threebody-static-site-manifest",
+        "hash_algorithm": "sha256",
         "build_provenance": {
             "commit_sha": "abc123",
             "commit_sha_short": "abc123",

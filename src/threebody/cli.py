@@ -706,6 +706,7 @@ def verify_static_artifact_bytes(
         "manifest_json": manifest_parse_error is None,
         "manifest_schema": manifest.get("manifest_schema_version") == 1,
         "manifest_artifact": manifest.get("artifact") == "threebody-static-site-manifest",
+        "manifest_hash_algorithm": manifest.get("hash_algorithm") == "sha256",
         "certificate_json": certificate_parse_error is None,
         "certificate_schema": certificate.get("certificate_schema_version") == 1,
         "certificate_artifact": certificate.get("artifact") == "threebody-static-research-certificate",

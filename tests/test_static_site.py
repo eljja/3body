@@ -78,6 +78,7 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["manifest_schema_version"] == 1
     assert manifest["artifact"] == "threebody-static-site-manifest"
+    assert manifest["hash_algorithm"] == "sha256"
     assert manifest["artifacts"]["index.html"]["sha256"] == _sha256(index_path)
     assert manifest["artifacts"]["certificate.json"]["sha256"] == _sha256(certificate_path)
     assert manifest["artifacts"]["certificate.json"]["bytes"] == certificate_path.stat().st_size
