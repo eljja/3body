@@ -82,6 +82,7 @@
 *   **Machine-readable certificate:** GitHub Pages 빌드는 HTML 내부 `<pre>`뿐 아니라 `certificate.json`도 배포해 외부 연구자와 자동화가 promotion gate, atlas snapshot, provenance를 직접 검증할 수 있게 했습니다.
 *   **Artifact integrity manifest:** Pages 빌드는 `manifest.json`에 `index.html`과 `certificate.json`의 SHA-256 digest와 byte size를 기록해 공개 증거 bundle의 파일 무결성을 독립적으로 점검할 수 있게 했습니다.
 *   **Evidence publication pipeline:** GitHub Pages 첫 화면에는 Python engine 계산, promotion gate 통과, `certificate.json` 공개, `manifest.json` 무결성 검증으로 이어지는 공개 연구 증거 흐름이 시각적으로 추가되었습니다.
+*   **Public verification ladder:** GitHub Pages 첫 화면에는 numerical evidence, Picard certification, symbolic dynamics, robustness gates, public artifacts, claim-level receipt로 이어지는 시각적 감사 ladder가 추가되었습니다. 지금까지의 변화가 단순 UI 업데이트가 아니라 공개 claim 검증 체계로 진화했음을 한 화면에서 보여줍니다.
 *   **Static artifact verifier:** `python -m threebody.cli verify-static-artifacts --site-dir site` 명령이 추가되어 `manifest.json`의 SHA-256/byte-size 기록과 `certificate.json` provenance 일관성을 로컬 또는 내려받은 Pages bundle에서 재검증할 수 있습니다.
 *   **Public URL artifact verifier:** 같은 검증기는 이제 `--base-url https://eljja.github.io/3body/`를 받아 공개 GitHub Pages에서 `index.html`, `certificate.json`, `manifest.json`을 직접 내려받아 동일한 SHA-256/byte-size/provenance 검사를 수행합니다. 외부 연구자가 저장소를 clone하지 않고도 현재 공개 증거 bundle을 감사할 수 있습니다.
 *   **Commit-pinned publication verifier:** `--require-commit <sha-or-prefix>` 옵션이 추가되어 논문/리뷰/외부 감사에서 인용한 특정 commit의 증거 bundle인지 강제할 수 있습니다. Pages가 새로 배포되어도 인용된 산출물과 현재 공개 산출물이 어긋나면 검증이 실패합니다.

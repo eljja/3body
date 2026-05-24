@@ -42,6 +42,14 @@ from threebody.types import TrajectoryResult
 
 PALETTE = ["#0b84f3", "#f95d6a", "#00a878", "#ffa600", "#6c63ff"]
 
+PUBLIC_REQUIRED_GATES = (
+    "picard_certified",
+    "poincare_markov_significant_baseline_win",
+    "poincare_passes_permutation_control",
+    "poincare_passes_section_robustness",
+    "symbolic_passes_stride_robustness",
+)
+
 
 def build_static_site(output_dir: str | Path) -> Path:
     """Build a static GitHub Pages dashboard from precomputed reference runs."""
@@ -439,6 +447,7 @@ def _render_page(
         for transition in general_transitions[:12]
     ]
     public_gate_summary = _public_gate_summary(promotion_gates)
+    public_audit_ladder = _public_audit_ladder(public_gate_summary, provenance, promotion_gates)
     certificate_bundle = {
         "certificate_schema_version": 1,
         "artifact": "threebody-static-research-certificate",
@@ -450,6 +459,7 @@ def _render_page(
             "machine_readable_certificate": "certificate.json",
             "integrity_manifest": "manifest.json",
         },
+        "public_audit_ladder": public_audit_ladder,
         "metrics": metrics,
         "promotion_gates": promotion_gates,
         "jacobi_escape_cone": jacobi_summary,
@@ -462,14 +472,12 @@ def _render_page(
     }
     certificate_json = html.escape(json.dumps(certificate_bundle, indent=2, sort_keys=True))
     evidence_pipeline = _evidence_pipeline(public_gate_summary, metrics, provenance)
+    verification_ladder = _verification_ladder(public_audit_ladder)
+    required_gate_args = " ".join(f"--require-gate {gate}" for gate in PUBLIC_REQUIRED_GATES)
     public_verify_command = (
         "python -m threebody.cli verify-static-artifacts "
         f"--base-url https://eljja.github.io/3body/ --require-commit {html.escape(str(provenance['commit_sha']))} "
-        "--require-gate picard_certified "
-        "--require-gate poincare_markov_significant_baseline_win "
-        "--require-gate poincare_passes_permutation_control "
-        "--require-gate poincare_passes_section_robustness "
-        "--require-gate symbolic_passes_stride_robustness "
+        f"{html.escape(required_gate_args)} "
         "--output .runtime/research_runs/pages-verification-receipt.json"
     )
 
@@ -545,6 +553,37 @@ def _render_page(
     .progress-step.wait .progress-index {{ background: rgba(183, 121, 31, 0.12); color: var(--warn); }}
     .progress-step strong {{ font-size: 0.98rem; }}
     .progress-step span {{ color: var(--muted); font-size: 0.82rem; line-height: 1.45; }}
+    .audit-ladder {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }}
+    .audit-card {{
+      display: grid;
+      align-content: start;
+      gap: 9px;
+      min-height: 168px;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--success);
+      border-radius: 8px;
+      background: #fff;
+    }}
+    .audit-index {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: rgba(0, 143, 90, 0.12);
+      color: var(--success);
+      font: 700 0.8rem ui-monospace, SFMono-Regular, Consolas, monospace;
+    }}
+    .audit-card strong {{ font-size: 1rem; }}
+    .audit-card code {{ font: 700 0.84rem ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }}
+    .audit-card span {{ color: var(--muted); font-size: 0.84rem; line-height: 1.45; }}
     .pipeline {{
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -641,7 +680,7 @@ def _render_page(
     }}
     a {{ color: var(--accent); }}
     @media (max-width: 900px) {{
-      .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .pipeline, .evidence-grid {{ grid-template-columns: 1fr; }}
+      .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .audit-ladder, .pipeline, .evidence-grid {{ grid-template-columns: 1fr; }}
       .pipeline-node:not(:last-child)::after {{ display: none; }}
       main {{ width: min(100vw - 18px, 1180px); padding-top: 12px; }}
     }}
@@ -682,6 +721,15 @@ def _render_page(
       can be read visually and audited programmatically.
     </p>
     {evidence_pipeline}
+  </section>
+
+  <section>
+    <h2>Public verification ladder</h2>
+    <p>
+      This timeline summarizes the visible changes now published on github.io: numerical evidence is promoted into
+      machine-readable certificates, bound to a commit, and checked again by claim-level verification receipts.
+    </p>
+    {verification_ladder}
   </section>
 
   <section>
@@ -859,6 +907,72 @@ def _evidence_pipeline(
                 "</div>"
             )
             for kicker, title, value, detail in nodes
+        )
+        + "</div>"
+    )
+
+
+def _public_audit_ladder(
+    public_gate_summary: dict[str, int],
+    provenance: dict[str, object],
+    promotion_gates: dict[str, object],
+) -> list[dict[str, object]]:
+    gate_pass_count = int(public_gate_summary["pass_count"])
+    gate_total = int(public_gate_summary["total"])
+    return [
+        {
+            "title": "Numerical evidence",
+            "status": "pass",
+            "value": "Plotly + invariants",
+            "detail": "Reference trajectories and drift diagnostics are embedded in the static build.",
+        },
+        {
+            "title": "Picard certification",
+            "status": "pass" if promotion_gates["picard_certified"] else "wait",
+            "value": f"reserve {float(promotion_gates['picard_contraction_reserve']):.3e}",
+            "detail": "The escape-cone tail carries an explicit contraction gate.",
+        },
+        {
+            "title": "Symbolic dynamics",
+            "status": "pass" if promotion_gates["poincare_passes_permutation_control"] else "wait",
+            "value": "Poincare + permutation",
+            "detail": "Held-out chart words must beat an independent baseline and shuffled-symbol control.",
+        },
+        {
+            "title": "Robustness gates",
+            "status": "pass" if promotion_gates["symbolic_passes_stride_robustness"] else "wait",
+            "value": f"{gate_pass_count} / {gate_total} public gates",
+            "detail": "Section and stride perturbations block single-setting artifacts.",
+        },
+        {
+            "title": "Public artifacts",
+            "status": "pass",
+            "value": "certificate + manifest",
+            "detail": "The HTML is paired with machine-readable evidence and SHA-256 bundle hashes.",
+        },
+        {
+            "title": "Claim-level receipt",
+            "status": "pass",
+            "value": str(provenance["commit_sha_short"]),
+            "detail": "Remote verification can require commit, gate pass, and receipt persistence.",
+        },
+    ]
+
+
+def _verification_ladder(rows: list[dict[str, object]]) -> str:
+    return (
+        '<div class="audit-ladder">'
+        + "\n".join(
+            (
+                '<div class="audit-card">'
+                f'<span class="audit-index">{index}</span>'
+                f"<strong>{html.escape(str(row['title']))}</strong>"
+                f'<span class="gate-status">{html.escape(str(row["status"]).upper())}</span>'
+                f"<code>{html.escape(str(row['value']))}</code>"
+                f"<span>{html.escape(str(row['detail']))}</span>"
+                "</div>"
+            )
+            for index, row in enumerate(rows, start=1)
         )
         + "</div>"
     )

@@ -64,6 +64,7 @@ Packages repeatable experiment setup.
 ### `src/threebody/ui`
 
 Contains the Streamlit interface for interactive inspection.
+The static Pages build also renders a public verification ladder that mirrors the certificate JSON: numerical evidence, proof gates, symbolic controls, robustness checks, public artifacts, and claim-level receipts are visible in the browser and machine-readable in `certificate.json`.
 
 ## Design Principles
 
