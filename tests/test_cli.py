@@ -582,6 +582,53 @@ def test_verify_static_artifact_bytes_does_not_let_partial_error_map_hide_missin
     assert result["artifact_errors"]["favicon.svg"] == "artifact missing from provided bytes"
 
 
+def test_verify_static_artifact_bytes_reports_malformed_error_map_without_crashing(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    artifacts = {
+        "index.html": (tmp_path / "index.html").read_bytes(),
+        "certificate.json": (tmp_path / "certificate.json").read_bytes(),
+        "favicon.svg": (tmp_path / "favicon.svg").read_bytes(),
+        "manifest.json": (tmp_path / "manifest.json").read_bytes(),
+    }
+
+    result = cli_module.verify_static_artifact_bytes(
+        artifacts,
+        source="direct-bytes",
+        artifact_errors=["not", "a", "mapping"],  # type: ignore[arg-type]
+        require_commit="abc123",
+        require_profiles=["public-claims-v1"],
+    )
+
+    assert result["verified"] is False
+    assert result["checks"]["index_available"] is False
+    assert result["checks"]["index_hash"] is True
+    assert result["artifact_errors"]["index.html"] == "artifact_errors is list, expected mapping"
+
+
+def test_verify_static_artifact_bytes_reports_non_bytes_payload_without_crashing(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    artifacts = {
+        "index.html": (tmp_path / "index.html").read_bytes(),
+        "certificate.json": (tmp_path / "certificate.json").read_bytes(),
+        "favicon.svg": "<svg></svg>",
+        "manifest.json": (tmp_path / "manifest.json").read_bytes(),
+    }
+
+    result = cli_module.verify_static_artifact_bytes(
+        artifacts,  # type: ignore[arg-type]
+        source="direct-bytes",
+        require_commit="abc123",
+        require_profiles=["public-claims-v1"],
+    )
+
+    assert result["verified"] is False
+    assert result["checks"]["favicon_available"] is False
+    assert result["checks"]["favicon_hash"] is False
+    assert result["checks"]["favicon_size"] is False
+    assert result["checks"]["required_profile_hashes"] is True
+    assert result["artifact_errors"]["favicon.svg"] == "artifact payload is str, expected bytes-like"
+
+
 def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp_path) -> None:
     _write_static_artifact_bundle(tmp_path)
     artifacts = {

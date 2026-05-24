@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from math import pi
 from pathlib import Path
@@ -683,9 +684,8 @@ def verify_static_artifact_bytes(
     require_maximums: Sequence[str] | None = None,
     require_profiles: Sequence[str] | None = None,
 ) -> dict[str, object]:
-    provided_artifact_names = set(artifacts)
-    artifacts = {name: artifacts.get(name, b"") for name in STATIC_SITE_BUNDLE_NAMES}
-    artifact_errors = _normalize_artifact_errors(artifact_errors, provided_artifact_names)
+    artifacts, artifact_payload_errors, provided_artifact_names = _normalize_static_artifact_bytes(artifacts)
+    artifact_errors = _normalize_artifact_errors(artifact_errors, provided_artifact_names, artifact_payload_errors)
     manifest, manifest_parse_error = _json_object_from_bytes(artifacts["manifest.json"])
     certificate, certificate_parse_error = _json_object_from_bytes(artifacts["certificate.json"])
     certificate_provenance = _dict_field(certificate, "build_provenance")
@@ -790,15 +790,54 @@ def _artifact_check_prefix(artifact_name: str) -> str:
     return artifact_name.rsplit(".", 1)[0]
 
 
+def _normalize_static_artifact_bytes(
+    artifacts: object,
+) -> tuple[dict[str, bytes], dict[str, str], set[str]]:
+    normalized: dict[str, bytes] = {}
+    payload_errors: dict[str, str] = {}
+    if not isinstance(artifacts, Mapping):
+        message = f"artifacts is {type(artifacts).__name__}, expected mapping"
+        return {name: b"" for name in STATIC_SITE_BUNDLE_NAMES}, {
+            name: message for name in STATIC_SITE_BUNDLE_NAMES
+        }, set()
+    provided_artifact_names = {str(name) for name in artifacts}
+    for name in STATIC_SITE_BUNDLE_NAMES:
+        payload = artifacts.get(name, b"")
+        if isinstance(payload, bytes):
+            normalized[name] = payload
+        elif isinstance(payload, bytearray):
+            normalized[name] = bytes(payload)
+        else:
+            normalized[name] = b""
+            payload_errors[name] = f"artifact payload is {type(payload).__name__}, expected bytes-like"
+    return normalized, payload_errors, provided_artifact_names
+
+
 def _normalize_artifact_errors(
-    artifact_errors: dict[str, str | None] | None,
+    artifact_errors: object,
     provided_artifact_names: set[str],
+    artifact_payload_errors: dict[str, str] | None = None,
 ) -> dict[str, str | None]:
     normalized: dict[str, str | None] = {}
+    artifact_payload_errors = artifact_payload_errors or {}
+    explicit_errors = artifact_errors if isinstance(artifact_errors, Mapping) else {}
+    malformed_error_map = (
+        f"artifact_errors is {type(artifact_errors).__name__}, expected mapping"
+        if artifact_errors is not None and not isinstance(artifact_errors, Mapping)
+        else None
+    )
     for name in STATIC_SITE_BUNDLE_NAMES:
-        explicit_error = None if artifact_errors is None else artifact_errors.get(name)
-        if explicit_error is not None:
-            normalized[name] = explicit_error
+        explicit_error = explicit_errors.get(name)
+        normalized_error = str(explicit_error) if explicit_error is not None else None
+        payload_error = artifact_payload_errors.get(name)
+        if normalized_error is not None and payload_error is not None:
+            normalized[name] = f"{normalized_error}; {payload_error}"
+        elif normalized_error is not None:
+            normalized[name] = normalized_error
+        elif payload_error is not None:
+            normalized[name] = payload_error
+        elif malformed_error_map is not None:
+            normalized[name] = malformed_error_map
         elif name not in provided_artifact_names:
             normalized[name] = "artifact missing from provided bytes"
         else:
