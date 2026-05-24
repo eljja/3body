@@ -123,6 +123,12 @@ Write a persistent verification receipt for CI logs, reviews, or paper supplemen
 & 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <commit-sha-or-prefix> --output .runtime/research_runs/pages-verification-receipt.json
 ```
 
+Require specific scientific promotion gates when auditing a public claim:
+
+```powershell
+& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <commit-sha-or-prefix> --require-gate picard_certified --require-gate symbolic_passes_stride_robustness --output .runtime/research_runs/pages-verification-receipt.json
+```
+
 Run a transition survey:
 
 ```powershell

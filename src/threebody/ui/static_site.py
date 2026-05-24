@@ -465,6 +465,11 @@ def _render_page(
     public_verify_command = (
         "python -m threebody.cli verify-static-artifacts "
         f"--base-url https://eljja.github.io/3body/ --require-commit {html.escape(str(provenance['commit_sha']))} "
+        "--require-gate picard_certified "
+        "--require-gate poincare_markov_significant_baseline_win "
+        "--require-gate poincare_passes_permutation_control "
+        "--require-gate poincare_passes_section_robustness "
+        "--require-gate symbolic_passes_stride_robustness "
         "--output .runtime/research_runs/pages-verification-receipt.json"
     )
 
