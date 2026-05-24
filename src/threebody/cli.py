@@ -253,12 +253,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--site-dir",
         type=Path,
         default=Path("site"),
-        help="Directory containing index.html, certificate.json, and manifest.json.",
+        help="Directory containing index.html, certificate.json, favicon.svg, and manifest.json.",
     )
     verify_static.add_argument(
         "--base-url",
         default=None,
-        help="Base URL containing index.html, certificate.json, and manifest.json.",
+        help="Base URL containing index.html, certificate.json, favicon.svg, and manifest.json.",
     )
     verify_static.add_argument(
         "--require-commit",
@@ -294,6 +294,16 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Apply a named verification profile that expands to a versioned set of gate/min/max requirements. "
             f"Available: {PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE}."
+        ),
+    )
+    verify_static.add_argument(
+        "--require-feature",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help=(
+            "Require this verifier receipt to advertise a named verification_schema_features capability. "
+            "Repeat for multiple capabilities."
         ),
     )
     verify_static.add_argument(
@@ -627,6 +637,7 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             require_minimums=args.require_min,
             require_maximums=args.require_max,
             require_profiles=args.require_profile,
+            require_features=args.require_feature,
         )
         if args.base_url
         else verify_static_artifacts(
@@ -636,6 +647,7 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             require_minimums=args.require_min,
             require_maximums=args.require_max,
             require_profiles=args.require_profile,
+            require_features=args.require_feature,
         )
     )
     if args.output is not None:
@@ -652,6 +664,7 @@ def verify_static_artifacts(
     require_minimums: Sequence[str] | None = None,
     require_maximums: Sequence[str] | None = None,
     require_profiles: Sequence[str] | None = None,
+    require_features: Sequence[str] | None = None,
 ) -> dict[str, object]:
     artifacts, artifact_errors = _read_static_artifacts_from_dir(site_dir)
     return verify_static_artifact_bytes(
@@ -663,6 +676,7 @@ def verify_static_artifacts(
         require_minimums=require_minimums,
         require_maximums=require_maximums,
         require_profiles=require_profiles,
+        require_features=require_features,
     )
 
 
@@ -673,6 +687,7 @@ def verify_static_artifacts_from_url(
     require_minimums: Sequence[str] | None = None,
     require_maximums: Sequence[str] | None = None,
     require_profiles: Sequence[str] | None = None,
+    require_features: Sequence[str] | None = None,
 ) -> dict[str, object]:
     normalized_base_url = base_url if base_url.endswith("/") else f"{base_url}/"
     artifacts, artifact_errors = _fetch_static_artifacts_from_url(normalized_base_url)
@@ -685,6 +700,7 @@ def verify_static_artifacts_from_url(
         require_minimums=require_minimums,
         require_maximums=require_maximums,
         require_profiles=require_profiles,
+        require_features=require_features,
     )
 
 
@@ -697,6 +713,7 @@ def verify_static_artifact_bytes(
     require_minimums: Sequence[str] | None = None,
     require_maximums: Sequence[str] | None = None,
     require_profiles: Sequence[str] | None = None,
+    require_features: Sequence[str] | None = None,
 ) -> dict[str, object]:
     artifacts, artifact_payload_errors, provided_artifact_names = _normalize_static_artifact_bytes(artifacts)
     artifact_errors = _normalize_artifact_errors(artifact_errors, provided_artifact_names, artifact_payload_errors)
@@ -715,6 +732,7 @@ def verify_static_artifact_bytes(
     required_gate_results = _required_gate_results(certificate, expanded_required_gates)
     required_minimum_results = _required_minimum_results(certificate, expanded_required_minimums)
     required_maximum_results = _required_maximum_results(certificate, expanded_required_maximums)
+    required_feature_results = _required_feature_results(require_features)
     checks = {
         **_artifact_available_checks(artifact_errors),
         "manifest_json": manifest_parse_error is None,
@@ -732,6 +750,7 @@ def verify_static_artifact_bytes(
         "required_gates": all(required_gate_results.values()),
         "required_minimums": all(row["passed"] for row in required_minimum_results),
         "required_maximums": all(row["passed"] for row in required_maximum_results),
+        "required_features": all(row["passed"] for row in required_feature_results),
         "index_certificate_link": _index_links_to_artifact(artifacts["index.html"], "certificate.json"),
         "index_manifest_link": _index_links_to_artifact(artifacts["index.html"], "manifest.json"),
         "index_favicon_link": _index_links_to_artifact(artifacts["index.html"], "favicon.svg"),
@@ -751,6 +770,8 @@ def verify_static_artifact_bytes(
         "source": source,
         "required_commit": require_commit,
         "required_profiles": list(require_profiles or []),
+        "required_features": list(require_features or []),
+        "required_feature_results": required_feature_results,
         "required_profile_requirements": profile_requirements,
         "required_profile_hashes": profile_hashes,
         "required_profile_results": required_profile_results,
@@ -1023,6 +1044,17 @@ def _required_profile_results(certificate: dict[str, object], required_profile_h
             }
         )
     return results
+
+
+def _required_feature_results(required_features: Sequence[str] | None) -> list[dict[str, object]]:
+    available_features = set(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
+    return [
+        {
+            "feature": feature,
+            "passed": feature in available_features,
+        }
+        for feature in (required_features or [])
+    ]
 
 
 def _merge_requirements(profile_requirements: Sequence[str], explicit_requirements: Sequence[str] | None) -> list[str]:

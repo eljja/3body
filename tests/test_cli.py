@@ -124,6 +124,10 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
             "publication_pipeline.promotion_gate_pass_count=7",
             "--require-max",
             "metrics.picard_max_contraction=0.35",
+            "--require-feature",
+            "index-artifact-discoverability",
+            "--require-feature",
+            "active-profile-descriptor",
             "--output",
             str(receipt_path),
         ]
@@ -166,6 +170,12 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["checks"]["required_gates"] is True
     assert receipt["checks"]["required_minimums"] is True
     assert receipt["checks"]["required_maximums"] is True
+    assert receipt["checks"]["required_features"] is True
+    assert receipt["required_features"] == ["index-artifact-discoverability", "active-profile-descriptor"]
+    assert receipt["required_feature_results"] == [
+        {"feature": "index-artifact-discoverability", "passed": True},
+        {"feature": "active-profile-descriptor", "passed": True},
+    ]
     assert receipt["checks"]["index_certificate_link"] is True
     assert receipt["checks"]["index_manifest_link"] is True
     assert receipt["checks"]["index_favicon_link"] is True
@@ -216,6 +226,33 @@ def test_verify_static_artifacts_cli_rejects_manifest_hash_algorithm_mismatch(tm
     assert receipt["checks"]["index_hash"] is True
     assert receipt["checks"]["certificate_hash"] is True
     assert receipt["checks"]["favicon_hash"] is True
+
+
+def test_verify_static_artifacts_cli_rejects_missing_required_feature(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    receipt_path = tmp_path / "missing-feature-receipt.json"
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-commit",
+            "abc123",
+            "--require-feature",
+            "not-a-real-feature",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert receipt["verified"] is False
+    assert receipt["checks"]["required_features"] is False
+    assert receipt["required_features"] == ["not-a-real-feature"]
+    assert receipt["required_feature_results"] == [{"feature": "not-a-real-feature", "passed": False}]
+    assert receipt["checks"]["index_hash"] is True
 
 
 def test_verify_static_artifacts_cli_rejects_index_without_manifest_link(tmp_path) -> None:
@@ -579,6 +616,7 @@ def test_verify_static_artifacts_from_url_reports_fetch_error(monkeypatch, tmp_p
         "https://example.test/3body",
         require_commit="abc123",
         require_profiles=["public-claims-v1"],
+        require_features=["manifest-hash-algorithm"],
     )
 
     assert result["verified"] is False
@@ -715,6 +753,7 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
         "https://example.test/3body",
         require_commit="abc123",
         require_profiles=["public-claims-v1"],
+        require_features=["manifest-hash-algorithm"],
     )
 
     assert result["verified"] is True
@@ -723,6 +762,8 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["verification_schema_version"] == 1
     assert "index-artifact-discoverability" in result["verification_schema_features"]
     assert "active-profile-descriptor" in result["verification_schema_features"]
+    assert result["required_features"] == ["manifest-hash-algorithm"]
+    assert result["required_feature_results"] == [{"feature": "manifest-hash-algorithm", "passed": True}]
     assert result["verified_at_utc"].endswith("Z")
     assert result["checks"]["manifest_artifact"] is True
     assert result["checks"]["manifest_hash_algorithm"] is True
