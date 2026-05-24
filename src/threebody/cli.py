@@ -213,6 +213,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Require a named certificate promotion_gates entry to be exactly true. Repeat for multiple gates.",
     )
     verify_static.add_argument(
+        "--require-min",
+        action="append",
+        default=[],
+        metavar="PATH=VALUE",
+        help="Require a numeric certificate field to be at least VALUE. Use dotted paths and repeat as needed.",
+    )
+    verify_static.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -540,9 +547,15 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             args.base_url,
             require_commit=args.require_commit,
             require_gates=args.require_gate,
+            require_minimums=args.require_min,
         )
         if args.base_url
-        else verify_static_artifacts(args.site_dir, require_commit=args.require_commit, require_gates=args.require_gate)
+        else verify_static_artifacts(
+            args.site_dir,
+            require_commit=args.require_commit,
+            require_gates=args.require_gate,
+            require_minimums=args.require_min,
+        )
     )
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -555,6 +568,7 @@ def verify_static_artifacts(
     site_dir: Path,
     require_commit: str | None = None,
     require_gates: Sequence[str] | None = None,
+    require_minimums: Sequence[str] | None = None,
 ) -> dict[str, object]:
     artifacts = {
         "index.html": (site_dir / "index.html").read_bytes(),
@@ -566,6 +580,7 @@ def verify_static_artifacts(
         source=str(site_dir),
         require_commit=require_commit,
         require_gates=require_gates,
+        require_minimums=require_minimums,
     )
 
 
@@ -573,6 +588,7 @@ def verify_static_artifacts_from_url(
     base_url: str,
     require_commit: str | None = None,
     require_gates: Sequence[str] | None = None,
+    require_minimums: Sequence[str] | None = None,
 ) -> dict[str, object]:
     normalized_base_url = base_url if base_url.endswith("/") else f"{base_url}/"
     artifacts = {
@@ -584,6 +600,7 @@ def verify_static_artifacts_from_url(
         source=normalized_base_url,
         require_commit=require_commit,
         require_gates=require_gates,
+        require_minimums=require_minimums,
     )
 
 
@@ -592,12 +609,14 @@ def verify_static_artifact_bytes(
     source: str,
     require_commit: str | None = None,
     require_gates: Sequence[str] | None = None,
+    require_minimums: Sequence[str] | None = None,
 ) -> dict[str, object]:
     manifest = json.loads(artifacts["manifest.json"].decode("utf-8"))
     certificate = json.loads(artifacts["certificate.json"].decode("utf-8"))
     certificate_commit = certificate.get("build_provenance", {}).get("commit_sha")
     manifest_commit = manifest.get("build_provenance", {}).get("commit_sha")
     required_gate_results = _required_gate_results(certificate, require_gates)
+    required_minimum_results = _required_minimum_results(certificate, require_minimums)
     checks = {
         "manifest_schema": manifest.get("manifest_schema_version") == 1,
         "certificate_schema": certificate.get("certificate_schema_version") == 1,
@@ -605,6 +624,7 @@ def verify_static_artifact_bytes(
         "provenance_commit_match": certificate_commit == manifest_commit,
         "required_commit": _required_commit_matches(certificate_commit, manifest_commit, require_commit),
         "required_gates": all(required_gate_results.values()),
+        "required_minimums": all(row["passed"] for row in required_minimum_results),
         "index_hash": _manifest_hash_matches(manifest, "index.html", artifacts["index.html"]),
         "certificate_hash": _manifest_hash_matches(manifest, "certificate.json", artifacts["certificate.json"]),
         "index_size": _manifest_size_matches(manifest, "index.html", artifacts["index.html"]),
@@ -619,6 +639,8 @@ def verify_static_artifact_bytes(
         "required_commit": require_commit,
         "required_gates": list(require_gates or []),
         "required_gate_results": required_gate_results,
+        "required_minimums": list(require_minimums or []),
+        "required_minimum_results": required_minimum_results,
         "commit_sha": certificate_commit,
         "commit_sha_short": certificate.get("build_provenance", {}).get("commit_sha_short"),
         "checks": checks,
@@ -652,6 +674,54 @@ def _required_gate_results(certificate: dict[str, object], required_gates: Seque
     if not isinstance(promotion_gates, dict):
         promotion_gates = {}
     return {gate: promotion_gates.get(gate) is True for gate in required_gates or []}
+
+
+def _required_minimum_results(certificate: dict[str, object], required_minimums: Sequence[str] | None) -> list[dict[str, object]]:
+    return [_required_minimum_result(certificate, requirement) for requirement in required_minimums or []]
+
+
+def _required_minimum_result(certificate: dict[str, object], requirement: str) -> dict[str, object]:
+    path, threshold_text = _split_minimum_requirement(requirement)
+    observed = _lookup_dotted_path(certificate, path)
+    try:
+        threshold = float(threshold_text)
+        observed_number = float(observed)
+    except (TypeError, ValueError):
+        return {
+            "path": path,
+            "threshold": threshold_text,
+            "observed": observed,
+            "passed": False,
+        }
+    return {
+        "path": path,
+        "threshold": threshold,
+        "observed": observed_number,
+        "passed": observed_number >= threshold,
+    }
+
+
+def _split_minimum_requirement(requirement: str) -> tuple[str, str]:
+    if "=" in requirement:
+        path, threshold = requirement.split("=", 1)
+    elif ":" in requirement:
+        path, threshold = requirement.split(":", 1)
+    else:
+        raise ValueError(f"Minimum requirement must use PATH=VALUE: {requirement}")
+    path = path.strip()
+    threshold = threshold.strip()
+    if not path or not threshold:
+        raise ValueError(f"Minimum requirement must use PATH=VALUE: {requirement}")
+    return path, threshold
+
+
+def _lookup_dotted_path(payload: dict[str, object], path: str) -> object:
+    value: object = payload
+    for part in path.split("."):
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+    return value
 
 
 def _utc_timestamp() -> str:

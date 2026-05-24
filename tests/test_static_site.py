@@ -70,6 +70,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "--require-gate picard_certified" in content
     assert "--require-gate poincare_passes_permutation_control" in content
     assert "--require-gate symbolic_passes_stride_robustness" in content
+    assert "--require-min publication_pipeline.promotion_gate_pass_count=7" in content
+    assert "--require-min promotion_gates.picard_contraction_reserve=0" in content
     assert "--output .runtime/research_runs/pages-verification-receipt.json" in content
     assert "verify-static-artifacts --site-dir site" in content
     assert "jacobi_parameter_interval_box_margin" not in content

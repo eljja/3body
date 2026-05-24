@@ -129,6 +129,12 @@ Require specific scientific promotion gates when auditing a public claim:
 & 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <commit-sha-or-prefix> --require-gate picard_certified --require-gate symbolic_passes_stride_robustness --output .runtime/research_runs/pages-verification-receipt.json
 ```
 
+Require numeric certificate thresholds as well:
+
+```powershell
+& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <commit-sha-or-prefix> --require-min publication_pipeline.promotion_gate_pass_count=7 --require-min promotion_gates.picard_contraction_reserve=0
+```
+
 Run a transition survey:
 
 ```powershell

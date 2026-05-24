@@ -478,6 +478,10 @@ def _render_page(
         "python -m threebody.cli verify-static-artifacts "
         f"--base-url https://eljja.github.io/3body/ --require-commit {html.escape(str(provenance['commit_sha']))} "
         f"{html.escape(required_gate_args)} "
+        "--require-min publication_pipeline.promotion_gate_pass_count=7 "
+        "--require-min promotion_gates.picard_contraction_reserve=0 "
+        "--require-min promotion_gates.poincare_section_robust_pass_fraction=1 "
+        "--require-min promotion_gates.symbolic_stride_robust_pass_fraction=1 "
         "--output .runtime/research_runs/pages-verification-receipt.json"
     )
 
