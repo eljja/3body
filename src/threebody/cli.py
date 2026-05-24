@@ -69,6 +69,7 @@ STATIC_ARTIFACT_REQUIREMENT_PROFILES: dict[str, dict[str, tuple[str, ...]]] = {
             "metrics.restricted_max_jacobi_drift=1e-9",
             "metrics.picard_max_contraction=0.35",
         ),
+        "require_features": STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES,
     }
 }
 
@@ -732,7 +733,8 @@ def verify_static_artifact_bytes(
     required_gate_results = _required_gate_results(certificate, expanded_required_gates)
     required_minimum_results = _required_minimum_results(certificate, expanded_required_minimums)
     required_maximum_results = _required_maximum_results(certificate, expanded_required_maximums)
-    required_feature_results = _required_feature_results(require_features)
+    expanded_required_features = _merge_requirements(profile_requirements["require_features"], require_features)
+    required_feature_results = _required_feature_results(expanded_required_features)
     checks = {
         **_artifact_available_checks(artifact_errors),
         "manifest_json": manifest_parse_error is None,
@@ -770,7 +772,7 @@ def verify_static_artifact_bytes(
         "source": source,
         "required_commit": require_commit,
         "required_profiles": list(require_profiles or []),
-        "required_features": list(require_features or []),
+        "required_features": expanded_required_features,
         "required_feature_results": required_feature_results,
         "required_profile_requirements": profile_requirements,
         "required_profile_hashes": profile_hashes,
@@ -978,6 +980,7 @@ def _static_artifact_profile_requirements(required_profiles: Sequence[str] | Non
         "require_gates": [],
         "require_minimums": [],
         "require_maximums": [],
+        "require_features": [],
     }
     for profile_name in required_profiles or []:
         profile = STATIC_ARTIFACT_REQUIREMENT_PROFILES.get(profile_name)

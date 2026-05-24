@@ -357,6 +357,7 @@ def test_verify_static_artifacts_cli_applies_public_claim_profile(tmp_path) -> N
     assert receipt["required_profile_hashes"] == {
         "public-claims-v1": cli_module.static_artifact_requirement_profile_sha256("public-claims-v1")
     }
+    assert "index-artifact-discoverability" in receipt["required_profile_requirements"]["require_features"]
     assert receipt["required_profile_results"][0]["active_matches"] is True
     assert receipt["required_profile_results"][0]["active_hash_matches"] is True
     assert receipt["required_profile_results"][0]["descriptor_matches"] is True
@@ -372,10 +373,13 @@ def test_verify_static_artifacts_cli_applies_public_claim_profile(tmp_path) -> N
     ]
     assert "publication_pipeline.promotion_gate_pass_count=7" in receipt["required_minimums"]
     assert "metrics.picard_max_contraction=0.35" in receipt["required_maximums"]
+    assert "index-artifact-discoverability" in receipt["required_features"]
+    assert "active-profile-descriptor" in receipt["required_features"]
     assert receipt["checks"]["required_profile_hashes"] is True
     assert receipt["checks"]["required_gates"] is True
     assert receipt["checks"]["required_minimums"] is True
     assert receipt["checks"]["required_maximums"] is True
+    assert receipt["checks"]["required_features"] is True
 
 
 def test_verify_static_artifacts_cli_rejects_inactive_required_profile(tmp_path) -> None:
@@ -762,8 +766,9 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["verification_schema_version"] == 1
     assert "index-artifact-discoverability" in result["verification_schema_features"]
     assert "active-profile-descriptor" in result["verification_schema_features"]
-    assert result["required_features"] == ["manifest-hash-algorithm"]
-    assert result["required_feature_results"] == [{"feature": "manifest-hash-algorithm", "passed": True}]
+    assert "manifest-hash-algorithm" in result["required_features"]
+    assert "index-artifact-discoverability" in result["required_features"]
+    assert all(row["passed"] for row in result["required_feature_results"])
     assert result["verified_at_utc"].endswith("Z")
     assert result["checks"]["manifest_artifact"] is True
     assert result["checks"]["manifest_hash_algorithm"] is True

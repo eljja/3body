@@ -71,6 +71,10 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
         "verification_profile_sha256"
     ]
     assert certificate["verification_profiles"]["public-claims-v1"]["requirements"]["require_maximums"]
+    assert certificate["verification_profiles"]["public-claims-v1"]["requirements"]["require_features"]
+    assert "index-artifact-discoverability" in certificate["verification_profiles"]["public-claims-v1"][
+        "requirements"
+    ]["require_features"]
     assert certificate["public_change_summary"]
     assert certificate["public_change_summary"][-1]["title"] == "Active profile digest"
     assert certificate["promotion_gates"]["symbolic_passes_stride_robustness"] is True
