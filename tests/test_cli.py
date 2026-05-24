@@ -122,6 +122,8 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
             "promotion_gates.picard_contraction_reserve=0.1",
             "--require-min",
             "publication_pipeline.promotion_gate_pass_count=7",
+            "--require-max",
+            "metrics.picard_max_contraction=0.35",
             "--output",
             str(receipt_path),
         ]
@@ -136,10 +138,13 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["checks"]["required_commit"] is True
     assert receipt["checks"]["required_gates"] is True
     assert receipt["checks"]["required_minimums"] is True
+    assert receipt["checks"]["required_maximums"] is True
     assert receipt["required_gates"] == ["symbolic_passes_stride_robustness"]
     assert receipt["required_gate_results"]["symbolic_passes_stride_robustness"] is True
     assert receipt["required_minimum_results"][0]["path"] == "promotion_gates.picard_contraction_reserve"
     assert receipt["required_minimum_results"][0]["passed"] is True
+    assert receipt["required_maximum_results"][0]["path"] == "metrics.picard_max_contraction"
+    assert receipt["required_maximum_results"][0]["passed"] is True
 
 
 def test_verify_static_artifacts_cli_rejects_unexpected_commit(tmp_path) -> None:
@@ -168,6 +173,22 @@ def test_verify_static_artifacts_cli_rejects_failed_minimum(tmp_path) -> None:
             str(tmp_path),
             "--require-min",
             "promotion_gates.picard_contraction_reserve=1.0",
+        ]
+    )
+
+    assert exit_code == 1
+
+
+def test_verify_static_artifacts_cli_rejects_failed_maximum(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-max",
+            "metrics.picard_max_contraction=0.001",
         ]
     )
 
@@ -208,6 +229,7 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
         require_commit="abc123",
         require_gates=["symbolic_passes_stride_robustness"],
         require_minimums=["publication_pipeline.promotion_gate_pass_count=7"],
+        require_maximums=["metrics.picard_max_contraction=0.35"],
     )
 
     assert result["verified"] is True
@@ -218,8 +240,10 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["checks"]["required_commit"] is True
     assert result["checks"]["required_gates"] is True
     assert result["checks"]["required_minimums"] is True
+    assert result["checks"]["required_maximums"] is True
     assert result["required_gate_results"]["symbolic_passes_stride_robustness"] is True
     assert result["required_minimum_results"][0]["passed"] is True
+    assert result["required_maximum_results"][0]["passed"] is True
     assert requested_urls == [
         "https://example.test/3body/index.html",
         "https://example.test/3body/certificate.json",
@@ -238,6 +262,10 @@ def _write_static_artifact_bundle(site_dir) -> None:
         "artifact_manifest": "manifest.json",
         "publication_pipeline": {
             "promotion_gate_pass_count": 7,
+        },
+        "metrics": {
+            "general_max_energy_drift": 1.0e-10,
+            "picard_max_contraction": 0.01,
         },
         "build_provenance": {
             "commit_sha": "abc123",

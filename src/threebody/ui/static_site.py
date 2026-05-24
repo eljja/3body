@@ -482,6 +482,9 @@ def _render_page(
         "--require-min promotion_gates.picard_contraction_reserve=0 "
         "--require-min promotion_gates.poincare_section_robust_pass_fraction=1 "
         "--require-min promotion_gates.symbolic_stride_robust_pass_fraction=1 "
+        "--require-max metrics.general_max_energy_drift=1e-8 "
+        "--require-max metrics.restricted_max_jacobi_drift=1e-9 "
+        "--require-max metrics.picard_max_contraction=0.35 "
         "--output .runtime/research_runs/pages-verification-receipt.json"
     )
 

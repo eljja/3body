@@ -132,8 +132,10 @@ Require specific scientific promotion gates when auditing a public claim:
 Require numeric certificate thresholds as well:
 
 ```powershell
-& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <commit-sha-or-prefix> --require-min publication_pipeline.promotion_gate_pass_count=7 --require-min promotion_gates.picard_contraction_reserve=0
+& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <commit-sha-or-prefix> --require-min publication_pipeline.promotion_gate_pass_count=7 --require-min promotion_gates.picard_contraction_reserve=0 --require-max metrics.picard_max_contraction=0.35
 ```
+
+Use `--require-min` for quantities that must be large enough, such as pass counts or robustness fractions, and `--require-max` for quantities that must stay small, such as Picard contraction and invariant drift.
 
 Run a transition survey:
 

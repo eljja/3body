@@ -220,6 +220,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Require a numeric certificate field to be at least VALUE. Use dotted paths and repeat as needed.",
     )
     verify_static.add_argument(
+        "--require-max",
+        action="append",
+        default=[],
+        metavar="PATH=VALUE",
+        help="Require a numeric certificate field to be at most VALUE. Use dotted paths and repeat as needed.",
+    )
+    verify_static.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -548,6 +555,7 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             require_commit=args.require_commit,
             require_gates=args.require_gate,
             require_minimums=args.require_min,
+            require_maximums=args.require_max,
         )
         if args.base_url
         else verify_static_artifacts(
@@ -555,6 +563,7 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             require_commit=args.require_commit,
             require_gates=args.require_gate,
             require_minimums=args.require_min,
+            require_maximums=args.require_max,
         )
     )
     if args.output is not None:
@@ -569,6 +578,7 @@ def verify_static_artifacts(
     require_commit: str | None = None,
     require_gates: Sequence[str] | None = None,
     require_minimums: Sequence[str] | None = None,
+    require_maximums: Sequence[str] | None = None,
 ) -> dict[str, object]:
     artifacts = {
         "index.html": (site_dir / "index.html").read_bytes(),
@@ -581,6 +591,7 @@ def verify_static_artifacts(
         require_commit=require_commit,
         require_gates=require_gates,
         require_minimums=require_minimums,
+        require_maximums=require_maximums,
     )
 
 
@@ -589,6 +600,7 @@ def verify_static_artifacts_from_url(
     require_commit: str | None = None,
     require_gates: Sequence[str] | None = None,
     require_minimums: Sequence[str] | None = None,
+    require_maximums: Sequence[str] | None = None,
 ) -> dict[str, object]:
     normalized_base_url = base_url if base_url.endswith("/") else f"{base_url}/"
     artifacts = {
@@ -601,6 +613,7 @@ def verify_static_artifacts_from_url(
         require_commit=require_commit,
         require_gates=require_gates,
         require_minimums=require_minimums,
+        require_maximums=require_maximums,
     )
 
 
@@ -610,6 +623,7 @@ def verify_static_artifact_bytes(
     require_commit: str | None = None,
     require_gates: Sequence[str] | None = None,
     require_minimums: Sequence[str] | None = None,
+    require_maximums: Sequence[str] | None = None,
 ) -> dict[str, object]:
     manifest = json.loads(artifacts["manifest.json"].decode("utf-8"))
     certificate = json.loads(artifacts["certificate.json"].decode("utf-8"))
@@ -617,6 +631,7 @@ def verify_static_artifact_bytes(
     manifest_commit = manifest.get("build_provenance", {}).get("commit_sha")
     required_gate_results = _required_gate_results(certificate, require_gates)
     required_minimum_results = _required_minimum_results(certificate, require_minimums)
+    required_maximum_results = _required_maximum_results(certificate, require_maximums)
     checks = {
         "manifest_schema": manifest.get("manifest_schema_version") == 1,
         "certificate_schema": certificate.get("certificate_schema_version") == 1,
@@ -625,6 +640,7 @@ def verify_static_artifact_bytes(
         "required_commit": _required_commit_matches(certificate_commit, manifest_commit, require_commit),
         "required_gates": all(required_gate_results.values()),
         "required_minimums": all(row["passed"] for row in required_minimum_results),
+        "required_maximums": all(row["passed"] for row in required_maximum_results),
         "index_hash": _manifest_hash_matches(manifest, "index.html", artifacts["index.html"]),
         "certificate_hash": _manifest_hash_matches(manifest, "certificate.json", artifacts["certificate.json"]),
         "index_size": _manifest_size_matches(manifest, "index.html", artifacts["index.html"]),
@@ -641,6 +657,8 @@ def verify_static_artifact_bytes(
         "required_gate_results": required_gate_results,
         "required_minimums": list(require_minimums or []),
         "required_minimum_results": required_minimum_results,
+        "required_maximums": list(require_maximums or []),
+        "required_maximum_results": required_maximum_results,
         "commit_sha": certificate_commit,
         "commit_sha_short": certificate.get("build_provenance", {}).get("commit_sha_short"),
         "checks": checks,
@@ -681,7 +699,7 @@ def _required_minimum_results(certificate: dict[str, object], required_minimums:
 
 
 def _required_minimum_result(certificate: dict[str, object], requirement: str) -> dict[str, object]:
-    path, threshold_text = _split_minimum_requirement(requirement)
+    path, threshold_text = _split_numeric_requirement(requirement, label="Minimum")
     observed = _lookup_dotted_path(certificate, path)
     try:
         threshold = float(threshold_text)
@@ -701,17 +719,42 @@ def _required_minimum_result(certificate: dict[str, object], requirement: str) -
     }
 
 
-def _split_minimum_requirement(requirement: str) -> tuple[str, str]:
+def _required_maximum_results(certificate: dict[str, object], required_maximums: Sequence[str] | None) -> list[dict[str, object]]:
+    return [_required_maximum_result(certificate, requirement) for requirement in required_maximums or []]
+
+
+def _required_maximum_result(certificate: dict[str, object], requirement: str) -> dict[str, object]:
+    path, threshold_text = _split_numeric_requirement(requirement, label="Maximum")
+    observed = _lookup_dotted_path(certificate, path)
+    try:
+        threshold = float(threshold_text)
+        observed_number = float(observed)
+    except (TypeError, ValueError):
+        return {
+            "path": path,
+            "threshold": threshold_text,
+            "observed": observed,
+            "passed": False,
+        }
+    return {
+        "path": path,
+        "threshold": threshold,
+        "observed": observed_number,
+        "passed": observed_number <= threshold,
+    }
+
+
+def _split_numeric_requirement(requirement: str, *, label: str) -> tuple[str, str]:
     if "=" in requirement:
         path, threshold = requirement.split("=", 1)
     elif ":" in requirement:
         path, threshold = requirement.split(":", 1)
     else:
-        raise ValueError(f"Minimum requirement must use PATH=VALUE: {requirement}")
+        raise ValueError(f"{label} requirement must use PATH=VALUE: {requirement}")
     path = path.strip()
     threshold = threshold.strip()
     if not path or not threshold:
-        raise ValueError(f"Minimum requirement must use PATH=VALUE: {requirement}")
+        raise ValueError(f"{label} requirement must use PATH=VALUE: {requirement}")
     return path, threshold
 
 
