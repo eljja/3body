@@ -5,6 +5,7 @@ import hashlib
 import json
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from html.parser import HTMLParser
 from math import pi
 from pathlib import Path
 from typing import Sequence
@@ -718,6 +719,9 @@ def verify_static_artifact_bytes(
         "required_gates": all(required_gate_results.values()),
         "required_minimums": all(row["passed"] for row in required_minimum_results),
         "required_maximums": all(row["passed"] for row in required_maximum_results),
+        "index_certificate_link": _index_links_to_artifact(artifacts["index.html"], "certificate.json"),
+        "index_manifest_link": _index_links_to_artifact(artifacts["index.html"], "manifest.json"),
+        "index_favicon_link": _index_links_to_artifact(artifacts["index.html"], "favicon.svg"),
         "index_hash": _manifest_hash_matches(manifest, "index.html", artifacts["index.html"]),
         "certificate_hash": _manifest_hash_matches(manifest, "certificate.json", artifacts["certificate.json"]),
         "favicon_hash": _manifest_hash_matches(manifest, "favicon.svg", artifacts["favicon.svg"]),
@@ -788,6 +792,32 @@ def _artifact_available_checks(artifact_errors: dict[str, str | None]) -> dict[s
 
 def _artifact_check_prefix(artifact_name: str) -> str:
     return artifact_name.rsplit(".", 1)[0]
+
+
+class _ArtifactLinkParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.references: set[str] = set()
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        for attr_name, attr_value in attrs:
+            if attr_name in {"href", "src"} and attr_value is not None:
+                self.references.add(attr_value)
+
+
+def _index_links_to_artifact(index_bytes: bytes, artifact_name: str) -> bool:
+    try:
+        index_html = index_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    parser = _ArtifactLinkParser()
+    parser.feed(index_html)
+    return any(_artifact_reference_matches(reference, artifact_name) for reference in parser.references)
+
+
+def _artifact_reference_matches(reference: str, artifact_name: str) -> bool:
+    normalized = reference.split("#", 1)[0].split("?", 1)[0].replace("\\", "/")
+    return normalized in {artifact_name, f"./{artifact_name}"}
 
 
 def _normalize_static_artifact_bytes(

@@ -153,6 +153,9 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["checks"]["required_gates"] is True
     assert receipt["checks"]["required_minimums"] is True
     assert receipt["checks"]["required_maximums"] is True
+    assert receipt["checks"]["index_certificate_link"] is True
+    assert receipt["checks"]["index_manifest_link"] is True
+    assert receipt["checks"]["index_favicon_link"] is True
     assert receipt["checks"]["favicon_hash"] is True
     assert receipt["checks"]["favicon_size"] is True
     assert receipt["required_gates"] == ["symbolic_passes_stride_robustness"]
@@ -200,6 +203,42 @@ def test_verify_static_artifacts_cli_rejects_manifest_hash_algorithm_mismatch(tm
     assert receipt["checks"]["index_hash"] is True
     assert receipt["checks"]["certificate_hash"] is True
     assert receipt["checks"]["favicon_hash"] is True
+
+
+def test_verify_static_artifacts_cli_rejects_index_without_manifest_link(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    index_path = tmp_path / "index.html"
+    receipt_path = tmp_path / "index-link-receipt.json"
+    index_path.write_text(
+        (
+            '<html><head><link rel="icon" href="favicon.svg" type="image/svg+xml"></head>'
+            '<body>ThreeBody Dynamics Lab <a href="certificate.json">certificate</a></body></html>'
+        ),
+        encoding="utf-8",
+    )
+    _refresh_manifest_hashes(tmp_path)
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-commit",
+            "abc123",
+            "--require-profile",
+            "public-claims-v1",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert receipt["verified"] is False
+    assert receipt["checks"]["index_certificate_link"] is True
+    assert receipt["checks"]["index_manifest_link"] is False
+    assert receipt["checks"]["index_favicon_link"] is True
+    assert receipt["checks"]["index_hash"] is True
 
 
 def test_verify_static_artifacts_cli_rejects_missing_required_gate(tmp_path) -> None:
@@ -681,6 +720,9 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["checks"]["required_gates"] is True
     assert result["checks"]["required_minimums"] is True
     assert result["checks"]["required_maximums"] is True
+    assert result["checks"]["index_certificate_link"] is True
+    assert result["checks"]["index_manifest_link"] is True
+    assert result["checks"]["index_favicon_link"] is True
     assert result["checks"]["favicon_hash"] is True
     assert result["checks"]["favicon_size"] is True
     assert result["required_gate_results"]["picard_certified"] is True
@@ -700,7 +742,11 @@ def _write_static_artifact_bundle(site_dir) -> None:
     favicon_path = site_dir / "favicon.svg"
     manifest_path = site_dir / "manifest.json"
     index_path.write_text(
-        '<html><head><link rel="icon" href="favicon.svg" type="image/svg+xml"></head>ThreeBody Dynamics Lab</html>',
+        (
+            '<html><head><link rel="icon" href="favicon.svg" type="image/svg+xml"></head>'
+            '<body>ThreeBody Dynamics Lab <a href="certificate.json">certificate</a> '
+            '<a href="manifest.json">manifest</a></body></html>'
+        ),
         encoding="utf-8",
     )
     favicon_path.write_text("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"></svg>\n", encoding="utf-8")

@@ -47,6 +47,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "Build provenance" in content
     assert "Open machine-readable certificate JSON" in content
     assert "Open artifact integrity manifest" in content
+    assert 'href="certificate.json"' in content
+    assert 'href="manifest.json"' in content
     assert "verify-static-artifacts --base-url https://eljja.github.io/3body/" in content
     assert "--require-commit local" in content
     assert "--require-profile public-claims-v1" in content
