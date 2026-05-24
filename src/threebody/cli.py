@@ -30,6 +30,31 @@ from .solvers import AdaptiveIntegrator
 from .types import Scenario
 
 
+PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE = "public-claims-v1"
+STATIC_ARTIFACT_REQUIREMENT_PROFILES: dict[str, dict[str, tuple[str, ...]]] = {
+    PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE: {
+        "require_gates": (
+            "picard_certified",
+            "poincare_markov_significant_baseline_win",
+            "poincare_passes_permutation_control",
+            "poincare_passes_section_robustness",
+            "symbolic_passes_stride_robustness",
+        ),
+        "require_minimums": (
+            "publication_pipeline.promotion_gate_pass_count=7",
+            "promotion_gates.picard_contraction_reserve=0",
+            "promotion_gates.poincare_section_robust_pass_fraction=1",
+            "promotion_gates.symbolic_stride_robust_pass_fraction=1",
+        ),
+        "require_maximums": (
+            "metrics.general_max_energy_drift=1e-8",
+            "metrics.restricted_max_jacobi_drift=1e-9",
+            "metrics.picard_max_contraction=0.35",
+        ),
+    }
+}
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="threebody",
@@ -225,6 +250,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar="PATH=VALUE",
         help="Require a numeric certificate field to be at most VALUE. Use dotted paths and repeat as needed.",
+    )
+    verify_static.add_argument(
+        "--require-profile",
+        action="append",
+        choices=tuple(STATIC_ARTIFACT_REQUIREMENT_PROFILES),
+        default=[],
+        metavar="NAME",
+        help=(
+            "Apply a named verification profile that expands to a versioned set of gate/min/max requirements. "
+            f"Available: {PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE}."
+        ),
     )
     verify_static.add_argument(
         "--output",
@@ -556,6 +592,7 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             require_gates=args.require_gate,
             require_minimums=args.require_min,
             require_maximums=args.require_max,
+            require_profiles=args.require_profile,
         )
         if args.base_url
         else verify_static_artifacts(
@@ -564,6 +601,7 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             require_gates=args.require_gate,
             require_minimums=args.require_min,
             require_maximums=args.require_max,
+            require_profiles=args.require_profile,
         )
     )
     if args.output is not None:
@@ -579,6 +617,7 @@ def verify_static_artifacts(
     require_gates: Sequence[str] | None = None,
     require_minimums: Sequence[str] | None = None,
     require_maximums: Sequence[str] | None = None,
+    require_profiles: Sequence[str] | None = None,
 ) -> dict[str, object]:
     artifacts = {
         "index.html": (site_dir / "index.html").read_bytes(),
@@ -592,6 +631,7 @@ def verify_static_artifacts(
         require_gates=require_gates,
         require_minimums=require_minimums,
         require_maximums=require_maximums,
+        require_profiles=require_profiles,
     )
 
 
@@ -601,6 +641,7 @@ def verify_static_artifacts_from_url(
     require_gates: Sequence[str] | None = None,
     require_minimums: Sequence[str] | None = None,
     require_maximums: Sequence[str] | None = None,
+    require_profiles: Sequence[str] | None = None,
 ) -> dict[str, object]:
     normalized_base_url = base_url if base_url.endswith("/") else f"{base_url}/"
     artifacts = {
@@ -614,6 +655,7 @@ def verify_static_artifacts_from_url(
         require_gates=require_gates,
         require_minimums=require_minimums,
         require_maximums=require_maximums,
+        require_profiles=require_profiles,
     )
 
 
@@ -624,14 +666,19 @@ def verify_static_artifact_bytes(
     require_gates: Sequence[str] | None = None,
     require_minimums: Sequence[str] | None = None,
     require_maximums: Sequence[str] | None = None,
+    require_profiles: Sequence[str] | None = None,
 ) -> dict[str, object]:
     manifest = json.loads(artifacts["manifest.json"].decode("utf-8"))
     certificate = json.loads(artifacts["certificate.json"].decode("utf-8"))
     certificate_commit = certificate.get("build_provenance", {}).get("commit_sha")
     manifest_commit = manifest.get("build_provenance", {}).get("commit_sha")
-    required_gate_results = _required_gate_results(certificate, require_gates)
-    required_minimum_results = _required_minimum_results(certificate, require_minimums)
-    required_maximum_results = _required_maximum_results(certificate, require_maximums)
+    profile_requirements = _static_artifact_profile_requirements(require_profiles)
+    expanded_required_gates = _merge_requirements(profile_requirements["require_gates"], require_gates)
+    expanded_required_minimums = _merge_requirements(profile_requirements["require_minimums"], require_minimums)
+    expanded_required_maximums = _merge_requirements(profile_requirements["require_maximums"], require_maximums)
+    required_gate_results = _required_gate_results(certificate, expanded_required_gates)
+    required_minimum_results = _required_minimum_results(certificate, expanded_required_minimums)
+    required_maximum_results = _required_maximum_results(certificate, expanded_required_maximums)
     checks = {
         "manifest_schema": manifest.get("manifest_schema_version") == 1,
         "certificate_schema": certificate.get("certificate_schema_version") == 1,
@@ -653,11 +700,13 @@ def verify_static_artifact_bytes(
         "verified": all(checks.values()),
         "source": source,
         "required_commit": require_commit,
-        "required_gates": list(require_gates or []),
+        "required_profiles": list(require_profiles or []),
+        "required_profile_requirements": profile_requirements,
+        "required_gates": expanded_required_gates,
         "required_gate_results": required_gate_results,
-        "required_minimums": list(require_minimums or []),
+        "required_minimums": expanded_required_minimums,
         "required_minimum_results": required_minimum_results,
-        "required_maximums": list(require_maximums or []),
+        "required_maximums": expanded_required_maximums,
         "required_maximum_results": required_maximum_results,
         "commit_sha": certificate_commit,
         "commit_sha_short": certificate.get("build_provenance", {}).get("commit_sha_short"),
@@ -692,6 +741,36 @@ def _required_gate_results(certificate: dict[str, object], required_gates: Seque
     if not isinstance(promotion_gates, dict):
         promotion_gates = {}
     return {gate: promotion_gates.get(gate) is True for gate in required_gates or []}
+
+
+def _static_artifact_profile_requirements(required_profiles: Sequence[str] | None) -> dict[str, list[str]]:
+    requirements: dict[str, list[str]] = {
+        "require_gates": [],
+        "require_minimums": [],
+        "require_maximums": [],
+    }
+    for profile_name in required_profiles or []:
+        profile = STATIC_ARTIFACT_REQUIREMENT_PROFILES.get(profile_name)
+        if profile is None:
+            raise ValueError(f"Unknown verification profile: {profile_name}")
+        for key in requirements:
+            requirements[key].extend(profile[key])
+    return {key: _unique_requirements(values) for key, values in requirements.items()}
+
+
+def _merge_requirements(profile_requirements: Sequence[str], explicit_requirements: Sequence[str] | None) -> list[str]:
+    return _unique_requirements([*profile_requirements, *(explicit_requirements or [])])
+
+
+def _unique_requirements(requirements: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for requirement in requirements:
+        if requirement in seen:
+            continue
+        seen.add(requirement)
+        unique.append(requirement)
+    return unique
 
 
 def _required_minimum_results(certificate: dict[str, object], required_minimums: Sequence[str] | None) -> list[dict[str, object]]:

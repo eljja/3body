@@ -123,6 +123,14 @@ Write a persistent verification receipt for CI logs, reviews, or paper supplemen
 & 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <commit-sha-or-prefix> --output .runtime/research_runs/pages-verification-receipt.json
 ```
 
+Apply the standard public claim profile when auditing the current Pages claim:
+
+```powershell
+& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <commit-sha-or-prefix> --require-profile public-claims-v1 --output .runtime/research_runs/pages-verification-receipt.json
+```
+
+`public-claims-v1` expands to the current publication gates plus the numeric lower and upper bounds used for the public certificate.
+
 Require specific scientific promotion gates when auditing a public claim:
 
 ```powershell

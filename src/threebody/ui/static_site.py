@@ -13,6 +13,7 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
 
+from threebody.cli import PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE
 from threebody.analysis import (
     AnalysisAtlas,
     bootstrap_markov_baseline_comparison,
@@ -41,14 +42,6 @@ from threebody.types import TrajectoryResult
 
 
 PALETTE = ["#0b84f3", "#f95d6a", "#00a878", "#ffa600", "#6c63ff"]
-
-PUBLIC_REQUIRED_GATES = (
-    "picard_certified",
-    "poincare_markov_significant_baseline_win",
-    "poincare_passes_permutation_control",
-    "poincare_passes_section_robustness",
-    "symbolic_passes_stride_robustness",
-)
 
 
 def build_static_site(output_dir: str | Path) -> Path:
@@ -458,6 +451,7 @@ def _render_page(
             "promotion_gate_total": public_gate_summary["total"],
             "machine_readable_certificate": "certificate.json",
             "integrity_manifest": "manifest.json",
+            "verification_profile": PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE,
         },
         "public_audit_ladder": public_audit_ladder,
         "metrics": metrics,
@@ -473,18 +467,10 @@ def _render_page(
     certificate_json = html.escape(json.dumps(certificate_bundle, indent=2, sort_keys=True))
     evidence_pipeline = _evidence_pipeline(public_gate_summary, metrics, provenance)
     verification_ladder = _verification_ladder(public_audit_ladder)
-    required_gate_args = " ".join(f"--require-gate {gate}" for gate in PUBLIC_REQUIRED_GATES)
     public_verify_command = (
         "python -m threebody.cli verify-static-artifacts "
         f"--base-url https://eljja.github.io/3body/ --require-commit {html.escape(str(provenance['commit_sha']))} "
-        f"{html.escape(required_gate_args)} "
-        "--require-min publication_pipeline.promotion_gate_pass_count=7 "
-        "--require-min promotion_gates.picard_contraction_reserve=0 "
-        "--require-min promotion_gates.poincare_section_robust_pass_fraction=1 "
-        "--require-min promotion_gates.symbolic_stride_robust_pass_fraction=1 "
-        "--require-max metrics.general_max_energy_drift=1e-8 "
-        "--require-max metrics.restricted_max_jacobi_drift=1e-9 "
-        "--require-max metrics.picard_max_contraction=0.35 "
+        f"--require-profile {PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE} "
         "--output .runtime/research_runs/pages-verification-receipt.json"
     )
 

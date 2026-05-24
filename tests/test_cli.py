@@ -195,6 +195,40 @@ def test_verify_static_artifacts_cli_rejects_failed_maximum(tmp_path) -> None:
     assert exit_code == 1
 
 
+def test_verify_static_artifacts_cli_applies_public_claim_profile(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    receipt_path = tmp_path / "profile-receipt.json"
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-profile",
+            "public-claims-v1",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert receipt["verified"] is True
+    assert receipt["required_profiles"] == ["public-claims-v1"]
+    assert receipt["required_profile_requirements"]["require_gates"] == [
+        "picard_certified",
+        "poincare_markov_significant_baseline_win",
+        "poincare_passes_permutation_control",
+        "poincare_passes_section_robustness",
+        "symbolic_passes_stride_robustness",
+    ]
+    assert "publication_pipeline.promotion_gate_pass_count=7" in receipt["required_minimums"]
+    assert "metrics.picard_max_contraction=0.35" in receipt["required_maximums"]
+    assert receipt["checks"]["required_gates"] is True
+    assert receipt["checks"]["required_minimums"] is True
+    assert receipt["checks"]["required_maximums"] is True
+
+
 def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp_path) -> None:
     _write_static_artifact_bundle(tmp_path)
     artifacts = {
@@ -227,9 +261,7 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     result = cli_module.verify_static_artifacts_from_url(
         "https://example.test/3body",
         require_commit="abc123",
-        require_gates=["symbolic_passes_stride_robustness"],
-        require_minimums=["publication_pipeline.promotion_gate_pass_count=7"],
-        require_maximums=["metrics.picard_max_contraction=0.35"],
+        require_profiles=["public-claims-v1"],
     )
 
     assert result["verified"] is True
@@ -237,11 +269,12 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["required_commit"] == "abc123"
     assert result["verification_schema_version"] == 1
     assert result["verified_at_utc"].endswith("Z")
+    assert result["required_profiles"] == ["public-claims-v1"]
     assert result["checks"]["required_commit"] is True
     assert result["checks"]["required_gates"] is True
     assert result["checks"]["required_minimums"] is True
     assert result["checks"]["required_maximums"] is True
-    assert result["required_gate_results"]["symbolic_passes_stride_robustness"] is True
+    assert result["required_gate_results"]["picard_certified"] is True
     assert result["required_minimum_results"][0]["passed"] is True
     assert result["required_maximum_results"][0]["passed"] is True
     assert requested_urls == [
@@ -266,15 +299,21 @@ def _write_static_artifact_bundle(site_dir) -> None:
         "metrics": {
             "general_max_energy_drift": 1.0e-10,
             "picard_max_contraction": 0.01,
+            "restricted_max_jacobi_drift": 1.0e-12,
         },
         "build_provenance": {
             "commit_sha": "abc123",
             "commit_sha_short": "abc123",
         },
         "promotion_gates": {
+            "picard_certified": True,
             "picard_contraction_reserve": 0.3437,
+            "poincare_markov_significant_baseline_win": True,
             "poincare_passes_permutation_control": True,
+            "poincare_passes_section_robustness": True,
+            "poincare_section_robust_pass_fraction": 1.0,
             "symbolic_passes_stride_robustness": True,
+            "symbolic_stride_robust_pass_fraction": 1.0,
         },
     }
     certificate_path.write_text(json.dumps(certificate, indent=2, sort_keys=True), encoding="utf-8")

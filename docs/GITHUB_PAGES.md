@@ -21,6 +21,7 @@ certificate JSON.
 Run `python -m threebody.cli verify-static-artifacts --site-dir site` to verify a local or downloaded Pages artifact directory.
 Run `python -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/` to verify the public Pages bundle directly by URL.
 Add `--require-commit <commit-sha-or-prefix>` when citing a specific build, so the verifier fails if GitHub Pages has moved to a different evidence bundle.
+Add `--require-profile public-claims-v1` to apply the versioned public claim profile. It expands to the current required promotion gates, numeric lower bounds, and numeric upper bounds for the Pages certificate.
 Repeat `--require-gate <promotion_gate_name>` to make the receipt fail unless named scientific promotion gates in `certificate.json` are exactly `true`.
 Repeat `--require-min <dotted.path>=<number>` to make the receipt fail unless named certificate scalars meet declared numeric lower bounds.
 Repeat `--require-max <dotted.path>=<number>` to make the receipt fail unless named certificate scalars remain below declared numeric upper bounds, such as Picard contraction or invariant drift.

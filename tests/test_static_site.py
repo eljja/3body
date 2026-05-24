@@ -67,14 +67,7 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "Open artifact integrity manifest" in content
     assert "verify-static-artifacts --base-url https://eljja.github.io/3body/" in content
     assert "--require-commit local" in content
-    assert "--require-gate picard_certified" in content
-    assert "--require-gate poincare_passes_permutation_control" in content
-    assert "--require-gate symbolic_passes_stride_robustness" in content
-    assert "--require-min publication_pipeline.promotion_gate_pass_count=7" in content
-    assert "--require-min promotion_gates.picard_contraction_reserve=0" in content
-    assert "--require-max metrics.general_max_energy_drift=1e-8" in content
-    assert "--require-max metrics.restricted_max_jacobi_drift=1e-9" in content
-    assert "--require-max metrics.picard_max_contraction=0.35" in content
+    assert "--require-profile public-claims-v1" in content
     assert "--output .runtime/research_runs/pages-verification-receipt.json" in content
     assert "verify-static-artifacts --site-dir site" in content
     assert "jacobi_parameter_interval_box_margin" not in content
@@ -85,6 +78,7 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert certificate["artifact_manifest"] == "manifest.json"
     assert certificate["publication_pipeline"]["promotion_gate_pass_count"] == 7
     assert certificate["publication_pipeline"]["integrity_manifest"] == "manifest.json"
+    assert certificate["publication_pipeline"]["verification_profile"] == "public-claims-v1"
     assert certificate["public_audit_ladder"]
     assert certificate["public_audit_ladder"][-1]["title"] == "Claim-level receipt"
     assert certificate["promotion_gates"]["symbolic_passes_stride_robustness"] is True
