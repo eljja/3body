@@ -55,6 +55,22 @@ STATIC_ARTIFACT_REQUIREMENT_PROFILES: dict[str, dict[str, tuple[str, ...]]] = {
 }
 
 
+def static_artifact_requirement_profile_descriptor(profile_name: str) -> dict[str, object]:
+    if profile_name not in STATIC_ARTIFACT_REQUIREMENT_PROFILES:
+        raise ValueError(f"Unknown verification profile: {profile_name}")
+    return {
+        "profile": profile_name,
+        "profile_schema_version": 1,
+        "requirements": _static_artifact_profile_requirements((profile_name,)),
+    }
+
+
+def static_artifact_requirement_profile_sha256(profile_name: str) -> str:
+    descriptor = static_artifact_requirement_profile_descriptor(profile_name)
+    canonical = json.dumps(descriptor, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="threebody",
@@ -673,6 +689,7 @@ def verify_static_artifact_bytes(
     certificate_commit = certificate.get("build_provenance", {}).get("commit_sha")
     manifest_commit = manifest.get("build_provenance", {}).get("commit_sha")
     profile_requirements = _static_artifact_profile_requirements(require_profiles)
+    profile_hashes = _static_artifact_profile_hashes(require_profiles)
     expanded_required_gates = _merge_requirements(profile_requirements["require_gates"], require_gates)
     expanded_required_minimums = _merge_requirements(profile_requirements["require_minimums"], require_minimums)
     expanded_required_maximums = _merge_requirements(profile_requirements["require_maximums"], require_maximums)
@@ -685,6 +702,7 @@ def verify_static_artifact_bytes(
         "certificate_manifest_link": certificate.get("artifact_manifest") == "manifest.json",
         "provenance_commit_match": certificate_commit == manifest_commit,
         "required_commit": _required_commit_matches(certificate_commit, manifest_commit, require_commit),
+        "required_profile_hashes": _required_profile_hashes_match(certificate, profile_hashes),
         "required_gates": all(required_gate_results.values()),
         "required_minimums": all(row["passed"] for row in required_minimum_results),
         "required_maximums": all(row["passed"] for row in required_maximum_results),
@@ -702,6 +720,7 @@ def verify_static_artifact_bytes(
         "required_commit": require_commit,
         "required_profiles": list(require_profiles or []),
         "required_profile_requirements": profile_requirements,
+        "required_profile_hashes": profile_hashes,
         "required_gates": expanded_required_gates,
         "required_gate_results": required_gate_results,
         "required_minimums": expanded_required_minimums,
@@ -756,6 +775,35 @@ def _static_artifact_profile_requirements(required_profiles: Sequence[str] | Non
         for key in requirements:
             requirements[key].extend(profile[key])
     return {key: _unique_requirements(values) for key, values in requirements.items()}
+
+
+def _static_artifact_profile_hashes(required_profiles: Sequence[str] | None) -> dict[str, str]:
+    return {
+        profile_name: static_artifact_requirement_profile_sha256(profile_name)
+        for profile_name in _unique_requirements(required_profiles or [])
+    }
+
+
+def _required_profile_hashes_match(certificate: dict[str, object], required_profile_hashes: dict[str, str]) -> bool:
+    if not required_profile_hashes:
+        return True
+    verification_profiles = certificate.get("verification_profiles", {})
+    if not isinstance(verification_profiles, dict):
+        verification_profiles = {}
+    publication_pipeline = certificate.get("publication_pipeline", {})
+    if not isinstance(publication_pipeline, dict):
+        publication_pipeline = {}
+
+    for profile_name, profile_hash in required_profile_hashes.items():
+        declared_hash = None
+        profile_descriptor = verification_profiles.get(profile_name)
+        if isinstance(profile_descriptor, dict):
+            declared_hash = profile_descriptor.get("sha256")
+        if declared_hash is None and publication_pipeline.get("verification_profile") == profile_name:
+            declared_hash = publication_pipeline.get("verification_profile_sha256")
+        if declared_hash != profile_hash:
+            return False
+    return True
 
 
 def _merge_requirements(profile_requirements: Sequence[str], explicit_requirements: Sequence[str] | None) -> list[str]:

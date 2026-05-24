@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 
+from threebody.cli import static_artifact_requirement_profile_sha256
 from threebody.ui.static_site import build_static_site
 
 
@@ -79,6 +80,13 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert certificate["publication_pipeline"]["promotion_gate_pass_count"] == 7
     assert certificate["publication_pipeline"]["integrity_manifest"] == "manifest.json"
     assert certificate["publication_pipeline"]["verification_profile"] == "public-claims-v1"
+    assert certificate["publication_pipeline"]["verification_profile_sha256"] == static_artifact_requirement_profile_sha256(
+        "public-claims-v1"
+    )
+    assert certificate["verification_profiles"]["public-claims-v1"]["sha256"] == certificate["publication_pipeline"][
+        "verification_profile_sha256"
+    ]
+    assert certificate["verification_profiles"]["public-claims-v1"]["requirements"]["require_maximums"]
     assert certificate["public_audit_ladder"]
     assert certificate["public_audit_ladder"][-1]["title"] == "Claim-level receipt"
     assert certificate["promotion_gates"]["symbolic_passes_stride_robustness"] is True

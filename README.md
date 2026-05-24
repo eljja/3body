@@ -130,6 +130,7 @@ Apply the standard public claim profile when auditing the current Pages claim:
 ```
 
 `public-claims-v1` expands to the current publication gates plus the numeric lower and upper bounds used for the public certificate.
+The certificate and receipt also include the profile's canonical SHA-256 digest so reviewers can confirm the profile name and profile definition match.
 
 Require specific scientific promotion gates when auditing a public claim:
 

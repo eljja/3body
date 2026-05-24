@@ -13,7 +13,11 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
 
-from threebody.cli import PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE
+from threebody.cli import (
+    PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE,
+    static_artifact_requirement_profile_descriptor,
+    static_artifact_requirement_profile_sha256,
+)
 from threebody.analysis import (
     AnalysisAtlas,
     bootstrap_markov_baseline_comparison,
@@ -441,6 +445,8 @@ def _render_page(
     ]
     public_gate_summary = _public_gate_summary(promotion_gates)
     public_audit_ladder = _public_audit_ladder(public_gate_summary, provenance, promotion_gates)
+    public_claim_profile_sha256 = static_artifact_requirement_profile_sha256(PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE)
+    public_claim_profile_descriptor = static_artifact_requirement_profile_descriptor(PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE)
     certificate_bundle = {
         "certificate_schema_version": 1,
         "artifact": "threebody-static-research-certificate",
@@ -452,6 +458,13 @@ def _render_page(
             "machine_readable_certificate": "certificate.json",
             "integrity_manifest": "manifest.json",
             "verification_profile": PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE,
+            "verification_profile_sha256": public_claim_profile_sha256,
+        },
+        "verification_profiles": {
+            PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE: {
+                **public_claim_profile_descriptor,
+                "sha256": public_claim_profile_sha256,
+            },
         },
         "public_audit_ladder": public_audit_ladder,
         "metrics": metrics,

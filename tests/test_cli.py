@@ -215,6 +215,9 @@ def test_verify_static_artifacts_cli_applies_public_claim_profile(tmp_path) -> N
     assert exit_code == 0
     assert receipt["verified"] is True
     assert receipt["required_profiles"] == ["public-claims-v1"]
+    assert receipt["required_profile_hashes"] == {
+        "public-claims-v1": cli_module.static_artifact_requirement_profile_sha256("public-claims-v1")
+    }
     assert receipt["required_profile_requirements"]["require_gates"] == [
         "picard_certified",
         "poincare_markov_significant_baseline_win",
@@ -224,6 +227,7 @@ def test_verify_static_artifacts_cli_applies_public_claim_profile(tmp_path) -> N
     ]
     assert "publication_pipeline.promotion_gate_pass_count=7" in receipt["required_minimums"]
     assert "metrics.picard_max_contraction=0.35" in receipt["required_maximums"]
+    assert receipt["checks"]["required_profile_hashes"] is True
     assert receipt["checks"]["required_gates"] is True
     assert receipt["checks"]["required_minimums"] is True
     assert receipt["checks"]["required_maximums"] is True
@@ -271,6 +275,7 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["verified_at_utc"].endswith("Z")
     assert result["required_profiles"] == ["public-claims-v1"]
     assert result["checks"]["required_commit"] is True
+    assert result["checks"]["required_profile_hashes"] is True
     assert result["checks"]["required_gates"] is True
     assert result["checks"]["required_minimums"] is True
     assert result["checks"]["required_maximums"] is True
@@ -289,12 +294,21 @@ def _write_static_artifact_bundle(site_dir) -> None:
     certificate_path = site_dir / "certificate.json"
     manifest_path = site_dir / "manifest.json"
     index_path.write_text("<html>ThreeBody Dynamics Lab</html>", encoding="utf-8")
+    profile_sha256 = cli_module.static_artifact_requirement_profile_sha256("public-claims-v1")
     certificate = {
         "certificate_schema_version": 1,
         "artifact": "threebody-static-research-certificate",
         "artifact_manifest": "manifest.json",
         "publication_pipeline": {
             "promotion_gate_pass_count": 7,
+            "verification_profile": "public-claims-v1",
+            "verification_profile_sha256": profile_sha256,
+        },
+        "verification_profiles": {
+            "public-claims-v1": {
+                **cli_module.static_artifact_requirement_profile_descriptor("public-claims-v1"),
+                "sha256": profile_sha256,
+            },
         },
         "metrics": {
             "general_max_energy_drift": 1.0e-10,
