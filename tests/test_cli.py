@@ -135,6 +135,9 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["verifier"] == "threebody.cli verify-static-artifacts"
     assert receipt["verified_at_utc"].endswith("Z")
     assert receipt["verified"] is True
+    assert receipt["checks"]["manifest_json"] is True
+    assert receipt["checks"]["certificate_json"] is True
+    assert receipt["parse_errors"] == {"certificate.json": None, "manifest.json": None}
     assert receipt["checks"]["required_commit"] is True
     assert receipt["checks"]["required_gates"] is True
     assert receipt["checks"]["required_minimums"] is True
@@ -379,6 +382,43 @@ def test_verify_static_artifacts_cli_reports_invalid_nested_json_shapes(tmp_path
     assert receipt["checks"]["index_size"] is False
     assert receipt["checks"]["certificate_size"] is False
     assert receipt["checks"]["favicon_size"] is False
+
+
+def test_verify_static_artifacts_cli_reports_invalid_json_without_crashing(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    certificate_path = tmp_path / "certificate.json"
+    manifest_path = tmp_path / "manifest.json"
+    receipt_path = tmp_path / "invalid-json-receipt.json"
+    certificate_path.write_text("{not-json", encoding="utf-8")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifacts"]["certificate.json"]["sha256"] = _sha256(certificate_path)
+    manifest["artifacts"]["certificate.json"]["bytes"] = certificate_path.stat().st_size
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-commit",
+            "abc123",
+            "--require-profile",
+            "public-claims-v1",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert receipt["verified"] is False
+    assert receipt["checks"]["manifest_json"] is True
+    assert receipt["checks"]["certificate_json"] is False
+    assert receipt["checks"]["certificate_hash"] is True
+    assert receipt["checks"]["certificate_size"] is True
+    assert receipt["checks"]["required_profile_hashes"] is False
+    assert receipt["parse_errors"]["manifest.json"] is None
+    assert "Expecting property name" in receipt["parse_errors"]["certificate.json"]
 
 
 def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp_path) -> None:

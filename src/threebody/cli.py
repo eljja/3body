@@ -684,8 +684,8 @@ def verify_static_artifact_bytes(
     require_maximums: Sequence[str] | None = None,
     require_profiles: Sequence[str] | None = None,
 ) -> dict[str, object]:
-    manifest = json.loads(artifacts["manifest.json"].decode("utf-8"))
-    certificate = json.loads(artifacts["certificate.json"].decode("utf-8"))
+    manifest, manifest_parse_error = _json_object_from_bytes(artifacts["manifest.json"])
+    certificate, certificate_parse_error = _json_object_from_bytes(artifacts["certificate.json"])
     certificate_provenance = _dict_field(certificate, "build_provenance")
     manifest_provenance = _dict_field(manifest, "build_provenance")
     certificate_commit = certificate_provenance.get("commit_sha")
@@ -700,8 +700,10 @@ def verify_static_artifact_bytes(
     required_minimum_results = _required_minimum_results(certificate, expanded_required_minimums)
     required_maximum_results = _required_maximum_results(certificate, expanded_required_maximums)
     checks = {
+        "manifest_json": manifest_parse_error is None,
         "manifest_schema": manifest.get("manifest_schema_version") == 1,
         "manifest_artifact": manifest.get("artifact") == "threebody-static-site-manifest",
+        "certificate_json": certificate_parse_error is None,
         "certificate_schema": certificate.get("certificate_schema_version") == 1,
         "certificate_artifact": certificate.get("artifact") == "threebody-static-research-certificate",
         "certificate_manifest_link": certificate.get("artifact_manifest") == "manifest.json",
@@ -738,8 +740,22 @@ def verify_static_artifact_bytes(
         "required_maximum_results": required_maximum_results,
         "commit_sha": certificate_commit,
         "commit_sha_short": certificate_provenance.get("commit_sha_short"),
+        "parse_errors": {
+            "manifest.json": manifest_parse_error,
+            "certificate.json": certificate_parse_error,
+        },
         "checks": checks,
     }
+
+
+def _json_object_from_bytes(payload: bytes) -> tuple[dict[str, object], str | None]:
+    try:
+        value = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return {}, str(exc)
+    if not isinstance(value, dict):
+        return {}, "top-level JSON value is not an object"
+    return value, None
 
 
 def _manifest_hash_matches(manifest: dict[str, object], artifact_name: str, artifact_bytes: bytes) -> bool:
