@@ -683,11 +683,9 @@ def verify_static_artifact_bytes(
     require_maximums: Sequence[str] | None = None,
     require_profiles: Sequence[str] | None = None,
 ) -> dict[str, object]:
+    provided_artifact_names = set(artifacts)
     artifacts = {name: artifacts.get(name, b"") for name in STATIC_SITE_BUNDLE_NAMES}
-    artifact_errors = {
-        name: None if artifact_errors is None else artifact_errors.get(name)
-        for name in STATIC_SITE_BUNDLE_NAMES
-    }
+    artifact_errors = _normalize_artifact_errors(artifact_errors, provided_artifact_names)
     manifest, manifest_parse_error = _json_object_from_bytes(artifacts["manifest.json"])
     certificate, certificate_parse_error = _json_object_from_bytes(artifacts["certificate.json"])
     certificate_provenance = _dict_field(certificate, "build_provenance")
@@ -789,6 +787,18 @@ def _artifact_available_checks(artifact_errors: dict[str, str | None]) -> dict[s
 
 def _artifact_check_prefix(artifact_name: str) -> str:
     return artifact_name.rsplit(".", 1)[0]
+
+
+def _normalize_artifact_errors(
+    artifact_errors: dict[str, str | None] | None,
+    provided_artifact_names: set[str],
+) -> dict[str, str | None]:
+    if artifact_errors is not None:
+        return {name: artifact_errors.get(name) for name in STATIC_SITE_BUNDLE_NAMES}
+    return {
+        name: None if name in provided_artifact_names else "artifact missing from provided bytes"
+        for name in STATIC_SITE_BUNDLE_NAMES
+    }
 
 
 def _json_object_from_bytes(payload: bytes) -> tuple[dict[str, object], str | None]:
