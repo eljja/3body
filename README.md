@@ -111,6 +111,12 @@ Verify the public GitHub Pages evidence bundle directly:
 & 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/
 ```
 
+Pin the public verification to a specific commit for reviews or paper supplements:
+
+```powershell
+& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <commit-sha-or-prefix>
+```
+
 Run a transition survey:
 
 ```powershell

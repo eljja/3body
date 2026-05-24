@@ -201,6 +201,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Base URL containing index.html, certificate.json, and manifest.json.",
     )
+    verify_static.add_argument(
+        "--require-commit",
+        default=None,
+        help="Require certificate.json and manifest.json provenance to match this commit SHA or prefix.",
+    )
     verify_static.set_defaults(func=run_verify_static_artifacts_command)
     return parser
 
@@ -518,40 +523,48 @@ def run_atlas_benchmark_command(args: argparse.Namespace) -> int:
 
 
 def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
-    result = verify_static_artifacts_from_url(args.base_url) if args.base_url else verify_static_artifacts(args.site_dir)
+    result = (
+        verify_static_artifacts_from_url(args.base_url, require_commit=args.require_commit)
+        if args.base_url
+        else verify_static_artifacts(args.site_dir, require_commit=args.require_commit)
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["verified"] else 1
 
 
-def verify_static_artifacts(site_dir: Path) -> dict[str, object]:
+def verify_static_artifacts(site_dir: Path, require_commit: str | None = None) -> dict[str, object]:
     artifacts = {
         "index.html": (site_dir / "index.html").read_bytes(),
         "certificate.json": (site_dir / "certificate.json").read_bytes(),
         "manifest.json": (site_dir / "manifest.json").read_bytes(),
     }
-    return verify_static_artifact_bytes(artifacts, source=str(site_dir))
+    return verify_static_artifact_bytes(artifacts, source=str(site_dir), require_commit=require_commit)
 
 
-def verify_static_artifacts_from_url(base_url: str) -> dict[str, object]:
+def verify_static_artifacts_from_url(base_url: str, require_commit: str | None = None) -> dict[str, object]:
     normalized_base_url = base_url if base_url.endswith("/") else f"{base_url}/"
     artifacts = {
         name: _fetch_url_bytes(urljoin(normalized_base_url, name))
         for name in ("index.html", "certificate.json", "manifest.json")
     }
-    return verify_static_artifact_bytes(artifacts, source=normalized_base_url)
+    return verify_static_artifact_bytes(artifacts, source=normalized_base_url, require_commit=require_commit)
 
 
-def verify_static_artifact_bytes(artifacts: dict[str, bytes], source: str) -> dict[str, object]:
+def verify_static_artifact_bytes(
+    artifacts: dict[str, bytes],
+    source: str,
+    require_commit: str | None = None,
+) -> dict[str, object]:
     manifest = json.loads(artifacts["manifest.json"].decode("utf-8"))
     certificate = json.loads(artifacts["certificate.json"].decode("utf-8"))
+    certificate_commit = certificate.get("build_provenance", {}).get("commit_sha")
+    manifest_commit = manifest.get("build_provenance", {}).get("commit_sha")
     checks = {
         "manifest_schema": manifest.get("manifest_schema_version") == 1,
         "certificate_schema": certificate.get("certificate_schema_version") == 1,
         "certificate_manifest_link": certificate.get("artifact_manifest") == "manifest.json",
-        "provenance_commit_match": (
-            certificate.get("build_provenance", {}).get("commit_sha")
-            == manifest.get("build_provenance", {}).get("commit_sha")
-        ),
+        "provenance_commit_match": certificate_commit == manifest_commit,
+        "required_commit": _required_commit_matches(certificate_commit, manifest_commit, require_commit),
         "index_hash": _manifest_hash_matches(manifest, "index.html", artifacts["index.html"]),
         "certificate_hash": _manifest_hash_matches(manifest, "certificate.json", artifacts["certificate.json"]),
         "index_size": _manifest_size_matches(manifest, "index.html", artifacts["index.html"]),
@@ -560,6 +573,8 @@ def verify_static_artifact_bytes(artifacts: dict[str, bytes], source: str) -> di
     return {
         "verified": all(checks.values()),
         "source": source,
+        "required_commit": require_commit,
+        "commit_sha": certificate_commit,
         "commit_sha_short": certificate.get("build_provenance", {}).get("commit_sha_short"),
         "checks": checks,
     }
@@ -573,6 +588,18 @@ def _manifest_hash_matches(manifest: dict[str, object], artifact_name: str, arti
 def _manifest_size_matches(manifest: dict[str, object], artifact_name: str, artifact_bytes: bytes) -> bool:
     artifact = manifest.get("artifacts", {}).get(artifact_name, {})
     return artifact.get("bytes") == len(artifact_bytes)
+
+
+def _required_commit_matches(
+    certificate_commit: object,
+    manifest_commit: object,
+    required_commit: str | None,
+) -> bool:
+    if not required_commit:
+        return True
+    if not isinstance(certificate_commit, str) or not isinstance(manifest_commit, str):
+        return False
+    return certificate_commit.startswith(required_commit) and manifest_commit.startswith(required_commit)
 
 
 def _fetch_url_bytes(url: str) -> bytes:

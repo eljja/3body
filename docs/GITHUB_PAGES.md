@@ -20,6 +20,7 @@ certificate JSON.
 `manifest.json` records SHA-256 digests so downstream checks can confirm which files belong to one generated evidence bundle.
 Run `python -m threebody.cli verify-static-artifacts --site-dir site` to verify a local or downloaded Pages artifact directory.
 Run `python -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/` to verify the public Pages bundle directly by URL.
+Add `--require-commit <commit-sha-or-prefix>` when citing a specific build, so the verifier fails if GitHub Pages has moved to a different evidence bundle.
 
 Build locally:
 

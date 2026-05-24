@@ -108,9 +108,17 @@ def test_atlas_benchmark_cli_writes_reproducible_cases(tmp_path) -> None:
 def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     _write_static_artifact_bundle(tmp_path)
 
-    exit_code = main(["verify-static-artifacts", "--site-dir", str(tmp_path)])
+    exit_code = main(["verify-static-artifacts", "--site-dir", str(tmp_path), "--require-commit", "abc"])
 
     assert exit_code == 0
+
+
+def test_verify_static_artifacts_cli_rejects_unexpected_commit(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+
+    exit_code = main(["verify-static-artifacts", "--site-dir", str(tmp_path), "--require-commit", "wrong"])
+
+    assert exit_code == 1
 
 
 def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp_path) -> None:
@@ -142,10 +150,12 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
 
     monkeypatch.setattr(cli_module, "urlopen", fake_urlopen)
 
-    result = cli_module.verify_static_artifacts_from_url("https://example.test/3body")
+    result = cli_module.verify_static_artifacts_from_url("https://example.test/3body", require_commit="abc123")
 
     assert result["verified"] is True
     assert result["source"] == "https://example.test/3body/"
+    assert result["required_commit"] == "abc123"
+    assert result["checks"]["required_commit"] is True
     assert requested_urls == [
         "https://example.test/3body/index.html",
         "https://example.test/3body/certificate.json",

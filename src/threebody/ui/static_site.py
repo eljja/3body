@@ -462,6 +462,10 @@ def _render_page(
     }
     certificate_json = html.escape(json.dumps(certificate_bundle, indent=2, sort_keys=True))
     evidence_pipeline = _evidence_pipeline(public_gate_summary, metrics, provenance)
+    public_verify_command = (
+        "python -m threebody.cli verify-static-artifacts "
+        f"--base-url https://eljja.github.io/3body/ --require-commit {html.escape(str(provenance['commit_sha']))}"
+    )
 
     return f"""<!doctype html>
 <html lang="en">
@@ -763,7 +767,7 @@ def _render_page(
       ·
       <a href="manifest.json">Open artifact integrity manifest</a>
     </p>
-    <pre>python -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/
+    <pre>{public_verify_command}
 python -m threebody.cli verify-static-artifacts --site-dir site</pre>
   </section>
 
