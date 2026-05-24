@@ -214,6 +214,9 @@ def test_verify_static_artifacts_cli_applies_public_claim_profile(tmp_path) -> N
 
     assert exit_code == 0
     assert receipt["verified"] is True
+    assert receipt["checks"]["manifest_artifact"] is True
+    assert receipt["checks"]["certificate_artifact"] is True
+    assert receipt["checks"]["publication_pipeline_links"] is True
     assert receipt["required_profiles"] == ["public-claims-v1"]
     assert receipt["required_profile_hashes"] == {
         "public-claims-v1": cli_module.static_artifact_requirement_profile_sha256("public-claims-v1")
@@ -304,6 +307,35 @@ def test_verify_static_artifacts_cli_rejects_tampered_profile_descriptor(tmp_pat
     assert receipt["required_profile_results"][0]["passed"] is False
 
 
+def test_verify_static_artifacts_cli_rejects_mismatched_publication_pipeline_links(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    certificate_path = tmp_path / "certificate.json"
+    receipt_path = tmp_path / "pipeline-link-receipt.json"
+    certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
+    certificate["publication_pipeline"]["integrity_manifest"] = "draft-manifest.json"
+    certificate_path.write_text(json.dumps(certificate, indent=2, sort_keys=True), encoding="utf-8")
+    _refresh_manifest_hashes(tmp_path)
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-profile",
+            "public-claims-v1",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert receipt["verified"] is False
+    assert receipt["checks"]["certificate_hash"] is True
+    assert receipt["checks"]["publication_pipeline_links"] is False
+    assert receipt["checks"]["required_profile_hashes"] is True
+
+
 def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp_path) -> None:
     _write_static_artifact_bundle(tmp_path)
     artifacts = {
@@ -344,6 +376,9 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["required_commit"] == "abc123"
     assert result["verification_schema_version"] == 1
     assert result["verified_at_utc"].endswith("Z")
+    assert result["checks"]["manifest_artifact"] is True
+    assert result["checks"]["certificate_artifact"] is True
+    assert result["checks"]["publication_pipeline_links"] is True
     assert result["required_profiles"] == ["public-claims-v1"]
     assert result["checks"]["required_commit"] is True
     assert result["checks"]["required_profile_hashes"] is True
@@ -372,6 +407,9 @@ def _write_static_artifact_bundle(site_dir) -> None:
         "artifact": "threebody-static-research-certificate",
         "artifact_manifest": "manifest.json",
         "publication_pipeline": {
+            "engine": "threebody.ui.static_site",
+            "integrity_manifest": "manifest.json",
+            "machine_readable_certificate": "certificate.json",
             "promotion_gate_pass_count": 7,
             "verification_profile": "public-claims-v1",
             "verification_profile_sha256": profile_sha256,

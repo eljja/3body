@@ -54,6 +54,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert certificate["artifact"] == "threebody-static-research-certificate"
     assert certificate["artifact_manifest"] == "manifest.json"
     assert certificate["publication_pipeline"]["promotion_gate_pass_count"] == 7
+    assert certificate["publication_pipeline"]["engine"] == "threebody.ui.static_site"
+    assert certificate["publication_pipeline"]["machine_readable_certificate"] == "certificate.json"
     assert certificate["publication_pipeline"]["integrity_manifest"] == "manifest.json"
     assert certificate["publication_pipeline"]["verification_profile"] == "public-claims-v1"
     assert certificate["publication_pipeline"]["verification_profile_sha256"] == static_artifact_requirement_profile_sha256(

@@ -699,8 +699,11 @@ def verify_static_artifact_bytes(
     required_maximum_results = _required_maximum_results(certificate, expanded_required_maximums)
     checks = {
         "manifest_schema": manifest.get("manifest_schema_version") == 1,
+        "manifest_artifact": manifest.get("artifact") == "threebody-static-site-manifest",
         "certificate_schema": certificate.get("certificate_schema_version") == 1,
+        "certificate_artifact": certificate.get("artifact") == "threebody-static-research-certificate",
         "certificate_manifest_link": certificate.get("artifact_manifest") == "manifest.json",
+        "publication_pipeline_links": _publication_pipeline_links_match(certificate),
         "provenance_commit_match": certificate_commit == manifest_commit,
         "required_commit": _required_commit_matches(certificate_commit, manifest_commit, require_commit),
         "required_profile_hashes": all(row["passed"] for row in required_profile_results),
@@ -743,6 +746,17 @@ def _manifest_hash_matches(manifest: dict[str, object], artifact_name: str, arti
 def _manifest_size_matches(manifest: dict[str, object], artifact_name: str, artifact_bytes: bytes) -> bool:
     artifact = manifest.get("artifacts", {}).get(artifact_name, {})
     return artifact.get("bytes") == len(artifact_bytes)
+
+
+def _publication_pipeline_links_match(certificate: dict[str, object]) -> bool:
+    publication_pipeline = certificate.get("publication_pipeline", {})
+    if not isinstance(publication_pipeline, dict):
+        return False
+    return (
+        publication_pipeline.get("engine") == "threebody.ui.static_site"
+        and publication_pipeline.get("machine_readable_certificate") == "certificate.json"
+        and publication_pipeline.get("integrity_manifest") == "manifest.json"
+    )
 
 
 def _required_commit_matches(
