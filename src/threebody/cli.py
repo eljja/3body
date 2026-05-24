@@ -36,6 +36,19 @@ from .types import Scenario
 PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE = "public-claims-v1"
 STATIC_SITE_ARTIFACT_NAMES = ("index.html", "certificate.json", "favicon.svg")
 STATIC_SITE_BUNDLE_NAMES = (*STATIC_SITE_ARTIFACT_NAMES, "manifest.json")
+STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES = (
+    "artifact-availability",
+    "json-parse-errors",
+    "artifact-identity",
+    "manifest-hash-algorithm",
+    "index-artifact-discoverability",
+    "publication-pipeline-links",
+    "commit-provenance",
+    "active-profile-descriptor",
+    "profile-gates",
+    "numeric-minimums",
+    "numeric-maximums",
+)
 STATIC_ARTIFACT_REQUIREMENT_PROFILES: dict[str, dict[str, tuple[str, ...]]] = {
     PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE: {
         "require_gates": (
@@ -731,6 +744,7 @@ def verify_static_artifact_bytes(
     }
     return {
         "verification_schema_version": 1,
+        "verification_schema_features": list(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES),
         "verified_at_utc": _utc_timestamp(),
         "verifier": "threebody.cli verify-static-artifacts",
         "verified": all(checks.values()),

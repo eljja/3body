@@ -132,6 +132,19 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
 
     assert exit_code == 0
     assert receipt["verification_schema_version"] == 1
+    assert receipt["verification_schema_features"] == [
+        "artifact-availability",
+        "json-parse-errors",
+        "artifact-identity",
+        "manifest-hash-algorithm",
+        "index-artifact-discoverability",
+        "publication-pipeline-links",
+        "commit-provenance",
+        "active-profile-descriptor",
+        "profile-gates",
+        "numeric-minimums",
+        "numeric-maximums",
+    ]
     assert receipt["verifier"] == "threebody.cli verify-static-artifacts"
     assert receipt["verified_at_utc"].endswith("Z")
     assert receipt["verified"] is True
@@ -708,6 +721,8 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["source"] == "https://example.test/3body/"
     assert result["required_commit"] == "abc123"
     assert result["verification_schema_version"] == 1
+    assert "index-artifact-discoverability" in result["verification_schema_features"]
+    assert "active-profile-descriptor" in result["verification_schema_features"]
     assert result["verified_at_utc"].endswith("Z")
     assert result["checks"]["manifest_artifact"] is True
     assert result["checks"]["manifest_hash_algorithm"] is True
