@@ -55,6 +55,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "Stride robustness" in content
     assert "Evidence publication pipeline" in content
     assert "Public verification ladder" in content
+    assert "Published claim seal" in content
+    assert "Canonical public claim profile" in content
     assert "Claim-level receipt" in content
     assert "Numerical evidence" in content
     assert "Public artifacts" in content
@@ -87,6 +89,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
         "verification_profile_sha256"
     ]
     assert certificate["verification_profiles"]["public-claims-v1"]["requirements"]["require_maximums"]
+    assert certificate["public_change_summary"]
+    assert certificate["public_change_summary"][-1]["title"] == "Profile digest"
     assert certificate["public_audit_ladder"]
     assert certificate["public_audit_ladder"][-1]["title"] == "Claim-level receipt"
     assert certificate["promotion_gates"]["symbolic_passes_stride_robustness"] is True
