@@ -218,6 +218,12 @@ def test_verify_static_artifacts_cli_applies_public_claim_profile(tmp_path) -> N
     assert receipt["required_profile_hashes"] == {
         "public-claims-v1": cli_module.static_artifact_requirement_profile_sha256("public-claims-v1")
     }
+    assert receipt["required_profile_results"][0]["active_matches"] is True
+    assert receipt["required_profile_results"][0]["active_hash_matches"] is True
+    assert receipt["required_profile_results"][0]["descriptor_matches"] is True
+    assert receipt["required_profile_results"][0]["descriptor_hash_matches"] is True
+    assert receipt["required_profile_results"][0]["hash_matches"] is True
+    assert receipt["required_profile_results"][0]["passed"] is True
     assert receipt["required_profile_requirements"]["require_gates"] == [
         "picard_certified",
         "poincare_markov_significant_baseline_win",
@@ -231,6 +237,71 @@ def test_verify_static_artifacts_cli_applies_public_claim_profile(tmp_path) -> N
     assert receipt["checks"]["required_gates"] is True
     assert receipt["checks"]["required_minimums"] is True
     assert receipt["checks"]["required_maximums"] is True
+
+
+def test_verify_static_artifacts_cli_rejects_inactive_required_profile(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    certificate_path = tmp_path / "certificate.json"
+    receipt_path = tmp_path / "inactive-profile-receipt.json"
+    certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
+    certificate["publication_pipeline"]["verification_profile"] = "local-draft-profile"
+    certificate_path.write_text(json.dumps(certificate, indent=2, sort_keys=True), encoding="utf-8")
+    _refresh_manifest_hashes(tmp_path)
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-profile",
+            "public-claims-v1",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert receipt["verified"] is False
+    assert receipt["checks"]["required_profile_hashes"] is False
+    assert receipt["required_profile_results"][0]["active_matches"] is False
+    assert receipt["required_profile_results"][0]["active_hash_matches"] is False
+    assert receipt["required_profile_results"][0]["descriptor_matches"] is True
+    assert receipt["required_profile_results"][0]["passed"] is False
+
+
+def test_verify_static_artifacts_cli_rejects_tampered_profile_descriptor(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    certificate_path = tmp_path / "certificate.json"
+    receipt_path = tmp_path / "tampered-profile-receipt.json"
+    certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
+    certificate["verification_profiles"]["public-claims-v1"]["requirements"]["require_gates"] = [
+        "picard_certified",
+    ]
+    certificate_path.write_text(json.dumps(certificate, indent=2, sort_keys=True), encoding="utf-8")
+    _refresh_manifest_hashes(tmp_path)
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-profile",
+            "public-claims-v1",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert receipt["verified"] is False
+    assert receipt["checks"]["required_profile_hashes"] is False
+    assert receipt["required_profile_results"][0]["active_matches"] is True
+    assert receipt["required_profile_results"][0]["active_hash_matches"] is True
+    assert receipt["required_profile_results"][0]["descriptor_hash_matches"] is True
+    assert receipt["required_profile_results"][0]["descriptor_matches"] is False
+    assert receipt["required_profile_results"][0]["passed"] is False
 
 
 def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp_path) -> None:
@@ -276,6 +347,7 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["required_profiles"] == ["public-claims-v1"]
     assert result["checks"]["required_commit"] is True
     assert result["checks"]["required_profile_hashes"] is True
+    assert result["required_profile_results"][0]["active_profile"] == "public-claims-v1"
     assert result["checks"]["required_gates"] is True
     assert result["checks"]["required_minimums"] is True
     assert result["checks"]["required_maximums"] is True
@@ -349,6 +421,16 @@ def _write_static_artifact_bundle(site_dir) -> None:
             },
         },
     }
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _refresh_manifest_hashes(site_dir) -> None:
+    manifest_path = site_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for artifact_name in ("index.html", "certificate.json"):
+        artifact_path = site_dir / artifact_name
+        manifest["artifacts"][artifact_name]["sha256"] = _sha256(artifact_path)
+        manifest["artifacts"][artifact_name]["bytes"] = artifact_path.stat().st_size
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
 
 

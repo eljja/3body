@@ -849,10 +849,10 @@ def _public_change_summary(
             "detail": "The public profile fixes upper bounds for invariant drift and Picard contraction.",
         },
         {
-            "title": "Profile digest",
+            "title": "Active profile digest",
             "status": "pass",
             "value": profile_sha256,
-            "detail": "The profile definition is hashed in both certificate JSON and verification receipts.",
+            "detail": "The active certificate profile and canonical descriptor digest must both match verifier expectations.",
         },
     ]
 
@@ -875,7 +875,7 @@ def _claim_verification_seal(rows: list[dict[str, object]], profile_sha256: str)
         "<span>Canonical public claim profile</span>"
         f"<strong>{html.escape(PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE)}</strong>"
         f"<code>{html.escape(profile_sha256)}</code>"
-        "<p>Same digest is embedded in certificate.json and required by the verifier receipt.</p>"
+        "<p>The verifier requires this active profile name, its digest, and the canonical descriptor to agree.</p>"
         "</div>"
         f'<div class="seal-checks">{checks}</div>'
         "</div>"

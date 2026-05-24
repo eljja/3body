@@ -39,7 +39,7 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "Canonical public claim profile" in content
     assert "Commit-pinned build" in content
     assert "Bounded numerical drift" in content
-    assert "Profile digest" in content
+    assert "Active profile digest" in content
     assert "Build provenance" in content
     assert "Open machine-readable certificate JSON" in content
     assert "Open artifact integrity manifest" in content
@@ -64,7 +64,7 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     ]
     assert certificate["verification_profiles"]["public-claims-v1"]["requirements"]["require_maximums"]
     assert certificate["public_change_summary"]
-    assert certificate["public_change_summary"][-1]["title"] == "Profile digest"
+    assert certificate["public_change_summary"][-1]["title"] == "Active profile digest"
     assert certificate["promotion_gates"]["symbolic_passes_stride_robustness"] is True
     assert certificate["build_provenance"]["generator"] == "threebody.ui.static_site"
     assert "analysis_atlas_snapshot" in certificate

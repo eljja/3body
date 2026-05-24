@@ -129,6 +129,8 @@ Apply the standard public claim profile when auditing the current Pages claim:
 & 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <commit-sha-or-prefix> --require-profile public-claims-v1 --output .runtime/research_runs/pages-verification-receipt.json
 ```
 
+`--require-profile public-claims-v1` now checks the active certificate profile name, the active profile digest, and the embedded canonical profile descriptor, not just the presence of a matching digest string.
+
 `public-claims-v1` expands to the current publication gates plus the numeric lower and upper bounds used for the public certificate.
 The certificate and receipt also include the profile's canonical SHA-256 digest so reviewers can confirm the profile name and profile definition match.
 
