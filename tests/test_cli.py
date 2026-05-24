@@ -138,6 +138,16 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["checks"]["manifest_json"] is True
     assert receipt["checks"]["certificate_json"] is True
     assert receipt["parse_errors"] == {"certificate.json": None, "manifest.json": None}
+    assert receipt["artifact_errors"] == {
+        "certificate.json": None,
+        "favicon.svg": None,
+        "index.html": None,
+        "manifest.json": None,
+    }
+    assert receipt["checks"]["index_available"] is True
+    assert receipt["checks"]["certificate_available"] is True
+    assert receipt["checks"]["favicon_available"] is True
+    assert receipt["checks"]["manifest_available"] is True
     assert receipt["checks"]["required_commit"] is True
     assert receipt["checks"]["required_gates"] is True
     assert receipt["checks"]["required_minimums"] is True
@@ -419,6 +429,81 @@ def test_verify_static_artifacts_cli_reports_invalid_json_without_crashing(tmp_p
     assert receipt["checks"]["required_profile_hashes"] is False
     assert receipt["parse_errors"]["manifest.json"] is None
     assert "Expecting property name" in receipt["parse_errors"]["certificate.json"]
+
+
+def test_verify_static_artifacts_cli_reports_missing_local_artifact_without_crashing(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    favicon_path = tmp_path / "favicon.svg"
+    receipt_path = tmp_path / "missing-favicon-receipt.json"
+    favicon_path.unlink()
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-commit",
+            "abc123",
+            "--require-profile",
+            "public-claims-v1",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert receipt["verified"] is False
+    assert receipt["checks"]["favicon_available"] is False
+    assert receipt["checks"]["favicon_hash"] is False
+    assert receipt["checks"]["favicon_size"] is False
+    assert receipt["checks"]["manifest_available"] is True
+    assert receipt["checks"]["required_profile_hashes"] is True
+    assert "favicon.svg" in receipt["artifact_errors"]["favicon.svg"]
+
+
+def test_verify_static_artifacts_from_url_reports_fetch_error(monkeypatch, tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    artifacts = {
+        "index.html": (tmp_path / "index.html").read_bytes(),
+        "certificate.json": (tmp_path / "certificate.json").read_bytes(),
+        "manifest.json": (tmp_path / "manifest.json").read_bytes(),
+    }
+
+    class FakeResponse:
+        def __init__(self, data: bytes) -> None:
+            self.data = data
+
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return self.data
+
+    def fake_urlopen(request, timeout: int) -> FakeResponse:
+        artifact_name = request.full_url.rstrip("/").rsplit("/", 1)[-1]
+        if artifact_name == "favicon.svg":
+            raise OSError("simulated missing favicon")
+        return FakeResponse(artifacts[artifact_name])
+
+    monkeypatch.setattr(cli_module, "urlopen", fake_urlopen)
+
+    result = cli_module.verify_static_artifacts_from_url(
+        "https://example.test/3body",
+        require_commit="abc123",
+        require_profiles=["public-claims-v1"],
+    )
+
+    assert result["verified"] is False
+    assert result["checks"]["favicon_available"] is False
+    assert result["checks"]["favicon_hash"] is False
+    assert result["checks"]["favicon_size"] is False
+    assert result["checks"]["manifest_available"] is True
+    assert result["checks"]["required_profile_hashes"] is True
+    assert result["artifact_errors"]["favicon.svg"] == "simulated missing favicon"
 
 
 def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp_path) -> None:

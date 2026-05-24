@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from math import pi
 from pathlib import Path
 from typing import Sequence
+from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
@@ -32,6 +33,7 @@ from .types import Scenario
 
 PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE = "public-claims-v1"
 STATIC_SITE_ARTIFACT_NAMES = ("index.html", "certificate.json", "favicon.svg")
+STATIC_SITE_BUNDLE_NAMES = (*STATIC_SITE_ARTIFACT_NAMES, "manifest.json")
 STATIC_ARTIFACT_REQUIREMENT_PROFILES: dict[str, dict[str, tuple[str, ...]]] = {
     PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE: {
         "require_gates": (
@@ -636,13 +638,11 @@ def verify_static_artifacts(
     require_maximums: Sequence[str] | None = None,
     require_profiles: Sequence[str] | None = None,
 ) -> dict[str, object]:
-    artifacts = {
-        name: (site_dir / name).read_bytes()
-        for name in (*STATIC_SITE_ARTIFACT_NAMES, "manifest.json")
-    }
+    artifacts, artifact_errors = _read_static_artifacts_from_dir(site_dir)
     return verify_static_artifact_bytes(
         artifacts,
         source=str(site_dir),
+        artifact_errors=artifact_errors,
         require_commit=require_commit,
         require_gates=require_gates,
         require_minimums=require_minimums,
@@ -660,13 +660,11 @@ def verify_static_artifacts_from_url(
     require_profiles: Sequence[str] | None = None,
 ) -> dict[str, object]:
     normalized_base_url = base_url if base_url.endswith("/") else f"{base_url}/"
-    artifacts = {
-        name: _fetch_url_bytes(urljoin(normalized_base_url, name))
-        for name in (*STATIC_SITE_ARTIFACT_NAMES, "manifest.json")
-    }
+    artifacts, artifact_errors = _fetch_static_artifacts_from_url(normalized_base_url)
     return verify_static_artifact_bytes(
         artifacts,
         source=normalized_base_url,
+        artifact_errors=artifact_errors,
         require_commit=require_commit,
         require_gates=require_gates,
         require_minimums=require_minimums,
@@ -678,12 +676,18 @@ def verify_static_artifacts_from_url(
 def verify_static_artifact_bytes(
     artifacts: dict[str, bytes],
     source: str,
+    artifact_errors: dict[str, str | None] | None = None,
     require_commit: str | None = None,
     require_gates: Sequence[str] | None = None,
     require_minimums: Sequence[str] | None = None,
     require_maximums: Sequence[str] | None = None,
     require_profiles: Sequence[str] | None = None,
 ) -> dict[str, object]:
+    artifacts = {name: artifacts.get(name, b"") for name in STATIC_SITE_BUNDLE_NAMES}
+    artifact_errors = {
+        name: None if artifact_errors is None else artifact_errors.get(name)
+        for name in STATIC_SITE_BUNDLE_NAMES
+    }
     manifest, manifest_parse_error = _json_object_from_bytes(artifacts["manifest.json"])
     certificate, certificate_parse_error = _json_object_from_bytes(artifacts["certificate.json"])
     certificate_provenance = _dict_field(certificate, "build_provenance")
@@ -700,6 +704,7 @@ def verify_static_artifact_bytes(
     required_minimum_results = _required_minimum_results(certificate, expanded_required_minimums)
     required_maximum_results = _required_maximum_results(certificate, expanded_required_maximums)
     checks = {
+        **_artifact_available_checks(artifact_errors),
         "manifest_json": manifest_parse_error is None,
         "manifest_schema": manifest.get("manifest_schema_version") == 1,
         "manifest_artifact": manifest.get("artifact") == "threebody-static-site-manifest",
@@ -744,8 +749,46 @@ def verify_static_artifact_bytes(
             "manifest.json": manifest_parse_error,
             "certificate.json": certificate_parse_error,
         },
+        "artifact_errors": artifact_errors,
         "checks": checks,
     }
+
+
+def _read_static_artifacts_from_dir(site_dir: Path) -> tuple[dict[str, bytes], dict[str, str | None]]:
+    artifacts: dict[str, bytes] = {}
+    artifact_errors: dict[str, str | None] = {}
+    for name in STATIC_SITE_BUNDLE_NAMES:
+        try:
+            artifacts[name] = (site_dir / name).read_bytes()
+            artifact_errors[name] = None
+        except OSError as exc:
+            artifacts[name] = b""
+            artifact_errors[name] = str(exc)
+    return artifacts, artifact_errors
+
+
+def _fetch_static_artifacts_from_url(base_url: str) -> tuple[dict[str, bytes], dict[str, str | None]]:
+    artifacts: dict[str, bytes] = {}
+    artifact_errors: dict[str, str | None] = {}
+    for name in STATIC_SITE_BUNDLE_NAMES:
+        try:
+            artifacts[name] = _fetch_url_bytes(urljoin(base_url, name))
+            artifact_errors[name] = None
+        except (HTTPError, URLError, OSError) as exc:
+            artifacts[name] = b""
+            artifact_errors[name] = str(exc)
+    return artifacts, artifact_errors
+
+
+def _artifact_available_checks(artifact_errors: dict[str, str | None]) -> dict[str, bool]:
+    return {
+        f"{_artifact_check_prefix(name)}_available": artifact_errors.get(name) is None
+        for name in STATIC_SITE_BUNDLE_NAMES
+    }
+
+
+def _artifact_check_prefix(artifact_name: str) -> str:
+    return artifact_name.rsplit(".", 1)[0]
 
 
 def _json_object_from_bytes(payload: bytes) -> tuple[dict[str, object], str | None]:
