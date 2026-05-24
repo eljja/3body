@@ -206,6 +206,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Require certificate.json and manifest.json provenance to match this commit SHA or prefix.",
     )
+    verify_static.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Optional JSON path for writing a persistent verification receipt.",
+    )
     verify_static.set_defaults(func=run_verify_static_artifacts_command)
     return parser
 
@@ -528,6 +534,9 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
         if args.base_url
         else verify_static_artifacts(args.site_dir, require_commit=args.require_commit)
     )
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["verified"] else 1
 
@@ -571,6 +580,9 @@ def verify_static_artifact_bytes(
         "certificate_size": _manifest_size_matches(manifest, "certificate.json", artifacts["certificate.json"]),
     }
     return {
+        "verification_schema_version": 1,
+        "verified_at_utc": _utc_timestamp(),
+        "verifier": "threebody.cli verify-static-artifacts",
         "verified": all(checks.values()),
         "source": source,
         "required_commit": require_commit,
@@ -600,6 +612,10 @@ def _required_commit_matches(
     if not isinstance(certificate_commit, str) or not isinstance(manifest_commit, str):
         return False
     return certificate_commit.startswith(required_commit) and manifest_commit.startswith(required_commit)
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _fetch_url_bytes(url: str) -> bytes:

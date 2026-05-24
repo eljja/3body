@@ -107,10 +107,27 @@ def test_atlas_benchmark_cli_writes_reproducible_cases(tmp_path) -> None:
 
 def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     _write_static_artifact_bundle(tmp_path)
+    receipt_path = tmp_path / "verification-receipt.json"
 
-    exit_code = main(["verify-static-artifacts", "--site-dir", str(tmp_path), "--require-commit", "abc"])
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-commit",
+            "abc",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
 
     assert exit_code == 0
+    assert receipt["verification_schema_version"] == 1
+    assert receipt["verifier"] == "threebody.cli verify-static-artifacts"
+    assert receipt["verified_at_utc"].endswith("Z")
+    assert receipt["verified"] is True
+    assert receipt["checks"]["required_commit"] is True
 
 
 def test_verify_static_artifacts_cli_rejects_unexpected_commit(tmp_path) -> None:
@@ -155,6 +172,8 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["verified"] is True
     assert result["source"] == "https://example.test/3body/"
     assert result["required_commit"] == "abc123"
+    assert result["verification_schema_version"] == 1
+    assert result["verified_at_utc"].endswith("Z")
     assert result["checks"]["required_commit"] is True
     assert requested_urls == [
         "https://example.test/3body/index.html",

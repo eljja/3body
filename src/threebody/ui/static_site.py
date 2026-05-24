@@ -464,7 +464,8 @@ def _render_page(
     evidence_pipeline = _evidence_pipeline(public_gate_summary, metrics, provenance)
     public_verify_command = (
         "python -m threebody.cli verify-static-artifacts "
-        f"--base-url https://eljja.github.io/3body/ --require-commit {html.escape(str(provenance['commit_sha']))}"
+        f"--base-url https://eljja.github.io/3body/ --require-commit {html.escape(str(provenance['commit_sha']))} "
+        "--output .runtime/research_runs/pages-verification-receipt.json"
     )
 
     return f"""<!doctype html>

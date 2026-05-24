@@ -21,6 +21,7 @@ certificate JSON.
 Run `python -m threebody.cli verify-static-artifacts --site-dir site` to verify a local or downloaded Pages artifact directory.
 Run `python -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/` to verify the public Pages bundle directly by URL.
 Add `--require-commit <commit-sha-or-prefix>` when citing a specific build, so the verifier fails if GitHub Pages has moved to a different evidence bundle.
+Add `--output .runtime/research_runs/pages-verification-receipt.json` to preserve the verification result as a machine-readable receipt with the verifier name, UTC verification time, source, commit, and all checks.
 
 Build locally:
 

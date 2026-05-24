@@ -117,6 +117,12 @@ Pin the public verification to a specific commit for reviews or paper supplement
 & 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <commit-sha-or-prefix>
 ```
 
+Write a persistent verification receipt for CI logs, reviews, or paper supplements:
+
+```powershell
+& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <commit-sha-or-prefix> --output .runtime/research_runs/pages-verification-receipt.json
+```
+
 Run a transition survey:
 
 ```powershell
