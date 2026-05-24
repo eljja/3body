@@ -444,7 +444,6 @@ def _render_page(
         for transition in general_transitions[:12]
     ]
     public_gate_summary = _public_gate_summary(promotion_gates)
-    public_audit_ladder = _public_audit_ladder(public_gate_summary, provenance, promotion_gates)
     public_claim_profile_sha256 = static_artifact_requirement_profile_sha256(PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE)
     public_claim_profile_descriptor = static_artifact_requirement_profile_descriptor(PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE)
     public_change_summary = _public_change_summary(public_gate_summary, metrics, provenance, public_claim_profile_sha256)
@@ -468,7 +467,6 @@ def _render_page(
             },
         },
         "public_change_summary": public_change_summary,
-        "public_audit_ladder": public_audit_ladder,
         "metrics": metrics,
         "promotion_gates": promotion_gates,
         "jacobi_escape_cone": jacobi_summary,
@@ -479,9 +477,6 @@ def _render_page(
         "build_provenance": provenance,
         "note": "Full theorem-suite benchmarks remain a local/CI research check; this artifact embeds a representative certificate and latest parameter-box summary.",
     }
-    certificate_json = html.escape(json.dumps(certificate_bundle, indent=2, sort_keys=True))
-    evidence_pipeline = _evidence_pipeline(public_gate_summary, metrics, provenance)
-    verification_ladder = _verification_ladder(public_audit_ladder)
     claim_verification_seal = _claim_verification_seal(public_change_summary, public_claim_profile_sha256)
     public_verify_command = (
         "python -m threebody.cli verify-static-artifacts "
@@ -562,68 +557,6 @@ def _render_page(
     .progress-step.wait .progress-index {{ background: rgba(183, 121, 31, 0.12); color: var(--warn); }}
     .progress-step strong {{ font-size: 0.98rem; }}
     .progress-step span {{ color: var(--muted); font-size: 0.82rem; line-height: 1.45; }}
-    .audit-ladder {{
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
-      gap: 12px;
-      margin-top: 18px;
-    }}
-    .audit-card {{
-      display: grid;
-      align-content: start;
-      gap: 9px;
-      min-height: 168px;
-      padding: 15px;
-      border: 1px solid var(--line);
-      border-top: 4px solid var(--success);
-      border-radius: 8px;
-      background: #fff;
-    }}
-    .audit-index {{
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 26px;
-      height: 26px;
-      border-radius: 999px;
-      background: rgba(0, 143, 90, 0.12);
-      color: var(--success);
-      font: 700 0.8rem ui-monospace, SFMono-Regular, Consolas, monospace;
-    }}
-    .audit-card strong {{ font-size: 1rem; }}
-    .audit-card code {{ font: 700 0.84rem ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }}
-    .audit-card span {{ color: var(--muted); font-size: 0.84rem; line-height: 1.45; }}
-    .pipeline {{
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
-      margin-top: 18px;
-    }}
-    .pipeline-node {{
-      position: relative;
-      display: grid;
-      gap: 8px;
-      min-height: 132px;
-      padding: 15px;
-      border: 1px solid var(--line);
-      border-top: 4px solid var(--accent);
-      border-radius: 8px;
-      background: #fff;
-    }}
-    .pipeline-node.pass {{ border-top-color: var(--success); }}
-    .pipeline-node:not(:last-child)::after {{
-      content: "";
-      position: absolute;
-      top: 50%;
-      right: -12px;
-      width: 12px;
-      height: 2px;
-      background: var(--line);
-    }}
-    .pipeline-kicker {{ color: var(--muted); font-size: 0.76rem; text-transform: uppercase; }}
-    .pipeline-node strong {{ font-size: 1rem; }}
-    .pipeline-node code {{ font: 700 0.86rem ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }}
-    .pipeline-node span {{ color: var(--muted); font-size: 0.84rem; line-height: 1.45; }}
     .claim-seal {{
       display: grid;
       grid-template-columns: minmax(240px, 0.88fr) minmax(0, 1.12fr);
@@ -721,8 +654,7 @@ def _render_page(
     }}
     a {{ color: var(--accent); }}
     @media (max-width: 900px) {{
-      .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .audit-ladder, .pipeline, .claim-seal, .seal-checks, .evidence-grid {{ grid-template-columns: 1fr; }}
-      .pipeline-node:not(:last-child)::after {{ display: none; }}
+      .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .claim-seal, .seal-checks, .evidence-grid {{ grid-template-columns: 1fr; }}
       main {{ width: min(100vw - 18px, 1180px); padding-top: 12px; }}
     }}
   </style>
@@ -756,28 +688,10 @@ def _render_page(
   </section>
 
   <section>
-    <h2>Evidence publication pipeline</h2>
+    <h2>Public claim audit chain</h2>
     <p>
-      The public page now separates computation, promotion, publication, and integrity checks so the research result
-      can be read visually and audited programmatically.
-    </p>
-    {evidence_pipeline}
-  </section>
-
-  <section>
-    <h2>Public verification ladder</h2>
-    <p>
-      This timeline summarizes the visible changes now published on github.io: numerical evidence is promoted into
-      machine-readable certificates, bound to a commit, and checked again by claim-level verification receipts.
-    </p>
-    {verification_ladder}
-  </section>
-
-  <section>
-    <h2>Published claim seal</h2>
-    <p>
-      The current github.io build now exposes a compact visual seal for the full public audit chain:
-      commit-pinned provenance, SHA-256 artifact integrity, versioned claim profile digest, and receipt-ready checks.
+      The public audit surface is intentionally compact: the page shows the four checks that make the current
+      claim reviewable, while the full certificate and artifact manifest remain available as linked JSON files.
     </p>
     {claim_verification_seal}
   </section>
@@ -874,11 +788,6 @@ def _render_page(
     <pre>{public_verify_command}
 python -m threebody.cli verify-static-artifacts --site-dir site</pre>
   </section>
-
-  <section>
-    <h2>Research certificate status</h2>
-    <pre>{certificate_json}</pre>
-  </section>
 </main>
 </body>
 </html>
@@ -946,120 +855,6 @@ def _public_change_summary(
             "detail": "The profile definition is hashed in both certificate JSON and verification receipts.",
         },
     ]
-
-
-def _evidence_pipeline(
-    public_gate_summary: dict[str, int],
-    metrics: dict[str, float],
-    provenance: dict[str, object],
-) -> str:
-    nodes = (
-        (
-            "Compute",
-            "Python engine",
-            f"drift {metrics['general_max_energy_drift']:.2e}",
-            "trajectories, invariants, atlas reports",
-        ),
-        (
-            "Promote",
-            "Gate suite",
-            f"{public_gate_summary['pass_count']} / {public_gate_summary['total']} pass",
-            "Picard, Markov, Poincare, robustness",
-        ),
-        (
-            "Publish",
-            "Certificate JSON",
-            "schema 1",
-            "machine-readable promotion evidence",
-        ),
-        (
-            "Verify",
-            "Integrity manifest",
-            str(provenance["commit_sha_short"]),
-            "SHA-256 bundle check",
-        ),
-    )
-    return (
-        '<div class="pipeline">'
-        + "\n".join(
-            (
-                '<div class="pipeline-node pass">'
-                f'<span class="pipeline-kicker">{html.escape(kicker)}</span>'
-                f"<strong>{html.escape(title)}</strong>"
-                f"<code>{html.escape(value)}</code>"
-                f"<span>{html.escape(detail)}</span>"
-                "</div>"
-            )
-            for kicker, title, value, detail in nodes
-        )
-        + "</div>"
-    )
-
-
-def _public_audit_ladder(
-    public_gate_summary: dict[str, int],
-    provenance: dict[str, object],
-    promotion_gates: dict[str, object],
-) -> list[dict[str, object]]:
-    gate_pass_count = int(public_gate_summary["pass_count"])
-    gate_total = int(public_gate_summary["total"])
-    return [
-        {
-            "title": "Numerical evidence",
-            "status": "pass",
-            "value": "Plotly + invariants",
-            "detail": "Reference trajectories and drift diagnostics are embedded in the static build.",
-        },
-        {
-            "title": "Picard certification",
-            "status": "pass" if promotion_gates["picard_certified"] else "wait",
-            "value": f"reserve {float(promotion_gates['picard_contraction_reserve']):.3e}",
-            "detail": "The escape-cone tail carries an explicit contraction gate.",
-        },
-        {
-            "title": "Symbolic dynamics",
-            "status": "pass" if promotion_gates["poincare_passes_permutation_control"] else "wait",
-            "value": "Poincare + permutation",
-            "detail": "Held-out chart words must beat an independent baseline and shuffled-symbol control.",
-        },
-        {
-            "title": "Robustness gates",
-            "status": "pass" if promotion_gates["symbolic_passes_stride_robustness"] else "wait",
-            "value": f"{gate_pass_count} / {gate_total} public gates",
-            "detail": "Section and stride perturbations block single-setting artifacts.",
-        },
-        {
-            "title": "Public artifacts",
-            "status": "pass",
-            "value": "certificate + manifest",
-            "detail": "The HTML is paired with machine-readable evidence and SHA-256 bundle hashes.",
-        },
-        {
-            "title": "Claim-level receipt",
-            "status": "pass",
-            "value": str(provenance["commit_sha_short"]),
-            "detail": "Remote verification can require commit, gate pass, and receipt persistence.",
-        },
-    ]
-
-
-def _verification_ladder(rows: list[dict[str, object]]) -> str:
-    return (
-        '<div class="audit-ladder">'
-        + "\n".join(
-            (
-                '<div class="audit-card">'
-                f'<span class="audit-index">{index}</span>'
-                f"<strong>{html.escape(str(row['title']))}</strong>"
-                f'<span class="gate-status">{html.escape(str(row["status"]).upper())}</span>'
-                f"<code>{html.escape(str(row['value']))}</code>"
-                f"<span>{html.escape(str(row['detail']))}</span>"
-                "</div>"
-            )
-            for index, row in enumerate(rows, start=1)
-        )
-        + "</div>"
-    )
 
 
 def _claim_verification_seal(rows: list[dict[str, object]], profile_sha256: str) -> str:
