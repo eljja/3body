@@ -529,6 +529,27 @@ def test_verify_static_artifact_bytes_reports_missing_direct_artifact_key(tmp_pa
     assert result["artifact_errors"]["favicon.svg"] == "artifact missing from provided bytes"
 
 
+def test_verify_static_artifact_bytes_does_not_let_partial_error_map_hide_missing_key(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    artifacts = {
+        "index.html": (tmp_path / "index.html").read_bytes(),
+        "certificate.json": (tmp_path / "certificate.json").read_bytes(),
+        "manifest.json": (tmp_path / "manifest.json").read_bytes(),
+    }
+
+    result = cli_module.verify_static_artifact_bytes(
+        artifacts,
+        source="direct-bytes",
+        artifact_errors={"index.html": None, "certificate.json": None, "manifest.json": None},
+        require_commit="abc123",
+        require_profiles=["public-claims-v1"],
+    )
+
+    assert result["verified"] is False
+    assert result["checks"]["favicon_available"] is False
+    assert result["artifact_errors"]["favicon.svg"] == "artifact missing from provided bytes"
+
+
 def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp_path) -> None:
     _write_static_artifact_bundle(tmp_path)
     artifacts = {

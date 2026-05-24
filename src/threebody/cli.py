@@ -793,12 +793,16 @@ def _normalize_artifact_errors(
     artifact_errors: dict[str, str | None] | None,
     provided_artifact_names: set[str],
 ) -> dict[str, str | None]:
-    if artifact_errors is not None:
-        return {name: artifact_errors.get(name) for name in STATIC_SITE_BUNDLE_NAMES}
-    return {
-        name: None if name in provided_artifact_names else "artifact missing from provided bytes"
-        for name in STATIC_SITE_BUNDLE_NAMES
-    }
+    normalized: dict[str, str | None] = {}
+    for name in STATIC_SITE_BUNDLE_NAMES:
+        explicit_error = None if artifact_errors is None else artifact_errors.get(name)
+        if explicit_error is not None:
+            normalized[name] = explicit_error
+        elif name not in provided_artifact_names:
+            normalized[name] = "artifact missing from provided bytes"
+        else:
+            normalized[name] = None
+    return normalized
 
 
 def _json_object_from_bytes(payload: bytes) -> tuple[dict[str, object], str | None]:
