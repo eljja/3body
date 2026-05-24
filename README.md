@@ -97,7 +97,7 @@ Build the static GitHub Pages visualizer:
 & 'D:\Codex\.venv\Scripts\python.exe' -m threebody.ui.static_site --output site
 ```
 
-The static build includes a visual research progress map, a compact public claim audit chain, and machine-readable `certificate.json` and `manifest.json` artifacts for reproducible public review.
+The static build includes a visual research progress map, a compact public claim audit chain, a browser favicon, and machine-readable `certificate.json` and `manifest.json` artifacts for reproducible public review.
 
 Verify a generated static evidence bundle:
 
@@ -130,7 +130,7 @@ Apply the standard public claim profile when auditing the current Pages claim:
 ```
 
 `--require-profile public-claims-v1` now checks the active certificate profile name, the active profile digest, and the embedded canonical profile descriptor, not just the presence of a matching digest string.
-The same verifier also checks artifact identity and publication-pipeline links, so a receipt fails if `certificate.json` no longer declares the static research certificate, `manifest.json` no longer declares the static-site manifest, or the certificate stops pointing back to the published certificate and manifest filenames.
+The same verifier also checks artifact identity and publication-pipeline links, so a receipt fails if `certificate.json` no longer declares the static research certificate, `manifest.json` no longer declares the static-site manifest, or the certificate stops pointing back to the published certificate and manifest filenames. Malformed nested provenance/artifact sections are reported as failed receipt checks, and commit provenance only passes when both artifacts declare the same non-empty commit string.
 
 `public-claims-v1` expands to the current publication gates plus the numeric lower and upper bounds used for the public certificate.
 The certificate and receipt also include the profile's canonical SHA-256 digest so reviewers can confirm the profile name and profile definition match.

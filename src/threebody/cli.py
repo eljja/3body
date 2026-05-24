@@ -31,6 +31,7 @@ from .types import Scenario
 
 
 PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE = "public-claims-v1"
+STATIC_SITE_ARTIFACT_NAMES = ("index.html", "certificate.json", "favicon.svg")
 STATIC_ARTIFACT_REQUIREMENT_PROFILES: dict[str, dict[str, tuple[str, ...]]] = {
     PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE: {
         "require_gates": (
@@ -636,9 +637,8 @@ def verify_static_artifacts(
     require_profiles: Sequence[str] | None = None,
 ) -> dict[str, object]:
     artifacts = {
-        "index.html": (site_dir / "index.html").read_bytes(),
-        "certificate.json": (site_dir / "certificate.json").read_bytes(),
-        "manifest.json": (site_dir / "manifest.json").read_bytes(),
+        name: (site_dir / name).read_bytes()
+        for name in (*STATIC_SITE_ARTIFACT_NAMES, "manifest.json")
     }
     return verify_static_artifact_bytes(
         artifacts,
@@ -662,7 +662,7 @@ def verify_static_artifacts_from_url(
     normalized_base_url = base_url if base_url.endswith("/") else f"{base_url}/"
     artifacts = {
         name: _fetch_url_bytes(urljoin(normalized_base_url, name))
-        for name in ("index.html", "certificate.json", "manifest.json")
+        for name in (*STATIC_SITE_ARTIFACT_NAMES, "manifest.json")
     }
     return verify_static_artifact_bytes(
         artifacts,
@@ -686,8 +686,10 @@ def verify_static_artifact_bytes(
 ) -> dict[str, object]:
     manifest = json.loads(artifacts["manifest.json"].decode("utf-8"))
     certificate = json.loads(artifacts["certificate.json"].decode("utf-8"))
-    certificate_commit = certificate.get("build_provenance", {}).get("commit_sha")
-    manifest_commit = manifest.get("build_provenance", {}).get("commit_sha")
+    certificate_provenance = _dict_field(certificate, "build_provenance")
+    manifest_provenance = _dict_field(manifest, "build_provenance")
+    certificate_commit = certificate_provenance.get("commit_sha")
+    manifest_commit = manifest_provenance.get("commit_sha")
     profile_requirements = _static_artifact_profile_requirements(require_profiles)
     profile_hashes = _static_artifact_profile_hashes(require_profiles)
     required_profile_results = _required_profile_results(certificate, profile_hashes)
@@ -704,7 +706,7 @@ def verify_static_artifact_bytes(
         "certificate_artifact": certificate.get("artifact") == "threebody-static-research-certificate",
         "certificate_manifest_link": certificate.get("artifact_manifest") == "manifest.json",
         "publication_pipeline_links": _publication_pipeline_links_match(certificate),
-        "provenance_commit_match": certificate_commit == manifest_commit,
+        "provenance_commit_match": _provenance_commits_match(certificate_commit, manifest_commit),
         "required_commit": _required_commit_matches(certificate_commit, manifest_commit, require_commit),
         "required_profile_hashes": all(row["passed"] for row in required_profile_results),
         "required_gates": all(required_gate_results.values()),
@@ -712,8 +714,10 @@ def verify_static_artifact_bytes(
         "required_maximums": all(row["passed"] for row in required_maximum_results),
         "index_hash": _manifest_hash_matches(manifest, "index.html", artifacts["index.html"]),
         "certificate_hash": _manifest_hash_matches(manifest, "certificate.json", artifacts["certificate.json"]),
+        "favicon_hash": _manifest_hash_matches(manifest, "favicon.svg", artifacts["favicon.svg"]),
         "index_size": _manifest_size_matches(manifest, "index.html", artifacts["index.html"]),
         "certificate_size": _manifest_size_matches(manifest, "certificate.json", artifacts["certificate.json"]),
+        "favicon_size": _manifest_size_matches(manifest, "favicon.svg", artifacts["favicon.svg"]),
     }
     return {
         "verification_schema_version": 1,
@@ -733,30 +737,43 @@ def verify_static_artifact_bytes(
         "required_maximums": expanded_required_maximums,
         "required_maximum_results": required_maximum_results,
         "commit_sha": certificate_commit,
-        "commit_sha_short": certificate.get("build_provenance", {}).get("commit_sha_short"),
+        "commit_sha_short": certificate_provenance.get("commit_sha_short"),
         "checks": checks,
     }
 
 
 def _manifest_hash_matches(manifest: dict[str, object], artifact_name: str, artifact_bytes: bytes) -> bool:
-    artifact = manifest.get("artifacts", {}).get(artifact_name, {})
+    artifact = _dict_field(_dict_field(manifest, "artifacts"), artifact_name)
     return artifact.get("sha256") == _sha256_bytes(artifact_bytes)
 
 
 def _manifest_size_matches(manifest: dict[str, object], artifact_name: str, artifact_bytes: bytes) -> bool:
-    artifact = manifest.get("artifacts", {}).get(artifact_name, {})
+    artifact = _dict_field(_dict_field(manifest, "artifacts"), artifact_name)
     return artifact.get("bytes") == len(artifact_bytes)
 
 
 def _publication_pipeline_links_match(certificate: dict[str, object]) -> bool:
-    publication_pipeline = certificate.get("publication_pipeline", {})
-    if not isinstance(publication_pipeline, dict):
-        return False
+    publication_pipeline = _dict_field(certificate, "publication_pipeline")
     return (
         publication_pipeline.get("engine") == "threebody.ui.static_site"
         and publication_pipeline.get("machine_readable_certificate") == "certificate.json"
         and publication_pipeline.get("integrity_manifest") == "manifest.json"
     )
+
+
+def _provenance_commits_match(certificate_commit: object, manifest_commit: object) -> bool:
+    return (
+        isinstance(certificate_commit, str)
+        and bool(certificate_commit)
+        and isinstance(manifest_commit, str)
+        and bool(manifest_commit)
+        and certificate_commit == manifest_commit
+    )
+
+
+def _dict_field(payload: dict[str, object], key: str) -> dict[str, object]:
+    value = payload.get(key)
+    return value if isinstance(value, dict) else {}
 
 
 def _required_commit_matches(

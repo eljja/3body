@@ -139,6 +139,8 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["checks"]["required_gates"] is True
     assert receipt["checks"]["required_minimums"] is True
     assert receipt["checks"]["required_maximums"] is True
+    assert receipt["checks"]["favicon_hash"] is True
+    assert receipt["checks"]["favicon_size"] is True
     assert receipt["required_gates"] == ["symbolic_passes_stride_robustness"]
     assert receipt["required_gate_results"]["symbolic_passes_stride_robustness"] is True
     assert receipt["required_minimum_results"][0]["path"] == "promotion_gates.picard_contraction_reserve"
@@ -332,8 +334,51 @@ def test_verify_static_artifacts_cli_rejects_mismatched_publication_pipeline_lin
     assert exit_code == 1
     assert receipt["verified"] is False
     assert receipt["checks"]["certificate_hash"] is True
+    assert receipt["checks"]["favicon_hash"] is True
     assert receipt["checks"]["publication_pipeline_links"] is False
     assert receipt["checks"]["required_profile_hashes"] is True
+
+
+def test_verify_static_artifacts_cli_reports_invalid_nested_json_shapes(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    certificate_path = tmp_path / "certificate.json"
+    manifest_path = tmp_path / "manifest.json"
+    receipt_path = tmp_path / "invalid-shapes-receipt.json"
+    certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    certificate["build_provenance"] = "not-an-object"
+    manifest["build_provenance"] = "not-an-object"
+    manifest["artifacts"] = []
+    certificate_path.write_text(json.dumps(certificate, indent=2, sort_keys=True), encoding="utf-8")
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-commit",
+            "abc123",
+            "--require-profile",
+            "public-claims-v1",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert receipt["verified"] is False
+    assert receipt["commit_sha"] is None
+    assert receipt["commit_sha_short"] is None
+    assert receipt["checks"]["provenance_commit_match"] is False
+    assert receipt["checks"]["required_commit"] is False
+    assert receipt["checks"]["index_hash"] is False
+    assert receipt["checks"]["certificate_hash"] is False
+    assert receipt["checks"]["favicon_hash"] is False
+    assert receipt["checks"]["index_size"] is False
+    assert receipt["checks"]["certificate_size"] is False
+    assert receipt["checks"]["favicon_size"] is False
 
 
 def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp_path) -> None:
@@ -341,6 +386,7 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     artifacts = {
         "index.html": (tmp_path / "index.html").read_bytes(),
         "certificate.json": (tmp_path / "certificate.json").read_bytes(),
+        "favicon.svg": (tmp_path / "favicon.svg").read_bytes(),
         "manifest.json": (tmp_path / "manifest.json").read_bytes(),
     }
     requested_urls: list[str] = []
@@ -386,12 +432,15 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["checks"]["required_gates"] is True
     assert result["checks"]["required_minimums"] is True
     assert result["checks"]["required_maximums"] is True
+    assert result["checks"]["favicon_hash"] is True
+    assert result["checks"]["favicon_size"] is True
     assert result["required_gate_results"]["picard_certified"] is True
     assert result["required_minimum_results"][0]["passed"] is True
     assert result["required_maximum_results"][0]["passed"] is True
     assert requested_urls == [
         "https://example.test/3body/index.html",
         "https://example.test/3body/certificate.json",
+        "https://example.test/3body/favicon.svg",
         "https://example.test/3body/manifest.json",
     ]
 
@@ -399,8 +448,13 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
 def _write_static_artifact_bundle(site_dir) -> None:
     index_path = site_dir / "index.html"
     certificate_path = site_dir / "certificate.json"
+    favicon_path = site_dir / "favicon.svg"
     manifest_path = site_dir / "manifest.json"
-    index_path.write_text("<html>ThreeBody Dynamics Lab</html>", encoding="utf-8")
+    index_path.write_text(
+        '<html><head><link rel="icon" href="favicon.svg" type="image/svg+xml"></head>ThreeBody Dynamics Lab</html>',
+        encoding="utf-8",
+    )
+    favicon_path.write_text("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"></svg>\n", encoding="utf-8")
     profile_sha256 = cli_module.static_artifact_requirement_profile_sha256("public-claims-v1")
     certificate = {
         "certificate_schema_version": 1,
@@ -457,6 +511,10 @@ def _write_static_artifact_bundle(site_dir) -> None:
                 "sha256": _sha256(certificate_path),
                 "bytes": certificate_path.stat().st_size,
             },
+            "favicon.svg": {
+                "sha256": _sha256(favicon_path),
+                "bytes": favicon_path.stat().st_size,
+            },
         },
     }
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
@@ -465,7 +523,7 @@ def _write_static_artifact_bundle(site_dir) -> None:
 def _refresh_manifest_hashes(site_dir) -> None:
     manifest_path = site_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    for artifact_name in ("index.html", "certificate.json"):
+    for artifact_name in ("index.html", "certificate.json", "favicon.svg"):
         artifact_path = site_dir / artifact_name
         manifest["artifacts"][artifact_name]["sha256"] = _sha256(artifact_path)
         manifest["artifacts"][artifact_name]["bytes"] = artifact_path.stat().st_size

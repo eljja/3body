@@ -15,6 +15,7 @@ import plotly.io as pio
 
 from threebody.cli import (
     PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE,
+    STATIC_SITE_ARTIFACT_NAMES,
     static_artifact_requirement_profile_descriptor,
     static_artifact_requirement_profile_sha256,
 )
@@ -117,11 +118,13 @@ def build_static_site(output_dir: str | Path) -> Path:
     index_path = output_path / "index.html"
     certificate_path = output_path / "certificate.json"
     manifest_path = output_path / "manifest.json"
+    favicon_path = output_path / "favicon.svg"
     index_path.write_text(page, encoding="utf-8")
     certificate_path.write_text(
         json.dumps(certificate_bundle, indent=2, sort_keys=True),
         encoding="utf-8",
     )
+    favicon_path.write_text(_favicon_svg(), encoding="utf-8")
     manifest_path.write_text(
         json.dumps(_artifact_manifest(output_path, provenance), indent=2, sort_keys=True),
         encoding="utf-8",
@@ -490,6 +493,8 @@ def _render_page(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#16212f">
   <title>ThreeBody Dynamics Lab</title>
   <style>
     :root {{
@@ -884,7 +889,7 @@ def _claim_verification_seal(rows: list[dict[str, object]], profile_sha256: str)
 
 def _artifact_manifest(output_path: Path, provenance: dict[str, object]) -> dict[str, object]:
     artifacts = {}
-    for name in ("index.html", "certificate.json"):
+    for name in STATIC_SITE_ARTIFACT_NAMES:
         path = output_path / name
         artifacts[name] = {
             "sha256": _sha256_file(path),
@@ -897,6 +902,20 @@ def _artifact_manifest(output_path: Path, provenance: dict[str, object]) -> dict
         "build_provenance": provenance,
         "artifacts": artifacts,
     }
+
+
+def _favicon_svg() -> str:
+    return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#16212f"/>
+  <path d="M14 40c7 10 23 11 34 1" fill="none" stroke="#d9e1ec" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M17 24c11-13 32-7 34 9" fill="none" stroke="#0b84f3" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M21 45 32 16l11 29Z" fill="none" stroke="#00a878" stroke-width="2.2" stroke-linejoin="round" opacity=".9"/>
+  <circle cx="32" cy="16" r="5.5" fill="#f95d6a"/>
+  <circle cx="21" cy="45" r="5" fill="#ffa600"/>
+  <circle cx="43" cy="45" r="5" fill="#0b84f3"/>
+  <circle cx="37" cy="31" r="2.4" fill="#ffffff"/>
+</svg>
+"""
 
 
 def _sha256_file(path: Path) -> str:

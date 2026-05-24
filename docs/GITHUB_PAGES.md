@@ -10,19 +10,20 @@ The static build performs these steps during GitHub Actions deployment:
 3. Compute invariant drift, stability, analysis-atlas distribution, representative Jacobi escape-cone certificates, Picard contraction tuning, hysteresis grammar Markov diagnostics with bootstrap uncertainty, Markov order selection, and Poincare-section word diagnostics.
 4. Embed the resulting Plotly figures, certificate bars, promotion gates, progress-map timeline, compact public claim audit chain, and metrics into `site/index.html`.
 5. Write the same machine-readable evidence bundle to `site/certificate.json`.
-6. Write `site/manifest.json` with SHA-256 hashes and byte sizes for the HTML and certificate artifacts.
-7. Publish the generated `site` directory through GitHub Pages.
+6. Write `site/favicon.svg` as the browser/tab icon for the public site.
+7. Write `site/manifest.json` with SHA-256 hashes and byte sizes for the HTML, certificate, and favicon artifacts.
+8. Publish the generated `site` directory through GitHub Pages.
 
 The workflow opts JavaScript actions into the Node 24 runner path and embeds build provenance in the generated HTML
 and `certificate.json`:
 commit SHA, workflow run, ref name, Python version, and UTC generation time are included beside the research
 certificate JSON.
-`manifest.json` records SHA-256 digests so downstream checks can confirm which files belong to one generated evidence bundle.
+`manifest.json` records SHA-256 digests so downstream checks can confirm which files belong to one generated evidence bundle, including the public browser favicon.
 Run `python -m threebody.cli verify-static-artifacts --site-dir site` to verify a local or downloaded Pages artifact directory.
 Run `python -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/` to verify the public Pages bundle directly by URL.
 Add `--require-commit <commit-sha-or-prefix>` when citing a specific build, so the verifier fails if GitHub Pages has moved to a different evidence bundle.
 Add `--require-profile public-claims-v1` to apply the versioned public claim profile. It expands to the current required promotion gates, numeric lower bounds, and numeric upper bounds for the Pages certificate. The generated certificate and verifier receipt include the profile's canonical SHA-256 digest, and the verifier now requires the certificate's active `publication_pipeline.verification_profile`, active profile digest, and embedded canonical descriptor to agree.
-The verifier also checks the static artifact identities and publication-pipeline links: `manifest.json` must identify a ThreeBody static-site manifest, `certificate.json` must identify a ThreeBody static research certificate, and the certificate's publication pipeline must point back to `threebody.ui.static_site`, `certificate.json`, and `manifest.json`.
+The verifier also checks the static artifact identities and publication-pipeline links: `manifest.json` must identify a ThreeBody static-site manifest, `certificate.json` must identify a ThreeBody static research certificate, and the certificate's publication pipeline must point back to `threebody.ui.static_site`, `certificate.json`, and `manifest.json`. Missing or non-object provenance/artifact sections are reported as failed receipt checks instead of crashing the verifier, and commit provenance only passes when both artifacts declare the same non-empty commit string.
 Repeat `--require-gate <promotion_gate_name>` to make the receipt fail unless named scientific promotion gates in `certificate.json` are exactly `true`.
 Repeat `--require-min <dotted.path>=<number>` to make the receipt fail unless named certificate scalars meet declared numeric lower bounds.
 Repeat `--require-max <dotted.path>=<number>` to make the receipt fail unless named certificate scalars remain below declared numeric upper bounds, such as Picard contraction or invariant drift.

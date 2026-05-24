@@ -14,11 +14,15 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert index_path.exists()
     assert (tmp_path / ".nojekyll").exists()
     certificate_path = tmp_path / "certificate.json"
+    favicon_path = tmp_path / "favicon.svg"
     manifest_path = tmp_path / "manifest.json"
     assert certificate_path.exists()
+    assert favicon_path.exists()
     assert manifest_path.exists()
     content = index_path.read_text(encoding="utf-8")
     assert "ThreeBody Dynamics Lab" in content
+    assert '<link rel="icon" href="favicon.svg" type="image/svg+xml">' in content
+    assert '<meta name="theme-color" content="#16212f">' in content
     assert "General three-body figure-eight" in content
     assert "autoscale extent" in content
     assert "scaleanchor" not in content
@@ -77,6 +81,9 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert manifest["artifacts"]["index.html"]["sha256"] == _sha256(index_path)
     assert manifest["artifacts"]["certificate.json"]["sha256"] == _sha256(certificate_path)
     assert manifest["artifacts"]["certificate.json"]["bytes"] == certificate_path.stat().st_size
+    assert manifest["artifacts"]["favicon.svg"]["sha256"] == _sha256(favicon_path)
+    assert manifest["artifacts"]["favicon.svg"]["bytes"] == favicon_path.stat().st_size
+    assert 'viewBox="0 0 64 64"' in favicon_path.read_text(encoding="utf-8")
 
 
 def _sha256(path) -> str:
