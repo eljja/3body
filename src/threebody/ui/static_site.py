@@ -132,6 +132,7 @@ def build_static_site(output_dir: str | Path) -> Path:
         json.dumps(_artifact_manifest(output_path, provenance), indent=2, sort_keys=True),
     )
     _write_text_lf(output_path / ".nojekyll", "")
+    _write_text_lf(output_path / ".gitattributes", "* text eol=lf\n")
     return index_path
 
 

@@ -29,9 +29,11 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     certificate_path = tmp_path / "certificate.json"
     favicon_path = tmp_path / "favicon.svg"
     manifest_path = tmp_path / "manifest.json"
+    gitattributes_path = tmp_path / ".gitattributes"
     assert certificate_path.exists()
     assert favicon_path.exists()
     assert manifest_path.exists()
+    assert gitattributes_path.exists()
     content = index_path.read_text(encoding="utf-8")
     assert "ThreeBody Dynamics Lab" in content
     assert '<link rel="icon" href="favicon.svg" type="image/svg+xml">' in content
@@ -125,6 +127,8 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert b"\r\n" not in certificate_path.read_bytes()
     assert b"\r\n" not in manifest_path.read_bytes()
     assert b"\r\n" not in favicon_path.read_bytes()
+    assert gitattributes_path.read_text(encoding="utf-8") == "* text eol=lf\n"
+    assert b"\r\n" not in gitattributes_path.read_bytes()
     public_api_receipt = verify_public_static_artifacts(tmp_path, require_commit="local")
     public_api_audit = audit_public_static_artifacts(tmp_path, require_commit="local")
     direct_bytes_receipt = verify_public_static_artifact_bytes(

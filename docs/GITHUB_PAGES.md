@@ -11,8 +11,9 @@ The static build performs these steps during GitHub Actions deployment:
 4. Embed the resulting Plotly figures, certificate bars, promotion gates, progress-map timeline, compact public claim audit chain, and metrics into `site/index.html`.
 5. Write the same machine-readable evidence bundle to `site/certificate.json`.
 6. Write `site/favicon.svg` as the browser/tab icon for the public site.
-7. Write `site/manifest.json` with `hash_algorithm: sha256`, SHA-256 hashes, and byte sizes for the HTML, certificate, and favicon artifacts.
-8. Publish the generated `site` directory through GitHub Pages.
+7. Write `site/.gitattributes` to pin generated static artifact line endings to LF during branch publication.
+8. Write `site/manifest.json` with `hash_algorithm: sha256`, SHA-256 hashes, and byte sizes for the HTML, certificate, and favicon artifacts.
+9. Publish the generated `site` directory through GitHub Pages.
 
 The workflow opts JavaScript actions into the Node 24 runner path and embeds build provenance in the generated HTML
 and `certificate.json`:
