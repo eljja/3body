@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -61,6 +61,38 @@ def public_static_artifact_claim_contract() -> dict[str, object]:
         "verification_schema_features_sha256": static_artifact_verification_features_sha256(
             verification_schema_features
         ),
+    }
+
+
+def validate_public_static_artifact_receipt_contract(
+    receipt: Mapping[str, object],
+    contract: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """Check whether a verifier receipt satisfies the stable public Pages claim contract."""
+
+    contract = contract or public_static_artifact_claim_contract()
+    profile = contract.get("profile")
+    profile_sha256 = contract.get("profile_sha256")
+    feature_set_sha256 = contract.get("verification_schema_features_sha256")
+    required_profile_hashes = _mapping_field(receipt, "required_profile_hashes")
+    checks = {
+        "receipt_verified": receipt.get("verified") is True,
+        "required_profile_declared": profile in _sequence_field(receipt, "required_profiles"),
+        "required_profile_hash_matches": required_profile_hashes.get(profile) == profile_sha256,
+        "required_feature_set_sha256_matches": receipt.get("required_feature_set_sha256") == feature_set_sha256,
+        "receipt_feature_set_sha256_matches": receipt.get("verification_schema_features_sha256") == feature_set_sha256,
+        "certificate_feature_set_sha256_matches": receipt.get("certificate_verification_schema_features_sha256")
+        == feature_set_sha256,
+        "profile_hash_check_passed": _mapping_field(receipt, "checks").get("required_profile_hashes") is True,
+        "feature_set_check_passed": _mapping_field(receipt, "checks").get("required_feature_set_sha256") is True,
+    }
+    return {
+        "contract_schema_version": contract.get("contract_schema_version"),
+        "profile": profile,
+        "profile_sha256": profile_sha256,
+        "verification_schema_features_sha256": feature_set_sha256,
+        "verified": all(checks.values()),
+        "checks": checks,
     }
 
 
@@ -138,6 +170,18 @@ def verify_public_static_artifact_bytes(
         require_feature_set_sha256=require_feature_set_sha256,
         require_public_claim=True,
     )
+
+
+def _mapping_field(payload: Mapping[str, object], key: str) -> Mapping[object, object]:
+    value = payload.get(key)
+    return value if isinstance(value, Mapping) else {}
+
+
+def _sequence_field(payload: Mapping[str, object], key: str) -> tuple[object, ...]:
+    value = payload.get(key)
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        return ()
+    return tuple(value)
 
 
 def integrate_reference_scenario(

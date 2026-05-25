@@ -9,6 +9,7 @@ from threebody.cli import (
     static_artifact_verification_features_sha256,
 )
 from threebody_engine import (
+    validate_public_static_artifact_receipt_contract,
     verify_public_static_artifact_bytes,
     verify_public_static_artifacts,
     verify_public_static_artifacts_from_url,
@@ -71,6 +72,7 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     ) in content
     assert "verify_public_static_artifacts_from_url" in content
     assert "public_static_artifact_claim_contract" in content
+    assert "validate_public_static_artifact_receipt_contract" in content
     assert "CLI and threebody_engine API callers can apply the same public claim contract" in content
     assert "jacobi_parameter_interval_box_margin" not in content
     certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
@@ -156,11 +158,13 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert public_api_receipt["verified"] is True
     assert public_api_receipt["required_profiles"] == ["public-claims-v1"]
     assert public_api_receipt["required_feature_set_sha256"] == verifier_feature_set_sha256
+    assert validate_public_static_artifact_receipt_contract(public_api_receipt)["verified"] is True
     assert direct_bytes_receipt["verified"] is True
     assert direct_bytes_receipt["required_profiles"] == ["public-claims-v1"]
     assert public_url_receipt["verified"] is True
     assert public_url_receipt["required_profiles"] == ["public-claims-v1"]
     assert public_url_receipt["required_feature_set_sha256"] == verifier_feature_set_sha256
+    assert validate_public_static_artifact_receipt_contract(public_url_receipt)["verified"] is True
 
 
 def _sha256(path) -> str:

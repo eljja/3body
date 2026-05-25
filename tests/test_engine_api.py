@@ -12,6 +12,7 @@ from threebody_engine import (
     select_hysteresis_markov_order,
     tune_jacobi_picard,
     validate_hysteresis_markov_chain,
+    validate_public_static_artifact_receipt_contract,
     verify_public_static_artifact_bytes,
     verify_public_static_artifacts,
     verify_public_static_artifacts_from_url,
@@ -42,6 +43,16 @@ def test_engine_api_exposes_public_static_claim_contract() -> None:
     assert "certificate-verifier-capability-digest" in contract["verification_schema_features"]
     assert isinstance(contract["verification_schema_features_sha256"], str)
     assert len(contract["verification_schema_features_sha256"]) == 64
+
+
+def test_engine_api_receipt_contract_validator_reports_missing_fields() -> None:
+    result = validate_public_static_artifact_receipt_contract({})
+
+    assert result["verified"] is False
+    assert result["checks"]["receipt_verified"] is False
+    assert result["checks"]["required_profile_declared"] is False
+    assert result["checks"]["required_profile_hash_matches"] is False
+    assert result["checks"]["required_feature_set_sha256_matches"] is False
 
 
 def test_engine_api_exposes_picard_jacobi_certificate() -> None:
