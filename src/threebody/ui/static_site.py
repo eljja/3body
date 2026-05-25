@@ -121,18 +121,22 @@ def build_static_site(output_dir: str | Path) -> Path:
     certificate_path = output_path / "certificate.json"
     manifest_path = output_path / "manifest.json"
     favicon_path = output_path / "favicon.svg"
-    index_path.write_text(page, encoding="utf-8")
-    certificate_path.write_text(
+    _write_text_lf(index_path, page)
+    _write_text_lf(
+        certificate_path,
         json.dumps(certificate_bundle, indent=2, sort_keys=True),
-        encoding="utf-8",
     )
-    favicon_path.write_text(_favicon_svg(), encoding="utf-8")
-    manifest_path.write_text(
+    _write_text_lf(favicon_path, _favicon_svg())
+    _write_text_lf(
+        manifest_path,
         json.dumps(_artifact_manifest(output_path, provenance), indent=2, sort_keys=True),
-        encoding="utf-8",
     )
-    (output_path / ".nojekyll").write_text("", encoding="utf-8")
+    _write_text_lf(output_path / ".nojekyll", "")
     return index_path
+
+
+def _write_text_lf(path: Path, text: str) -> None:
+    path.write_text(text, encoding="utf-8", newline="\n")
 
 
 def _render_page(

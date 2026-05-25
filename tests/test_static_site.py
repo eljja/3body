@@ -121,6 +121,10 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert manifest["artifacts"]["favicon.svg"]["sha256"] == _sha256(favicon_path)
     assert manifest["artifacts"]["favicon.svg"]["bytes"] == favicon_path.stat().st_size
     assert 'viewBox="0 0 64 64"' in favicon_path.read_text(encoding="utf-8")
+    assert b"\r\n" not in index_path.read_bytes()
+    assert b"\r\n" not in certificate_path.read_bytes()
+    assert b"\r\n" not in manifest_path.read_bytes()
+    assert b"\r\n" not in favicon_path.read_bytes()
     public_api_receipt = verify_public_static_artifacts(tmp_path, require_commit="local")
     public_api_audit = audit_public_static_artifacts(tmp_path, require_commit="local")
     direct_bytes_receipt = verify_public_static_artifact_bytes(
