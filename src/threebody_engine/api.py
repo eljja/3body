@@ -541,6 +541,122 @@ def predict_three_body_position_distribution(
     return result
 
 
+def predict_three_body_distribution_ephemeris(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    count: int = 64,
+    position_scale: float = 1.0e-6,
+    velocity_scale: float = 1.0e-6,
+    seed: int = 0,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    samples: int = 256,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+    max_step: float = math.inf,
+    preserve_center_of_mass: bool = True,
+    include_sample_ephemerides: bool = False,
+) -> dict[str, object]:
+    """Return an empirical position-distribution ephemeris over the full forecast interval."""
+
+    system, initial_state = _general_prediction_system(
+        masses,
+        positions,
+        velocities,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+    )
+    target_time = _finite_float(target_time, "target_time")
+    count = _validated_positive_int(count, "count")
+    sample_count = _validated_sample_count(samples)
+    position_scale = _nonnegative_float(position_scale, "position_scale")
+    velocity_scale = _nonnegative_float(velocity_scale, "velocity_scale")
+    rng = np.random.default_rng(seed)
+    initial_states = _perturbed_initial_states(
+        system,
+        initial_state,
+        count=count,
+        rng=rng,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        preserve_center_of_mass=preserve_center_of_mass,
+    )
+    integrator = AdaptiveIntegrator(rtol=rtol, atol=atol, max_step=max_step)
+    successful_positions: list[np.ndarray] = []
+    successful_times: np.ndarray | None = None
+    sample_rows: list[dict[str, object]] = []
+    failures: list[dict[str, object]] = []
+    for index, state in enumerate(initial_states):
+        trajectory = _prediction_trajectory_with_integrator(
+            system,
+            state,
+            target_time,
+            samples=sample_count,
+            integrator=integrator,
+        )
+        if not trajectory.success or len(trajectory.y) == 0:
+            failures.append({"index": index, "message": trajectory.message})
+            continue
+        positions_series, velocities_series = _trajectory_position_velocity_series(system, trajectory)
+        successful_positions.append(positions_series)
+        if successful_times is None:
+            successful_times = trajectory.t
+        if include_sample_ephemerides:
+            sample_rows.append(
+                {
+                    "index": index,
+                    "times": trajectory.t.tolist(),
+                    "positions": positions_series.tolist(),
+                    "velocities": velocities_series.tolist(),
+                }
+            )
+    base_ephemeris = predict_three_body_ephemeris(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+    )
+    result: dict[str, object] = {
+        "prediction_schema_version": 1,
+        "prediction_type": "empirical-position-distribution-ephemeris",
+        "method": "adaptive-DOP853-ensemble-ephemeris",
+        "target_time": target_time,
+        "dimension": system.dimension,
+        "masses": [float(mass) for mass in system.masses],
+        "gravitational_constant": float(system.gravitational_constant),
+        "softening": float(system.softening),
+        "uncertainty_model": {
+            "type": "gaussian_initial_state",
+            "count": count,
+            "seed": int(seed),
+            "position_scale": position_scale,
+            "velocity_scale": velocity_scale,
+            "preserve_center_of_mass": preserve_center_of_mass,
+        },
+        "success_count": len(successful_positions),
+        "failure_count": len(failures),
+        "failures": failures,
+        "times": [] if successful_times is None else successful_times.tolist(),
+        "base_ephemeris": base_ephemeris,
+        "position_distribution_ephemeris": _position_distribution_ephemeris_summary(
+            successful_positions,
+            system.dimension,
+        ),
+    }
+    if include_sample_ephemerides:
+        result["sample_ephemerides"] = sample_rows
+    return result
+
+
 def predict_three_body_linearized_distribution(
     masses: Sequence[float],
     positions: Sequence[Sequence[float]],
@@ -931,6 +1047,26 @@ def _prediction_trajectory(
     )
 
 
+def _prediction_trajectory_with_integrator(
+    system: GeneralThreeBodySystem,
+    initial_state: np.ndarray,
+    target_time: float,
+    *,
+    samples: int,
+    integrator: AdaptiveIntegrator,
+) -> TrajectoryResult:
+    t_eval = _prediction_times(target_time, samples)
+    if target_time == 0.0:
+        return TrajectoryResult(
+            t=np.array([0.0], dtype=float),
+            y=np.asarray([initial_state], dtype=float),
+            success=True,
+            message="target_time is zero; returned the initial state.",
+            metadata={"method": "identity", "nfev": 0, "njev": 0, "nlu": 0},
+        )
+    return integrator.integrate(system, (0.0, target_time), initial_state, t_eval=t_eval)
+
+
 def _trajectory_position_velocity_series(
     system: GeneralThreeBodySystem,
     trajectory: TrajectoryResult,
@@ -1028,6 +1164,46 @@ def _position_distribution_summary(positions: list[np.ndarray], dimension: int) 
         "flat_covariance": flat_covariance.tolist(),
         "body_covariances": [covariance.tolist() for covariance in body_covariances],
         "max_body_radius_from_mean": float(np.max(body_radii)),
+    }
+
+
+def _position_distribution_ephemeris_summary(
+    positions_by_sample: list[np.ndarray],
+    dimension: int,
+) -> dict[str, object]:
+    if not positions_by_sample:
+        return {
+            "mean_positions": [],
+            "median_positions": [],
+            "q05_positions": [],
+            "q95_positions": [],
+            "flat_covariances": [],
+            "max_body_radius_from_mean": [],
+        }
+    stack = np.asarray(positions_by_sample, dtype=float)
+    # Shape: ensemble, time, body, dimension.
+    ensemble_count, time_count = stack.shape[:2]
+    mean = np.mean(stack, axis=0)
+    quantiles = np.quantile(stack, [0.05, 0.5, 0.95], axis=0)
+    flat_covariances: list[list[list[float]]] = []
+    max_body_radii: list[float] = []
+    for time_index in range(time_count):
+        time_positions = stack[:, time_index, :, :]
+        flat = time_positions.reshape(ensemble_count, 3 * dimension)
+        if ensemble_count > 1:
+            covariance = np.cov(flat, rowvar=False)
+        else:
+            covariance = np.zeros((3 * dimension, 3 * dimension), dtype=float)
+        flat_covariances.append(covariance.tolist())
+        body_radii = np.linalg.norm(time_positions - mean[time_index][None, :, :], axis=2)
+        max_body_radii.append(float(np.max(body_radii)))
+    return {
+        "mean_positions": mean.tolist(),
+        "median_positions": quantiles[1].tolist(),
+        "q05_positions": quantiles[0].tolist(),
+        "q95_positions": quantiles[2].tolist(),
+        "flat_covariances": flat_covariances,
+        "max_body_radius_from_mean": max_body_radii,
     }
 
 

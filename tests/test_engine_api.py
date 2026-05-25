@@ -10,6 +10,7 @@ from threebody_engine import (
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
+    predict_three_body_distribution_ephemeris,
     predict_three_body_ephemeris,
     predict_three_body_forecast_horizon,
     predict_three_body_interpretation_report,
@@ -122,6 +123,35 @@ def test_engine_api_builds_three_body_position_distribution() -> None:
     assert len(distribution["position_distribution"]["mean_positions"]) == 3
     assert len(distribution["position_distribution"]["flat_covariance"]) == 6
     assert len(distribution["sample_predictions"]) == 7
+
+
+def test_engine_api_builds_three_body_distribution_ephemeris() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    distribution = predict_three_body_distribution_ephemeris(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        count=7,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        seed=4,
+        samples=9,
+        include_sample_ephemerides=True,
+    )
+
+    assert distribution["prediction_type"] == "empirical-position-distribution-ephemeris"
+    assert distribution["success_count"] == 7
+    assert distribution["failure_count"] == 0
+    assert len(distribution["times"]) == 9
+    assert len(distribution["position_distribution_ephemeris"]["mean_positions"]) == 9
+    assert len(distribution["position_distribution_ephemeris"]["mean_positions"][0]) == 3
+    assert len(distribution["position_distribution_ephemeris"]["flat_covariances"]) == 9
+    assert len(distribution["position_distribution_ephemeris"]["flat_covariances"][0]) == 6
+    assert len(distribution["sample_ephemerides"]) == 7
+    assert len(distribution["sample_ephemerides"][0]["positions"]) == 9
 
 
 def test_engine_api_builds_linearized_three_body_position_distribution() -> None:

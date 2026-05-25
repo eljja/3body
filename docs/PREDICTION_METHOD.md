@@ -129,6 +129,22 @@ Output includes:
 - covariance of the flattened final position vector
 - per-body position covariance matrices
 
+## Ensemble Distribution Ephemeris
+
+For a probability distribution over the whole forecast interval, use `threebody_engine.predict_three_body_distribution_ephemeris(...)` or:
+
+```powershell
+threebody predict --input initial-state.json --distribution-ephemeris --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution-ephemeris.json
+```
+
+This integrates the same Gaussian perturbation ensemble as the final-time distribution mode, but keeps every sampled time. The output contains the shared time grid, deterministic base ephemeris, and a `position_distribution_ephemeris` block with time-indexed mean positions, median positions, 5%/95% coordinate quantiles, flattened position covariance matrices, and maximum body radius from the ensemble mean.
+
+This mode answers the strongest operational uncertainty question:
+
+```text
+At each sampled time between now and t, what is the probability distribution of the three positions?
+```
+
 ## Scientific Interpretation
 
 The deterministic API answers "where are the bodies at time `t` if the initial state is exactly known?"
@@ -140,5 +156,7 @@ The forecast-horizon API answers "up to what time is that claim still tolerance-
 The interpretation report answers "which of the available mathematical forecasts is justified by diagnostics?"
 
 The distribution API answers "where are the bodies likely to be at time `t` if the initial state has a specified observational uncertainty?"
+
+The distribution-ephemeris API answers "how does that final probability distribution develop over the whole interval?"
 
 The atlas and symbolic-dynamics work remain necessary because long-time chaotic forecasts can become distributional even when the equations are deterministic. The prediction layer gives the concrete flow samples; the research layer explains when those samples support point forecasts, regime-local claims, or only probabilistic claims.

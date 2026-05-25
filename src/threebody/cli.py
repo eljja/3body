@@ -289,6 +289,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Propagate Gaussian initial-condition uncertainty and return a final-position distribution.",
     )
     predict.add_argument(
+        "--distribution-ephemeris",
+        action="store_true",
+        help="Propagate Gaussian initial-condition uncertainty and return time-sampled position distributions.",
+    )
+    predict.add_argument(
         "--linearized-distribution",
         action="store_true",
         help="Propagate initial covariance through the variational flow map.",
@@ -330,6 +335,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--include-sample-positions",
         action="store_true",
         help="Include every ensemble member's final positions in distribution mode.",
+    )
+    predict.add_argument(
+        "--include-sample-ephemerides",
+        action="store_true",
+        help="Include every ensemble member's sampled positions and velocities in distribution-ephemeris mode.",
     )
     predict.add_argument(
         "--include-invariant-series",
@@ -490,6 +500,7 @@ def run_survey_command(args: argparse.Namespace) -> int:
 
 def run_predict_command(args: argparse.Namespace) -> int:
     from threebody_engine import (
+        predict_three_body_distribution_ephemeris,
         predict_three_body_ephemeris,
         predict_three_body_forecast_horizon,
         predict_three_body_interpretation_report,
@@ -501,11 +512,19 @@ def run_predict_command(args: argparse.Namespace) -> int:
     payload = _read_prediction_input(args.input)
     selected_modes = sum(
         bool(value)
-        for value in (args.distribution, args.linearized_distribution, args.report, args.horizon, args.ephemeris)
+        for value in (
+            args.distribution,
+            args.distribution_ephemeris,
+            args.linearized_distribution,
+            args.report,
+            args.horizon,
+            args.ephemeris,
+        )
     )
     if selected_modes > 1:
         raise ValueError(
-            "Choose only one of --distribution, --linearized-distribution, --report, --horizon, or --ephemeris."
+            "Choose only one of --distribution, --distribution-ephemeris, --linearized-distribution, "
+            "--report, --horizon, or --ephemeris."
         )
     target_time = args.target_time if args.target_time is not None else _required_prediction_field(payload, "target_time")
     common_kwargs = {
@@ -572,6 +591,22 @@ def run_predict_command(args: argparse.Namespace) -> int:
             **common_kwargs,
         )
         exit_code = 0 if result["success"] else 1
+    elif args.distribution_ephemeris:
+        result = predict_three_body_distribution_ephemeris(
+            _required_prediction_field(payload, "masses"),
+            _required_prediction_field(payload, "positions"),
+            _required_prediction_field(payload, "velocities"),
+            target_time,
+            count=args.count,
+            position_scale=args.position_scale,
+            velocity_scale=args.velocity_scale,
+            seed=args.seed,
+            include_sample_ephemerides=args.include_sample_ephemerides,
+            samples=args.samples,
+            max_step=args.max_step,
+            **common_kwargs,
+        )
+        exit_code = 0 if result["success_count"] else 1
     elif args.distribution:
         result = predict_three_body_position_distribution(
             _required_prediction_field(payload, "masses"),

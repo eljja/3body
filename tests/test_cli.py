@@ -198,6 +198,43 @@ def test_predict_cli_writes_position_distribution(tmp_path) -> None:
     assert len(payload["sample_predictions"]) == 5
 
 
+def test_predict_cli_writes_distribution_ephemeris(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "distribution-ephemeris.json"
+    _write_prediction_input(input_path)
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--distribution-ephemeris",
+            "--count",
+            "5",
+            "--position-scale",
+            "1e-7",
+            "--velocity-scale",
+            "1e-7",
+            "--samples",
+            "9",
+            "--include-sample-ephemerides",
+            "--output",
+            str(output_path),
+        ]
+    )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["prediction_type"] == "empirical-position-distribution-ephemeris"
+    assert payload["success_count"] == 5
+    assert payload["failure_count"] == 0
+    assert len(payload["times"]) == 9
+    assert len(payload["position_distribution_ephemeris"]["mean_positions"]) == 9
+    assert len(payload["position_distribution_ephemeris"]["mean_positions"][0]) == 3
+    assert len(payload["position_distribution_ephemeris"]["flat_covariances"][0]) == 6
+    assert len(payload["sample_ephemerides"]) == 5
+
+
 def test_predict_cli_writes_linearized_position_distribution(tmp_path) -> None:
     input_path = tmp_path / "initial-state.json"
     output_path = tmp_path / "linearized-distribution.json"

@@ -72,6 +72,7 @@ from threebody_engine import (
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
+    predict_three_body_distribution_ephemeris,
     predict_three_body_ephemeris,
     predict_three_body_forecast_horizon,
     predict_three_body_interpretation_report,
@@ -94,6 +95,7 @@ For an arbitrary Newtonian three-body initial state, use the prediction API rath
 
 ```python
 from threebody_engine import (
+    predict_three_body_distribution_ephemeris,
     predict_three_body_ephemeris,
     predict_three_body_forecast_horizon,
     predict_three_body_interpretation_report,
@@ -143,9 +145,18 @@ distribution = predict_three_body_position_distribution(
     position_scale=1.0e-6,
     velocity_scale=1.0e-6,
 )
+distribution_ephemeris = predict_three_body_distribution_ephemeris(
+    masses,
+    positions,
+    velocities,
+    target_time=0.5,
+    count=64,
+    position_scale=1.0e-6,
+    velocity_scale=1.0e-6,
+)
 ```
 
-`predict_three_body_positions` returns the final positions, velocities, solver metadata, and Noether invariant drift diagnostics. `predict_three_body_ephemeris` returns the sampled positions and velocities from `0` through `target_time`, suitable for orbit tables, downstream visualization, and independent audit. `predict_three_body_forecast_horizon` estimates how far the target-time forecast remains locally tolerance-resolved by propagating initial covariance through the variational flow. `predict_three_body_interpretation_report` runs the point, forecast-horizon, variational Gaussian, and ensemble modes together, compares the distributions, and recommends `linearized-gaussian`, `empirical-ensemble`, `deterministic-only`, or `unresolved`. `predict_three_body_linearized_distribution` computes the variational state-transition matrix and pushes an initial covariance forward by `P(t) = D Phi_t P(0) D Phi_t^T`. `predict_three_body_position_distribution` perturbs the initial state and returns empirical mean positions, quantiles, covariances, and the deterministic base forecast.
+`predict_three_body_positions` returns the final positions, velocities, solver metadata, and Noether invariant drift diagnostics. `predict_three_body_ephemeris` returns the sampled positions and velocities from `0` through `target_time`, suitable for orbit tables, downstream visualization, and independent audit. `predict_three_body_forecast_horizon` estimates how far the target-time forecast remains locally tolerance-resolved by propagating initial covariance through the variational flow. `predict_three_body_interpretation_report` runs the point, forecast-horizon, variational Gaussian, and ensemble modes together, compares the distributions, and recommends `linearized-gaussian`, `empirical-ensemble`, `deterministic-only`, or `unresolved`. `predict_three_body_linearized_distribution` computes the variational state-transition matrix and pushes an initial covariance forward by `P(t) = D Phi_t P(0) D Phi_t^T`. `predict_three_body_position_distribution` perturbs the initial state and returns empirical mean positions, quantiles, covariances, and the deterministic base forecast. `predict_three_body_distribution_ephemeris` applies the same ensemble idea at every sampled time, returning a probability ephemeris instead of only a final-time distribution.
 
 The same layer is available from the CLI:
 
@@ -156,6 +167,7 @@ threebody predict --input initial-state.json --horizon --position-tolerance 1e-3
 threebody predict --input initial-state.json --report --count 128 --position-tolerance 1e-3 --position-scale 1e-6 --velocity-scale 1e-6 --output report.json
 threebody predict --input initial-state.json --linearized-distribution --position-scale 1e-6 --velocity-scale 1e-6 --output linearized.json
 threebody predict --input initial-state.json --distribution --count 128 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution.json
+threebody predict --input initial-state.json --distribution-ephemeris --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution-ephemeris.json
 ```
 
 The hysteresis helpers accept `word_mode="refined"`, `"return"`, or `"poincare"`.
