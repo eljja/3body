@@ -707,6 +707,7 @@ def _render_page(
     <p>
       The public audit surface is intentionally compact: the page shows the four checks that make the current
       claim reviewable, while the full certificate and artifact manifest remain available as linked JSON files.
+      CLI and Python API callers can apply the same public claim contract with one option.
     </p>
     {claim_verification_seal}
   </section>
@@ -801,7 +802,8 @@ def _render_page(
       <a href="manifest.json">Open artifact integrity manifest</a>
     </p>
     <pre>{public_verify_command}
-python -m threebody.cli verify-static-artifacts --site-dir site --require-commit local --require-public-claim</pre>
+python -m threebody.cli verify-static-artifacts --site-dir site --require-commit local --require-public-claim
+verify_static_artifacts_from_url("https://eljja.github.io/3body/", require_commit="{html.escape(str(provenance['commit_sha']))}", require_public_claim=True)</pre>
   </section>
 </main>
 </body>
@@ -867,7 +869,7 @@ def _public_change_summary(
             "title": "Active profile digest",
             "status": "pass",
             "value": profile_sha256,
-            "detail": "The active certificate profile and canonical descriptor digest must both match verifier expectations.",
+            "detail": "The active certificate profile and canonical descriptor digest must both match verifier expectations; CLI and API callers share the same public-claim shortcut.",
         },
     ]
 

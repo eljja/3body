@@ -659,14 +659,11 @@ def run_atlas_benchmark_command(args: argparse.Namespace) -> int:
 
 
 def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
-    require_profiles = _merge_requirements(
-        [PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE] if args.require_public_claim else [],
+    require_profiles, require_feature_set_sha256 = _resolve_static_artifact_claim_requirements(
         args.require_profile,
-    )
-    require_feature_set_sha256 = (
-        static_artifact_verification_features_sha256(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
-        if args.require_current_feature_set or (args.require_public_claim and args.require_feature_set_sha256 is None)
-        else args.require_feature_set_sha256
+        args.require_feature_set_sha256,
+        require_public_claim=args.require_public_claim,
+        require_current_feature_set=args.require_current_feature_set,
     )
     result = (
         verify_static_artifacts_from_url(
@@ -707,6 +704,7 @@ def verify_static_artifacts(
     require_profiles: Sequence[str] | None = None,
     require_features: Sequence[str] | None = None,
     require_feature_set_sha256: str | None = None,
+    require_public_claim: bool = False,
 ) -> dict[str, object]:
     artifacts, artifact_errors = _read_static_artifacts_from_dir(site_dir)
     return verify_static_artifact_bytes(
@@ -720,6 +718,7 @@ def verify_static_artifacts(
         require_profiles=require_profiles,
         require_features=require_features,
         require_feature_set_sha256=require_feature_set_sha256,
+        require_public_claim=require_public_claim,
     )
 
 
@@ -732,6 +731,7 @@ def verify_static_artifacts_from_url(
     require_profiles: Sequence[str] | None = None,
     require_features: Sequence[str] | None = None,
     require_feature_set_sha256: str | None = None,
+    require_public_claim: bool = False,
 ) -> dict[str, object]:
     normalized_base_url = base_url if base_url.endswith("/") else f"{base_url}/"
     artifacts, artifact_errors = _fetch_static_artifacts_from_url(normalized_base_url)
@@ -746,6 +746,7 @@ def verify_static_artifacts_from_url(
         require_profiles=require_profiles,
         require_features=require_features,
         require_feature_set_sha256=require_feature_set_sha256,
+        require_public_claim=require_public_claim,
     )
 
 
@@ -760,7 +761,13 @@ def verify_static_artifact_bytes(
     require_profiles: Sequence[str] | None = None,
     require_features: Sequence[str] | None = None,
     require_feature_set_sha256: str | None = None,
+    require_public_claim: bool = False,
 ) -> dict[str, object]:
+    require_profiles, require_feature_set_sha256 = _resolve_static_artifact_claim_requirements(
+        require_profiles,
+        require_feature_set_sha256,
+        require_public_claim=require_public_claim,
+    )
     artifacts, artifact_payload_errors, provided_artifact_names = _normalize_static_artifact_bytes(artifacts)
     artifact_errors = _normalize_artifact_errors(artifact_errors, provided_artifact_names, artifact_payload_errors)
     manifest, manifest_parse_error = _json_object_from_bytes(artifacts["manifest.json"])
@@ -1135,6 +1142,24 @@ def _required_feature_results(
 
 def _required_feature_set_sha256_matches(actual_sha256: str, required_sha256: str | None) -> bool:
     return required_sha256 is None or actual_sha256 == required_sha256
+
+
+def _resolve_static_artifact_claim_requirements(
+    require_profiles: Sequence[str] | None,
+    require_feature_set_sha256: str | None,
+    require_public_claim: bool = False,
+    require_current_feature_set: bool = False,
+) -> tuple[list[str], str | None]:
+    resolved_profiles = _merge_requirements(
+        [PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE] if require_public_claim else [],
+        require_profiles,
+    )
+    resolved_feature_set_sha256 = (
+        static_artifact_verification_features_sha256(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
+        if require_current_feature_set or (require_public_claim and require_feature_set_sha256 is None)
+        else require_feature_set_sha256
+    )
+    return resolved_profiles, resolved_feature_set_sha256
 
 
 def _merge_requirements(profile_requirements: Sequence[str], explicit_requirements: Sequence[str] | None) -> list[str]:

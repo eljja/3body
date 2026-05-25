@@ -64,6 +64,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert (
         "verify-static-artifacts --site-dir site --require-commit local --require-public-claim"
     ) in content
+    assert "require_public_claim=True" in content
+    assert "CLI and Python API callers can apply the same public claim contract" in content
     assert "jacobi_parameter_interval_box_margin" not in content
     certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
     verifier_feature_set_sha256 = static_artifact_verification_features_sha256(
@@ -93,6 +95,7 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert verifier_feature_set_sha256 in content
     assert certificate["public_change_summary"]
     assert certificate["public_change_summary"][-1]["title"] == "Active profile digest"
+    assert "public-claim shortcut" in certificate["public_change_summary"][-1]["detail"]
     assert certificate["promotion_gates"]["symbolic_passes_stride_robustness"] is True
     assert certificate["build_provenance"]["generator"] == "threebody.ui.static_site"
     assert "analysis_atlas_snapshot" in certificate
