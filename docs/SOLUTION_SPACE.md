@@ -30,7 +30,7 @@ They can miss at least four mechanisms:
 
 The original practical target is now exposed as a small prediction API family:
 
-- `threebody_engine.solve_three_body_prediction_problem(...)` answers the full operational version in one call: final positions, deterministic ephemeris, time-resolved empirical distribution, forecast-horizon diagnostics, and recommended interpretation mode.
+- `threebody_engine.solve_three_body_prediction_problem(...)` answers the full operational version in one call: final positions, deterministic ephemeris, linearized Gaussian ephemeris, time-resolved empirical distribution, Gaussian-vs-empirical ephemeris comparison, forecast-horizon diagnostics, and recommended interpretation mode.
 - `threebody_engine.predict_three_body_positions(...)` answers: given three masses, initial positions, initial velocities, and a target time, where are the three bodies? It integrates the Newtonian equations directly and returns final positions, velocities, solver metadata, and energy/momentum/angular-momentum drift diagnostics.
 - `threebody_engine.predict_three_body_ephemeris(...)` answers the orbit-table version: what are the sampled positions and velocities for all three bodies from `0` through the target time?
 - `threebody_engine.predict_three_body_interpretation_report(...)` answers the decision version: run the deterministic, variational Gaussian, and empirical ensemble forecasts together, compare the final-position distributions, and recommend which mathematical claim is defensible.

@@ -55,6 +55,7 @@ This is the most direct public API for the original project target. It returns:
 - `deterministic_ephemeris`: the sampled deterministic trajectory from `0` through `target_time`.
 - `linearized_gaussian_ephemeris`: the sampled first-order Gaussian distribution from `0` through `target_time`.
 - `distribution_ephemeris`: the sampled empirical position distribution from `0` through `target_time`.
+- `ephemeris_distribution_comparison`: time-resolved mean/covariance gaps between the linearized Gaussian and empirical ephemerides, including the first break time if the linearized approximation leaves the configured gates.
 - `interpretation_report`: the linearized/ensemble comparison and forecast-horizon verdict.
 
 The bundle is intentionally not a closed-form theorem for all initial conditions. It is a reproducible computational answer: exact initial data produce a flow-map sample; uncertain initial data produce a pushed-forward empirical distribution; diagnostics say how strong the resulting claim is.
@@ -198,5 +199,7 @@ The distribution API answers "where are the bodies likely to be at time `t` if t
 The linearized-ephemeris API answers "what Gaussian distribution does the variational flow imply at every sampled time?"
 
 The distribution-ephemeris API answers "how does that final probability distribution develop over the whole interval?"
+
+The solution bundle's ephemeris comparison answers "until when does the theoretical linearized Gaussian stay consistent with the sampled empirical distribution?"
 
 The atlas and symbolic-dynamics work remain necessary because long-time chaotic forecasts can become distributional even when the equations are deterministic. The prediction layer gives the concrete flow samples; the research layer explains when those samples support point forecasts, regime-local claims, or only probabilistic claims.

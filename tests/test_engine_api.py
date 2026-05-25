@@ -180,6 +180,10 @@ def test_engine_api_solves_three_body_prediction_problem() -> None:
     assert solution["deterministic_ephemeris"]["prediction_type"] == "deterministic-ephemeris"
     assert solution["linearized_gaussian_ephemeris"]["prediction_type"] == "linearized-gaussian-ephemeris"
     assert solution["distribution_ephemeris"]["prediction_type"] == "empirical-position-distribution-ephemeris"
+    assert solution["ephemeris_distribution_comparison"]["row_count"] == 9
+    assert solution["ephemeris_distribution_comparison"]["final_covariance_relative_gap"] >= 0.0
+    assert "linearized_ephemeris_consistent_until" in solution["answer"]
+    assert "first_linearized_ephemeris_break_time" in solution["answer"]
     assert solution["interpretation_report"]["prediction_type"] == "three-body-interpretation-report"
 
 

@@ -742,6 +742,11 @@ def solve_three_body_prediction_problem(
         horizon_samples=horizon_samples,
         linearized_covariance_relative_tolerance=linearized_covariance_relative_tolerance,
     )
+    ephemeris_comparison = _linearized_empirical_ephemeris_comparison(
+        linearized_ephemeris,
+        distribution_ephemeris,
+        covariance_relative_tolerance=linearized_covariance_relative_tolerance,
+    )
     verdict = interpretation_report.get("verdict", {})
     if not isinstance(verdict, Mapping):
         verdict = {}
@@ -762,10 +767,13 @@ def solve_three_body_prediction_problem(
             "target_time_inside_forecast_horizon": verdict.get("target_time_inside_forecast_horizon") is True,
             "deterministic_resolved": verdict.get("deterministic_resolved") is True,
             "empirical_distribution_resolved": verdict.get("empirical_distribution_resolved") is True,
+            "linearized_ephemeris_consistent_until": ephemeris_comparison["linearized_consistent_until"],
+            "first_linearized_ephemeris_break_time": ephemeris_comparison["first_break_time"],
         },
         "deterministic_ephemeris": deterministic_ephemeris,
         "linearized_gaussian_ephemeris": linearized_ephemeris,
         "distribution_ephemeris": distribution_ephemeris,
+        "ephemeris_distribution_comparison": ephemeris_comparison,
         "interpretation_report": interpretation_report,
     }
 
@@ -1417,6 +1425,106 @@ def _final_position_distribution_from_ephemeris(distribution_ephemeris: Mapping[
         "max_body_radius_from_mean": final_value("max_body_radius_from_mean"),
         "success_count": int(distribution_ephemeris.get("success_count", 0)),
         "failure_count": int(distribution_ephemeris.get("failure_count", 0)),
+    }
+
+
+def _linearized_empirical_ephemeris_comparison(
+    linearized_ephemeris: Mapping[str, object],
+    empirical_ephemeris: Mapping[str, object],
+    *,
+    covariance_relative_tolerance: float,
+    mean_sigma_tolerance: float = 3.0,
+) -> dict[str, object]:
+    linearized_rows = linearized_ephemeris.get("rows", [])
+    if isinstance(linearized_rows, str) or not isinstance(linearized_rows, Sequence):
+        linearized_rows = []
+    empirical_summary = empirical_ephemeris.get("position_distribution_ephemeris", {})
+    if not isinstance(empirical_summary, Mapping):
+        empirical_summary = {}
+    empirical_means = np.asarray(empirical_summary.get("mean_positions", []), dtype=float)
+    empirical_covariances = np.asarray(empirical_summary.get("flat_covariances", []), dtype=float)
+    times = np.asarray(empirical_ephemeris.get("times", []), dtype=float)
+    row_count = min(len(linearized_rows), len(empirical_means), len(empirical_covariances))
+    rows: list[dict[str, object]] = []
+    linearized_consistent_until: float | None = None
+    first_break_time: float | None = None
+    for index in range(row_count):
+        linearized_row = linearized_rows[index]
+        if not isinstance(linearized_row, Mapping):
+            continue
+        time = float(times[index]) if index < len(times) else float(linearized_row.get("time", index))
+        linearized_mean = np.asarray(linearized_row.get("mean_positions", []), dtype=float)
+        empirical_mean = np.asarray(empirical_means[index], dtype=float)
+        linearized_covariance = np.asarray(linearized_row.get("position_covariance", []), dtype=float)
+        empirical_covariance = np.asarray(empirical_covariances[index], dtype=float)
+        mean_gap_norm = (
+            float(np.linalg.norm(empirical_mean - linearized_mean))
+            if empirical_mean.shape == linearized_mean.shape and empirical_mean.size
+            else math.inf
+        )
+        covariance_gap = (
+            float(np.linalg.norm(empirical_covariance - linearized_covariance, ord="fro"))
+            if empirical_covariance.shape == linearized_covariance.shape and empirical_covariance.size
+            else math.inf
+        )
+        empirical_norm = (
+            float(np.linalg.norm(empirical_covariance, ord="fro"))
+            if empirical_covariance.size
+            else math.inf
+        )
+        linearized_norm = (
+            float(np.linalg.norm(linearized_covariance, ord="fro"))
+            if linearized_covariance.size
+            else math.inf
+        )
+        covariance_scale = max(empirical_norm, linearized_norm, 1.0e-300)
+        covariance_relative_gap = (
+            covariance_gap / covariance_scale
+            if math.isfinite(covariance_gap) and math.isfinite(covariance_scale)
+            else math.inf
+        )
+        empirical_std = (
+            np.sqrt(np.maximum(np.diag(empirical_covariance), 0.0))
+            if empirical_covariance.ndim == 2
+            else np.asarray([math.inf], dtype=float)
+        )
+        linearized_std = (
+            np.sqrt(np.maximum(np.diag(linearized_covariance), 0.0))
+            if linearized_covariance.ndim == 2
+            else np.asarray([math.inf], dtype=float)
+        )
+        spread_scale = max(float(np.max(empirical_std)), float(np.max(linearized_std)), 1.0e-300)
+        mean_gap_in_sigma_units = mean_gap_norm / spread_scale
+        consistent = bool(
+            covariance_relative_gap <= covariance_relative_tolerance
+            and mean_gap_in_sigma_units <= mean_sigma_tolerance
+        )
+        if consistent and first_break_time is None:
+            linearized_consistent_until = time
+        elif first_break_time is None:
+            first_break_time = time
+        rows.append(
+            {
+                "time": time,
+                "mean_gap_norm": mean_gap_norm,
+                "mean_gap_in_sigma_units": float(mean_gap_in_sigma_units),
+                "covariance_frobenius_gap": covariance_gap,
+                "covariance_relative_gap": float(covariance_relative_gap),
+                "linearized_consistent_with_empirical": consistent,
+            }
+        )
+    final_row = rows[-1] if rows else {}
+    return {
+        "comparison_schema_version": 1,
+        "row_count": len(rows),
+        "covariance_relative_tolerance": float(covariance_relative_tolerance),
+        "mean_sigma_tolerance": float(mean_sigma_tolerance),
+        "linearized_consistent_until": linearized_consistent_until,
+        "first_break_time": first_break_time,
+        "target_time_consistent": final_row.get("linearized_consistent_with_empirical") is True,
+        "final_covariance_relative_gap": float(final_row.get("covariance_relative_gap", math.inf)),
+        "final_mean_gap_in_sigma_units": float(final_row.get("mean_gap_in_sigma_units", math.inf)),
+        "rows": rows,
     }
 
 

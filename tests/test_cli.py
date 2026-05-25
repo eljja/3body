@@ -271,6 +271,8 @@ def test_predict_cli_writes_solution_bundle(tmp_path) -> None:
     assert payload["deterministic_ephemeris"]["prediction_type"] == "deterministic-ephemeris"
     assert payload["distribution_ephemeris"]["prediction_type"] == "empirical-position-distribution-ephemeris"
     assert payload["linearized_gaussian_ephemeris"]["prediction_type"] == "linearized-gaussian-ephemeris"
+    assert payload["ephemeris_distribution_comparison"]["row_count"] == 9
+    assert payload["ephemeris_distribution_comparison"]["final_covariance_relative_gap"] >= 0.0
     assert payload["interpretation_report"]["prediction_type"] == "three-body-interpretation-report"
 
 
