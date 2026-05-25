@@ -149,6 +149,9 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
         "numeric-minimums",
         "numeric-maximums",
     ]
+    assert receipt["verification_schema_features_sha256"] == cli_module.static_artifact_verification_features_sha256(
+        receipt["verification_schema_features"]
+    )
     assert receipt["verifier"] == "threebody.cli verify-static-artifacts"
     assert receipt["verified_at_utc"].endswith("Z")
     assert receipt["verified"] is True
@@ -404,6 +407,14 @@ def test_required_feature_results_are_based_on_advertised_features() -> None:
         {"feature": "numeric-maximums", "passed": True},
         {"feature": "missing-capability", "passed": False},
     ]
+
+
+def test_verification_feature_digest_is_order_sensitive() -> None:
+    features = ["artifact-availability", "numeric-maximums"]
+
+    assert cli_module.static_artifact_verification_features_sha256(features) != (
+        cli_module.static_artifact_verification_features_sha256(list(reversed(features)))
+    )
 
 
 def test_verify_static_artifacts_cli_rejects_inactive_required_profile(tmp_path) -> None:

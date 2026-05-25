@@ -91,6 +91,11 @@ def static_artifact_requirement_profile_sha256(profile_name: str) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
+def static_artifact_verification_features_sha256(features: Sequence[str]) -> str:
+    canonical = json.dumps(list(features), separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="threebody",
@@ -737,6 +742,7 @@ def verify_static_artifact_bytes(
     required_maximum_results = _required_maximum_results(certificate, expanded_required_maximums)
     expanded_required_features = _merge_requirements(profile_requirements["require_features"], require_features)
     required_feature_results = _required_feature_results(expanded_required_features, verification_schema_features)
+    verification_schema_features_sha256 = static_artifact_verification_features_sha256(verification_schema_features)
     checks = {
         **_artifact_available_checks(artifact_errors),
         "manifest_json": manifest_parse_error is None,
@@ -768,6 +774,7 @@ def verify_static_artifact_bytes(
     return {
         "verification_schema_version": 1,
         "verification_schema_features": verification_schema_features,
+        "verification_schema_features_sha256": verification_schema_features_sha256,
         "verified_at_utc": _utc_timestamp(),
         "verifier": "threebody.cli verify-static-artifacts",
         "verified": all(checks.values()),
