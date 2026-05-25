@@ -45,6 +45,11 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert "Jacobi escape-cone theorem candidate" in content
     assert "Verification engine upgrades" in content
     assert "Research progress map" in content
+    assert "Current change ledger" in content
+    assert "Reduced-state report bridge" in content
+    assert "Branch line endings verified" in content
+    assert "Receipt and audit fingerprints" in content
+    assert "Stable claim contract" in content
     assert "Permutation confidence" in content
     assert "Poincare sweep" in content
     assert "Picard contraction tuning" in content
@@ -107,6 +112,11 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert certificate["verification_schema_features"] == list(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
     assert certificate["verification_schema_features_sha256"] == verifier_feature_set_sha256
     assert verifier_feature_set_sha256 in content
+    assert certificate["recent_change_ledger"]
+    assert certificate["recent_change_ledger"][0]["title"] == "Reduced-state report bridge"
+    assert certificate["recent_change_ledger"][1]["value"] == "* text eol=lf"
+    assert certificate["recent_change_ledger"][2]["value"] == verifier_feature_set_sha256[:12]
+    assert certificate["recent_change_ledger"][-1]["value"] == "public-claims-v1"
     assert certificate["public_change_summary"]
     assert certificate["public_change_summary"][-1]["title"] == "Active profile digest"
     assert "public verifier shortcut" in certificate["public_change_summary"][-1]["detail"]

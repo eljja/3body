@@ -8,7 +8,7 @@ The static build performs these steps during GitHub Actions deployment:
 1. Install the Python package.
 2. Integrate representative two-body, restricted three-body, and general figure-eight trajectories.
 3. Compute invariant drift, stability, analysis-atlas distribution, representative Jacobi escape-cone certificates, Picard contraction tuning, hysteresis grammar Markov diagnostics with bootstrap uncertainty, Markov order selection, and Poincare-section word diagnostics.
-4. Embed the resulting Plotly figures, certificate bars, promotion gates, progress-map timeline, compact public claim audit chain, and metrics into `site/index.html`.
+4. Embed the resulting Plotly figures, certificate bars, promotion gates, progress-map timeline, compact current change ledger, public claim audit chain, and metrics into `site/index.html`.
 5. Write the same machine-readable evidence bundle to `site/certificate.json`.
 6. Write `site/favicon.svg` as the browser/tab icon for the public site.
 7. Write `site/.gitattributes` to pin generated static artifact line endings to LF during branch publication.
@@ -47,5 +47,6 @@ Limitations:
 - The refined chart-word promotion gate is accompanied by a multi-coordinate Poincare sweep. The fixed hierarchy-perturbation section remains a falsification diagnostic, while the coordinate sweep searches common chart diagnostics on training phases, reports the best crossing-rich section, validates its Markov memory on a held-out binary phase against both an independent-symbol baseline and a shuffled-symbol permutation control, and reports whether nearby section quantiles and nearby atlas strides pass the same held-out memory gates.
 - The research progress map summarizes the current verification path visually: Picard tuning, hysteresis grammar, Markov order, Poincare sweep, permutation control, section robustness, stride robustness, and API packaging.
 - The public claim audit chain consolidates the older ladder, pipeline, and seal views into one compact section: commit-pinned build, scientific gate profile, bounded numerical drift, and active canonical profile digest.
+- The current change ledger gives a compact visual summary of the latest research and audit-surface deltas: reduced-state report bridge, branch line-ending policy verification, timestamp-independent fingerprints, and stable public API contract.
 - The raw certificate JSON is no longer dumped into the page body; it remains available through `certificate.json` for external review and automated verification.
 - New public scenarios require adding them to `threebody.ui.static_site` and rebuilding.

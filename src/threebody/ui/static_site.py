@@ -459,6 +459,7 @@ def _render_page(
     public_claim_profile_descriptor = static_artifact_requirement_profile_descriptor(PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE)
     verifier_feature_set = list(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
     verifier_feature_set_sha256 = static_artifact_verification_features_sha256(verifier_feature_set)
+    recent_change_ledger = _recent_change_ledger(provenance, verifier_feature_set_sha256)
     public_change_summary = _public_change_summary(public_gate_summary, metrics, provenance, public_claim_profile_sha256)
     certificate_bundle = {
         "certificate_schema_version": 1,
@@ -481,6 +482,7 @@ def _render_page(
         },
         "verification_schema_features": verifier_feature_set,
         "verification_schema_features_sha256": verifier_feature_set_sha256,
+        "recent_change_ledger": recent_change_ledger,
         "public_change_summary": public_change_summary,
         "metrics": metrics,
         "promotion_gates": promotion_gates,
@@ -497,6 +499,7 @@ def _render_page(
         public_claim_profile_sha256,
         verifier_feature_set_sha256,
     )
+    recent_change_ledger_html = _recent_change_ledger_html(recent_change_ledger)
     public_verify_command = (
         "python -m threebody.cli verify-static-artifacts "
         f"--base-url https://eljja.github.io/3body/ --require-commit {html.escape(str(provenance['commit_sha']))} "
@@ -578,6 +581,22 @@ def _render_page(
     .progress-step.wait .progress-index {{ background: rgba(183, 121, 31, 0.12); color: var(--warn); }}
     .progress-step strong {{ font-size: 0.98rem; }}
     .progress-step span {{ color: var(--muted); font-size: 0.82rem; line-height: 1.45; }}
+    .change-ledger {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }}
+    .change-card {{
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 8px;
+      min-height: 168px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }}
+    .change-card strong {{ font-size: 0.98rem; }}
+    .change-card p {{ font-size: 0.88rem; line-height: 1.5; }}
+    .change-card code {{ font: 700 0.78rem ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }}
+    .change-kicker {{ color: var(--muted); font-size: 0.76rem; text-transform: uppercase; }}
+    .change-status {{ width: fit-content; color: var(--success); font: 700 0.78rem ui-monospace, SFMono-Regular, Consolas, monospace; }}
     .claim-seal {{
       display: grid;
       grid-template-columns: minmax(240px, 0.88fr) minmax(0, 1.12fr);
@@ -675,7 +694,7 @@ def _render_page(
     }}
     a {{ color: var(--accent); }}
     @media (max-width: 900px) {{
-      .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .claim-seal, .seal-checks, .evidence-grid {{ grid-template-columns: 1fr; }}
+      .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .change-ledger, .claim-seal, .seal-checks, .evidence-grid {{ grid-template-columns: 1fr; }}
       main {{ width: min(100vw - 18px, 1180px); padding-top: 12px; }}
     }}
   </style>
@@ -706,6 +725,16 @@ def _render_page(
       backed by the current build output.
     </p>
     {progress_map}
+  </section>
+
+  <section>
+    <h2>Current change ledger</h2>
+    <p>
+      This compact ledger shows the newest public-facing shifts: what became easier to audit,
+      what became harder to spoof, and which research surface moved closer to the reduced
+      shape-scale atlas target.
+    </p>
+    {recent_change_ledger_html}
   </section>
 
   <section>
@@ -846,6 +875,55 @@ def _public_gate_summary(promotion_gates: dict[str, object]) -> dict[str, int]:
         bool(promotion_gates["symbolic_passes_stride_robustness"]),
     )
     return {"pass_count": sum(gates), "total": len(gates)}
+
+
+def _recent_change_ledger(provenance: dict[str, object], verifier_feature_set_sha256: str) -> list[dict[str, str]]:
+    return [
+        {
+            "stage": "Atlas surface",
+            "title": "Reduced-state report bridge",
+            "detail": "General analysis reports now carry a ReducedThreeBodyState snapshot alongside chart features.",
+            "value": str(provenance["commit_sha_short"]),
+            "status": "landed",
+        },
+        {
+            "stage": "Artifact policy",
+            "title": "Branch line endings verified",
+            "detail": ".gitattributes is hashed in the manifest and must declare LF publication semantics.",
+            "value": "* text eol=lf",
+            "status": "verified",
+        },
+        {
+            "stage": "Audit identity",
+            "title": "Receipt and audit fingerprints",
+            "detail": "Timestamp-independent digests identify both verifier receipts and full audit bundles.",
+            "value": verifier_feature_set_sha256[:12],
+            "status": "pinned",
+        },
+        {
+            "stage": "Public API",
+            "title": "Stable claim contract",
+            "detail": "threebody_engine exposes public verifier, contract validator, and audit report helpers.",
+            "value": PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE,
+            "status": "api ready",
+        },
+    ]
+
+
+def _recent_change_ledger_html(rows: list[dict[str, str]]) -> str:
+    cards = "\n".join(
+        (
+            '<div class="change-card">'
+            f'<span class="change-kicker">{html.escape(row["stage"])}</span>'
+            f'<strong>{html.escape(row["title"])}</strong>'
+            f'<p>{html.escape(row["detail"])}</p>'
+            f'<code>{html.escape(row["value"])}</code>'
+            f'<span class="change-status">{html.escape(row["status"])}</span>'
+            "</div>"
+        )
+        for row in rows
+    )
+    return f'<div class="change-ledger">{cards}</div>'
 
 
 def _public_change_summary(
