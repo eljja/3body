@@ -8,11 +8,15 @@ from threebody.cli import (
     static_artifact_requirement_profile_sha256,
     static_artifact_verification_features_sha256,
 )
-from threebody_engine import verify_public_static_artifact_bytes, verify_public_static_artifacts
+from threebody_engine import (
+    verify_public_static_artifact_bytes,
+    verify_public_static_artifacts,
+    verify_public_static_artifacts_from_url,
+)
 from threebody.ui.static_site import build_static_site
 
 
-def test_static_site_builder_writes_index(tmp_path) -> None:
+def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     index_path = build_static_site(tmp_path)
 
     assert index_path.name == "index.html"
@@ -66,6 +70,7 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
         "verify-static-artifacts --site-dir site --require-commit local --require-public-claim"
     ) in content
     assert "verify_public_static_artifacts_from_url" in content
+    assert "public_static_artifact_claim_contract" in content
     assert "CLI and threebody_engine API callers can apply the same public claim contract" in content
     assert "jacobi_parameter_interval_box_margin" not in content
     certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
@@ -121,11 +126,41 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
         },
         require_commit="local",
     )
+    artifacts = {
+        "index.html": index_path.read_bytes(),
+        "certificate.json": certificate_path.read_bytes(),
+        "favicon.svg": favicon_path.read_bytes(),
+        "manifest.json": manifest_path.read_bytes(),
+    }
+
+    class FakeResponse:
+        def __init__(self, data: bytes) -> None:
+            self.data = data
+
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return self.data
+
+    def fake_urlopen(request, timeout: int) -> FakeResponse:
+        artifact_name = str(request.full_url).rstrip("/").rsplit("/", 1)[-1]
+        return FakeResponse(artifacts[artifact_name])
+
+    monkeypatch.setattr("threebody.cli.urlopen", fake_urlopen)
+    public_url_receipt = verify_public_static_artifacts_from_url("https://example.test/3body/", require_commit="local")
+
     assert public_api_receipt["verified"] is True
     assert public_api_receipt["required_profiles"] == ["public-claims-v1"]
     assert public_api_receipt["required_feature_set_sha256"] == verifier_feature_set_sha256
     assert direct_bytes_receipt["verified"] is True
     assert direct_bytes_receipt["required_profiles"] == ["public-claims-v1"]
+    assert public_url_receipt["verified"] is True
+    assert public_url_receipt["required_profiles"] == ["public-claims-v1"]
+    assert public_url_receipt["required_feature_set_sha256"] == verifier_feature_set_sha256
 
 
 def _sha256(path) -> str:

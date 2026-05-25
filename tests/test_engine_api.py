@@ -7,6 +7,7 @@ from threebody_engine import (
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
+    public_static_artifact_claim_contract,
     run_verification_report,
     select_hysteresis_markov_order,
     tune_jacobi_picard,
@@ -27,6 +28,20 @@ def test_engine_api_integrates_reference_scenario() -> None:
     assert scenario.name == "general-figure-eight"
     assert trajectory.success is True
     assert len(trajectory.t) == 30
+
+
+def test_engine_api_exposes_public_static_claim_contract() -> None:
+    contract = public_static_artifact_claim_contract()
+
+    assert contract["contract_schema_version"] == 1
+    assert contract["profile"] == "public-claims-v1"
+    assert isinstance(contract["profile_sha256"], str)
+    assert len(contract["profile_sha256"]) == 64
+    assert contract["profile_descriptor"]["profile"] == "public-claims-v1"
+    assert "artifact-availability" in contract["profile_descriptor"]["requirements"]["require_features"]
+    assert "certificate-verifier-capability-digest" in contract["verification_schema_features"]
+    assert isinstance(contract["verification_schema_features_sha256"], str)
+    assert len(contract["verification_schema_features_sha256"]) == 64
 
 
 def test_engine_api_exposes_picard_jacobi_certificate() -> None:

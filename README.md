@@ -69,6 +69,7 @@ from threebody_engine import (
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
+    public_static_artifact_claim_contract,
     run_verification_report,
     select_hysteresis_markov_order,
     tune_jacobi_picard,
@@ -81,7 +82,7 @@ from threebody_engine import (
 
 The hysteresis helpers accept `word_mode="refined"`, `"return"`, or `"poincare"`.
 The default promotion path uses refined chart words; Poincare-section words, section sweeps, multi-coordinate sweeps, held-out binary-phase validation, permutation controls, section-robustness checks, and stride-perturbation checks as stricter diagnostics when a scenario has enough crossings.
-Use `verify_public_static_artifacts_from_url("https://eljja.github.io/3body/", require_commit="<sha>")` to audit the public Pages evidence bundle through the stable engine API.
+Use `public_static_artifact_claim_contract()` to inspect the versioned public claim profile and verifier feature-set digest, then `verify_public_static_artifacts_from_url("https://eljja.github.io/3body/", require_commit="<sha>")` to audit the public Pages evidence bundle through the stable engine API.
 
 Run the test suite:
 

@@ -30,6 +30,11 @@ from threebody.analysis import (
     validate_markov_chain,
 )
 from threebody.cli import (
+    PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE,
+    STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES,
+    static_artifact_requirement_profile_descriptor,
+    static_artifact_requirement_profile_sha256,
+    static_artifact_verification_features_sha256,
     verify_static_artifact_bytes,
     verify_static_artifacts,
     verify_static_artifacts_from_url,
@@ -40,6 +45,23 @@ from threebody.types import Scenario, TrajectoryResult
 
 ReferenceScenario = Literal["figure-eight", "hierarchical-flyby", "restricted-l4", "restricted-l5"]
 WordMode = Literal["refined", "return", "poincare"]
+
+
+def public_static_artifact_claim_contract() -> dict[str, object]:
+    """Return the JSON-ready public Pages claim profile and verifier feature contract."""
+
+    profile = PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE
+    verification_schema_features = list(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
+    return {
+        "contract_schema_version": 1,
+        "profile": profile,
+        "profile_sha256": static_artifact_requirement_profile_sha256(profile),
+        "profile_descriptor": static_artifact_requirement_profile_descriptor(profile),
+        "verification_schema_features": verification_schema_features,
+        "verification_schema_features_sha256": static_artifact_verification_features_sha256(
+            verification_schema_features
+        ),
+    }
 
 
 def verify_public_static_artifacts(
