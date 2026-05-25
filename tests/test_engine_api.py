@@ -10,6 +10,7 @@ from threebody_engine import (
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
+    predict_three_body_interpretation_report,
     predict_three_body_linearized_distribution,
     predict_three_body_position_distribution,
     predict_three_body_positions,
@@ -108,6 +109,31 @@ def test_engine_api_builds_linearized_three_body_position_distribution() -> None
     assert len(distribution["state_transition_matrix"]) == 12
     assert distribution["linearized_diagnostics"]["minimum_covariance_eigenvalue"] > -1.0e-18
     assert distribution["linearized_diagnostics"]["maximum_position_std"] > 0.0
+
+
+def test_engine_api_builds_interpretation_prediction_report() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    report = predict_three_body_interpretation_report(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        count=7,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        samples=16,
+    )
+
+    assert report["prediction_type"] == "three-body-interpretation-report"
+    assert report["deterministic"]["prediction_type"] == "deterministic-position"
+    assert report["linearized_gaussian"]["prediction_type"] == "linearized-gaussian-position-distribution"
+    assert report["empirical_distribution"]["prediction_type"] == "empirical-position-distribution"
+    assert report["comparison"]["mean_gap_in_sigma_units"] >= 0.0
+    assert report["verdict"]["deterministic_resolved"] is True
+    assert report["verdict"]["empirical_distribution_resolved"] is True
+    assert report["verdict"]["recommended_mode"] in {"linearized-gaussian", "empirical-ensemble"}
 
 
 def test_engine_api_exposes_public_static_claim_contract() -> None:

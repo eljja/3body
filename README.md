@@ -72,6 +72,7 @@ from threebody_engine import (
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
+    predict_three_body_interpretation_report,
     predict_three_body_linearized_distribution,
     predict_three_body_position_distribution,
     predict_three_body_positions,
@@ -90,13 +91,27 @@ from threebody_engine import (
 For an arbitrary Newtonian three-body initial state, use the prediction API rather than a claimed global closed-form solution:
 
 ```python
-from threebody_engine import predict_three_body_position_distribution, predict_three_body_positions
+from threebody_engine import (
+    predict_three_body_interpretation_report,
+    predict_three_body_linearized_distribution,
+    predict_three_body_position_distribution,
+    predict_three_body_positions,
+)
 
 masses = (1.0, 1.0, 1.0)
 positions = [[0.97000436, -0.24308753], [-0.97000436, 0.24308753], [0.0, 0.0]]
 velocities = [[0.466203685, 0.43236573], [0.466203685, 0.43236573], [-0.93240737, -0.86473146]]
 
 point_forecast = predict_three_body_positions(masses, positions, velocities, target_time=0.5)
+report = predict_three_body_interpretation_report(
+    masses,
+    positions,
+    velocities,
+    target_time=0.5,
+    count=64,
+    position_scale=1.0e-6,
+    velocity_scale=1.0e-6,
+)
 linearized = predict_three_body_linearized_distribution(
     masses,
     positions,
@@ -116,12 +131,13 @@ distribution = predict_three_body_position_distribution(
 )
 ```
 
-`predict_three_body_positions` returns the final positions, velocities, solver metadata, and Noether invariant drift diagnostics. `predict_three_body_linearized_distribution` computes the variational state-transition matrix and pushes an initial covariance forward by `P(t) = D Phi_t P(0) D Phi_t^T`. `predict_three_body_position_distribution` perturbs the initial state and returns empirical mean positions, quantiles, covariances, and the deterministic base forecast.
+`predict_three_body_positions` returns the final positions, velocities, solver metadata, and Noether invariant drift diagnostics. `predict_three_body_interpretation_report` runs the point, variational Gaussian, and ensemble modes together, compares the distributions, and recommends `linearized-gaussian`, `empirical-ensemble`, `deterministic-only`, or `unresolved`. `predict_three_body_linearized_distribution` computes the variational state-transition matrix and pushes an initial covariance forward by `P(t) = D Phi_t P(0) D Phi_t^T`. `predict_three_body_position_distribution` perturbs the initial state and returns empirical mean positions, quantiles, covariances, and the deterministic base forecast.
 
 The same layer is available from the CLI:
 
 ```powershell
 threebody predict --input initial-state.json --target-time 0.5 --output prediction.json
+threebody predict --input initial-state.json --report --count 128 --position-scale 1e-6 --velocity-scale 1e-6 --output report.json
 threebody predict --input initial-state.json --linearized-distribution --position-scale 1e-6 --velocity-scale 1e-6 --output linearized.json
 threebody predict --input initial-state.json --distribution --count 128 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution.json
 ```

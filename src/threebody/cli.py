@@ -293,6 +293,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Propagate initial covariance through the variational flow map.",
     )
+    predict.add_argument(
+        "--report",
+        action="store_true",
+        help="Run deterministic, linearized, and ensemble predictions and return a recommendation report.",
+    )
     predict.add_argument("--count", type=int, default=64, help="Distribution ensemble size.")
     predict.add_argument("--position-scale", type=float, default=1.0e-6, help="Initial position uncertainty scale.")
     predict.add_argument("--velocity-scale", type=float, default=1.0e-6, help="Initial velocity uncertainty scale.")
@@ -463,14 +468,16 @@ def run_survey_command(args: argparse.Namespace) -> int:
 
 def run_predict_command(args: argparse.Namespace) -> int:
     from threebody_engine import (
+        predict_three_body_interpretation_report,
         predict_three_body_linearized_distribution,
         predict_three_body_position_distribution,
         predict_three_body_positions,
     )
 
     payload = _read_prediction_input(args.input)
-    if args.distribution and args.linearized_distribution:
-        raise ValueError("Choose either --distribution or --linearized-distribution, not both.")
+    selected_modes = sum(bool(value) for value in (args.distribution, args.linearized_distribution, args.report))
+    if selected_modes > 1:
+        raise ValueError("Choose only one of --distribution, --linearized-distribution, or --report.")
     target_time = args.target_time if args.target_time is not None else _required_prediction_field(payload, "target_time")
     common_kwargs = {
         "gravitational_constant": args.gravitational_constant,
@@ -478,7 +485,23 @@ def run_predict_command(args: argparse.Namespace) -> int:
         "rtol": args.rtol,
         "atol": args.atol,
     }
-    if args.linearized_distribution:
+    if args.report:
+        result = predict_three_body_interpretation_report(
+            _required_prediction_field(payload, "masses"),
+            _required_prediction_field(payload, "positions"),
+            _required_prediction_field(payload, "velocities"),
+            target_time,
+            count=args.count,
+            position_scale=args.position_scale,
+            velocity_scale=args.velocity_scale,
+            seed=args.seed,
+            samples=args.samples,
+            max_step=args.max_step,
+            jacobian_step=args.jacobian_step,
+            **common_kwargs,
+        )
+        exit_code = 0 if result["verdict"]["recommended_mode"] != "unresolved" else 1
+    elif args.linearized_distribution:
         result = predict_three_body_linearized_distribution(
             _required_prediction_field(payload, "masses"),
             _required_prediction_field(payload, "positions"),

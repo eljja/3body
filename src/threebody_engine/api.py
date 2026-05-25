@@ -584,6 +584,95 @@ def predict_three_body_linearized_distribution(
     }
 
 
+def predict_three_body_interpretation_report(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    count: int = 64,
+    position_scale: float = 1.0e-6,
+    velocity_scale: float = 1.0e-6,
+    seed: int = 0,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    samples: int = 256,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+    max_step: float = math.inf,
+    jacobian_step: float = 1.0e-6,
+    linearized_covariance_relative_tolerance: float = 0.75,
+) -> dict[str, object]:
+    """Return a point/linearized/ensemble prediction report with a mode recommendation."""
+
+    deterministic = predict_three_body_positions(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+    )
+    linearized = predict_three_body_linearized_distribution(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        jacobian_step=jacobian_step,
+        rtol=rtol,
+        atol=atol,
+    )
+    empirical = predict_three_body_position_distribution(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        count=count,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        seed=seed,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+    )
+    comparison = _prediction_distribution_comparison(linearized, empirical)
+    verdict = _prediction_report_verdict(
+        deterministic,
+        linearized,
+        empirical,
+        comparison,
+        linearized_covariance_relative_tolerance=linearized_covariance_relative_tolerance,
+    )
+    return {
+        "prediction_schema_version": 1,
+        "prediction_type": "three-body-interpretation-report",
+        "target_time": float(target_time),
+        "uncertainty_model": {
+            "type": "gaussian_initial_state",
+            "count": int(count),
+            "seed": int(seed),
+            "position_scale": float(position_scale),
+            "velocity_scale": float(velocity_scale),
+        },
+        "deterministic": deterministic,
+        "linearized_gaussian": linearized,
+        "empirical_distribution": empirical,
+        "comparison": comparison,
+        "verdict": verdict,
+    }
+
+
 def _general_prediction_system(
     masses: Sequence[float],
     positions: Sequence[Sequence[float]],
@@ -797,6 +886,136 @@ def _linearized_flow_map(
 def _symmetrize_covariance(covariance: np.ndarray) -> np.ndarray:
     covariance = np.asarray(covariance, dtype=float)
     return 0.5 * (covariance + covariance.T)
+
+
+def _prediction_distribution_comparison(
+    linearized: Mapping[str, object],
+    empirical: Mapping[str, object],
+) -> dict[str, object]:
+    linearized_mean = np.asarray(linearized.get("mean_positions", []), dtype=float)
+    empirical_distribution = empirical.get("position_distribution", {})
+    if not isinstance(empirical_distribution, Mapping):
+        empirical_distribution = {}
+    empirical_mean = np.asarray(empirical_distribution.get("mean_positions", []), dtype=float)
+    linearized_covariance = np.asarray(linearized.get("position_covariance", []), dtype=float)
+    empirical_covariance = np.asarray(empirical_distribution.get("flat_covariance", []), dtype=float)
+    if linearized_mean.shape == empirical_mean.shape and linearized_mean.size:
+        body_mean_gap = np.linalg.norm(empirical_mean - linearized_mean, axis=1)
+        mean_gap_norm = float(np.linalg.norm(empirical_mean - linearized_mean))
+        max_body_mean_gap = float(np.max(body_mean_gap))
+    else:
+        body_mean_gap = np.asarray([], dtype=float)
+        mean_gap_norm = math.inf
+        max_body_mean_gap = math.inf
+    if linearized_covariance.shape == empirical_covariance.shape and linearized_covariance.size:
+        covariance_gap = float(np.linalg.norm(empirical_covariance - linearized_covariance, ord="fro"))
+        empirical_norm = float(np.linalg.norm(empirical_covariance, ord="fro"))
+        linearized_norm = float(np.linalg.norm(linearized_covariance, ord="fro"))
+        covariance_relative_gap = covariance_gap / max(empirical_norm, linearized_norm, 1.0e-300)
+        empirical_std = np.sqrt(np.maximum(np.diag(empirical_covariance), 0.0))
+        linearized_std = np.sqrt(np.maximum(np.diag(linearized_covariance), 0.0))
+        max_empirical_std = float(np.max(empirical_std))
+        max_linearized_std = float(np.max(linearized_std))
+    else:
+        covariance_gap = math.inf
+        empirical_norm = math.inf
+        linearized_norm = math.inf
+        covariance_relative_gap = math.inf
+        max_empirical_std = math.inf
+        max_linearized_std = math.inf
+    spread_scale = max(max_empirical_std, max_linearized_std, 1.0e-300)
+    return {
+        "body_mean_gap": body_mean_gap.tolist(),
+        "mean_gap_norm": mean_gap_norm,
+        "max_body_mean_gap": max_body_mean_gap,
+        "mean_gap_in_sigma_units": float(max_body_mean_gap / spread_scale),
+        "covariance_frobenius_gap": covariance_gap,
+        "empirical_covariance_frobenius_norm": empirical_norm,
+        "linearized_covariance_frobenius_norm": linearized_norm,
+        "covariance_relative_gap": covariance_relative_gap,
+        "max_empirical_position_std": max_empirical_std,
+        "max_linearized_position_std": max_linearized_std,
+    }
+
+
+def _prediction_report_verdict(
+    deterministic: Mapping[str, object],
+    linearized: Mapping[str, object],
+    empirical: Mapping[str, object],
+    comparison: Mapping[str, object],
+    *,
+    linearized_covariance_relative_tolerance: float,
+) -> dict[str, object]:
+    invariant_certificate = deterministic.get("invariant_certificate", {})
+    if not isinstance(invariant_certificate, Mapping):
+        invariant_certificate = {}
+    deterministic_resolved = bool(
+        deterministic.get("success") is True
+        and invariant_certificate.get("maximum_relative_energy_drift", math.inf) <= 1.0e-8
+    )
+    empirical_success_count = int(empirical.get("success_count", 0))
+    empirical_failure_count = int(empirical.get("failure_count", 0))
+    empirical_resolved = empirical_success_count > 0 and empirical_failure_count == 0
+    covariance_relative_gap = float(comparison.get("covariance_relative_gap", math.inf))
+    mean_gap_in_sigma_units = float(comparison.get("mean_gap_in_sigma_units", math.inf))
+    linearized_consistent = bool(
+        linearized.get("success") is True
+        and empirical_resolved
+        and covariance_relative_gap <= linearized_covariance_relative_tolerance
+        and mean_gap_in_sigma_units <= 3.0
+    )
+    if linearized_consistent:
+        recommended_mode = "linearized-gaussian"
+    elif empirical_resolved:
+        recommended_mode = "empirical-ensemble"
+    elif deterministic_resolved:
+        recommended_mode = "deterministic-only"
+    else:
+        recommended_mode = "unresolved"
+    return {
+        "deterministic_resolved": deterministic_resolved,
+        "linearized_consistent_with_ensemble": linearized_consistent,
+        "empirical_distribution_resolved": empirical_resolved,
+        "recommended_mode": recommended_mode,
+        "linearized_covariance_relative_tolerance": float(linearized_covariance_relative_tolerance),
+        "rationale": _prediction_verdict_rationale(
+            recommended_mode,
+            deterministic_resolved=deterministic_resolved,
+            covariance_relative_gap=covariance_relative_gap,
+            mean_gap_in_sigma_units=mean_gap_in_sigma_units,
+            empirical_failure_count=empirical_failure_count,
+        ),
+    }
+
+
+def _prediction_verdict_rationale(
+    recommended_mode: str,
+    *,
+    deterministic_resolved: bool,
+    covariance_relative_gap: float,
+    mean_gap_in_sigma_units: float,
+    empirical_failure_count: int,
+) -> str:
+    if recommended_mode == "linearized-gaussian":
+        return (
+            "The deterministic trajectory is resolved, and the variational covariance push-forward agrees "
+            "with the empirical ensemble within the declared mean/covariance gates."
+        )
+    if recommended_mode == "empirical-ensemble":
+        return (
+            "The empirical ensemble integrated successfully, but the linearized Gaussian approximation is "
+            f"not promoted: covariance_relative_gap={covariance_relative_gap:.3g}, "
+            f"mean_gap_in_sigma_units={mean_gap_in_sigma_units:.3g}."
+        )
+    if recommended_mode == "deterministic-only":
+        return (
+            "Only the nominal trajectory is resolved; the uncertainty propagation did not produce a clean "
+            f"ensemble result, with empirical_failure_count={empirical_failure_count}."
+        )
+    return (
+        "The nominal trajectory or uncertainty propagation failed the configured diagnostics; tighten solver "
+        f"settings or shorten the forecast horizon. deterministic_resolved={deterministic_resolved}."
+    )
 
 
 def integrate_reference_scenario(

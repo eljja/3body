@@ -39,6 +39,29 @@ Input JSON:
 
 Output includes final positions, final velocities, solver metadata, and a Noether invariant drift certificate for energy, linear momentum, and angular momentum.
 
+## Interpretation Report
+
+Use `threebody_engine.predict_three_body_interpretation_report(...)` or:
+
+```powershell
+threebody predict --input initial-state.json --report --count 128 --position-scale 1e-6 --velocity-scale 1e-6 --output report.json
+```
+
+The report runs all three prediction layers:
+
+- deterministic flow-map evaluation
+- linearized Gaussian covariance push-forward
+- empirical ensemble push-forward
+
+It then compares the linearized and empirical final-position distributions. The comparison records the mean-position gap, covariance Frobenius gap, covariance relative gap, and mean gap in sigma units. The verdict recommends one of:
+
+- `linearized-gaussian`: the variational distribution agrees with the ensemble within the configured gates.
+- `empirical-ensemble`: the ensemble is resolved, but nonlinear effects are large enough that linearization should not be promoted.
+- `deterministic-only`: only the nominal trajectory is resolved.
+- `unresolved`: the nominal or uncertainty propagation failed the diagnostics.
+
+This is the default scientific handoff format because it answers not only "where are the bodies?" but also "which mathematical claim is defensible for this initial condition and forecast horizon?"
+
 ## Linearized Gaussian Forecast
 
 For small observational uncertainty, use `threebody_engine.predict_three_body_linearized_distribution(...)` or:
@@ -80,6 +103,8 @@ Output includes:
 ## Scientific Interpretation
 
 The deterministic API answers "where are the bodies at time `t` if the initial state is exactly known?"
+
+The interpretation report answers "which of the available mathematical forecasts is justified by diagnostics?"
 
 The distribution API answers "where are the bodies likely to be at time `t` if the initial state has a specified observational uncertainty?"
 
