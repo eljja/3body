@@ -307,6 +307,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     verify_static.add_argument(
+        "--require-public-claim",
+        action="store_true",
+        help=(
+            f"Apply {PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE} and pin this verifier build's current "
+            "capability-set digest."
+        ),
+    )
+    verify_static.add_argument(
         "--require-feature",
         action="append",
         default=[],
@@ -651,9 +659,13 @@ def run_atlas_benchmark_command(args: argparse.Namespace) -> int:
 
 
 def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
+    require_profiles = _merge_requirements(
+        [PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE] if args.require_public_claim else [],
+        args.require_profile,
+    )
     require_feature_set_sha256 = (
         static_artifact_verification_features_sha256(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
-        if args.require_current_feature_set
+        if args.require_current_feature_set or (args.require_public_claim and args.require_feature_set_sha256 is None)
         else args.require_feature_set_sha256
     )
     result = (
@@ -663,7 +675,7 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             require_gates=args.require_gate,
             require_minimums=args.require_min,
             require_maximums=args.require_max,
-            require_profiles=args.require_profile,
+            require_profiles=require_profiles,
             require_features=args.require_feature,
             require_feature_set_sha256=require_feature_set_sha256,
         )
@@ -674,7 +686,7 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             require_gates=args.require_gate,
             require_minimums=args.require_min,
             require_maximums=args.require_max,
-            require_profiles=args.require_profile,
+            require_profiles=require_profiles,
             require_features=args.require_feature,
             require_feature_set_sha256=require_feature_set_sha256,
         )

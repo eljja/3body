@@ -494,8 +494,7 @@ def _render_page(
     public_verify_command = (
         "python -m threebody.cli verify-static-artifacts "
         f"--base-url https://eljja.github.io/3body/ --require-commit {html.escape(str(provenance['commit_sha']))} "
-        f"--require-profile {PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE} "
-        "--require-current-feature-set "
+        "--require-public-claim "
         "--output .runtime/research_runs/pages-verification-receipt.json"
     )
 
@@ -802,7 +801,7 @@ def _render_page(
       <a href="manifest.json">Open artifact integrity manifest</a>
     </p>
     <pre>{public_verify_command}
-python -m threebody.cli verify-static-artifacts --site-dir site --require-commit local --require-profile public-claims-v1 --require-current-feature-set</pre>
+python -m threebody.cli verify-static-artifacts --site-dir site --require-commit local --require-public-claim</pre>
   </section>
 </main>
 </body>
