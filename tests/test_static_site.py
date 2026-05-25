@@ -3,7 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 
-from threebody.cli import static_artifact_requirement_profile_sha256
+from threebody.cli import (
+    STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES,
+    static_artifact_requirement_profile_sha256,
+    static_artifact_verification_features_sha256,
+)
 from threebody.ui.static_site import build_static_site
 
 
@@ -41,6 +45,7 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "Research certificate status" not in content
     assert "Public claim audit chain" in content
     assert "Canonical public claim profile" in content
+    assert "Verifier capability set" in content
     assert "Commit-pinned build" in content
     assert "Bounded numerical drift" in content
     assert "Active profile digest" in content
@@ -52,10 +57,14 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "verify-static-artifacts --base-url https://eljja.github.io/3body/" in content
     assert "--require-commit local" in content
     assert "--require-profile public-claims-v1" in content
+    assert "--require-feature-set-sha256" in content
     assert "--output .runtime/research_runs/pages-verification-receipt.json" in content
     assert "verify-static-artifacts --site-dir site" in content
     assert "jacobi_parameter_interval_box_margin" not in content
     certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
+    verifier_feature_set_sha256 = static_artifact_verification_features_sha256(
+        STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES
+    )
     assert certificate["certificate_schema_version"] == 1
     assert certificate["artifact"] == "threebody-static-research-certificate"
     assert certificate["artifact_manifest"] == "manifest.json"
@@ -75,6 +84,9 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "index-artifact-discoverability" in certificate["verification_profiles"]["public-claims-v1"][
         "requirements"
     ]["require_features"]
+    assert certificate["verification_schema_features"] == list(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
+    assert certificate["verification_schema_features_sha256"] == verifier_feature_set_sha256
+    assert verifier_feature_set_sha256 in content
     assert certificate["public_change_summary"]
     assert certificate["public_change_summary"][-1]["title"] == "Active profile digest"
     assert certificate["promotion_gates"]["symbolic_passes_stride_robustness"] is True

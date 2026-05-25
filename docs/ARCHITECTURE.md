@@ -51,7 +51,7 @@ Runs repeatable research jobs from the command line.
 - `threebody survey`
 - `python -m threebody.cli survey`
 - `python -m threebody.cli verify-static-artifacts --site-dir site`
-- `python -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <sha-or-prefix> --require-profile public-claims-v1 --output .runtime/research_runs/pages-verification-receipt.json`
+- `python -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <sha-or-prefix> --require-profile public-claims-v1 --require-feature-set-sha256 <verification-schema-features-sha256> --output .runtime/research_runs/pages-verification-receipt.json`
 
 ### `src/threebody/experiments`
 
@@ -64,7 +64,7 @@ Packages repeatable experiment setup.
 ### `src/threebody/ui`
 
 Contains the Streamlit interface for interactive inspection.
-The static Pages build also renders a compact public claim audit chain that mirrors the certificate JSON: commit provenance, scientific gates, bounded numerical drift, public artifacts, and active profile digest checks are visible in the browser and machine-readable in `certificate.json`.
+The static Pages build also renders a compact public claim audit chain that mirrors the certificate JSON: commit provenance, scientific gates, bounded numerical drift, public artifacts, active profile digest checks, and the verifier capability-set digest are visible in the browser and machine-readable in `certificate.json`.
 
 ## Design Principles
 

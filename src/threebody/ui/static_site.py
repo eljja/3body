@@ -15,9 +15,11 @@ import plotly.io as pio
 
 from threebody.cli import (
     PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE,
+    STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES,
     STATIC_SITE_ARTIFACT_NAMES,
     static_artifact_requirement_profile_descriptor,
     static_artifact_requirement_profile_sha256,
+    static_artifact_verification_features_sha256,
 )
 from threebody.analysis import (
     AnalysisAtlas,
@@ -449,6 +451,8 @@ def _render_page(
     public_gate_summary = _public_gate_summary(promotion_gates)
     public_claim_profile_sha256 = static_artifact_requirement_profile_sha256(PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE)
     public_claim_profile_descriptor = static_artifact_requirement_profile_descriptor(PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE)
+    verifier_feature_set = list(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
+    verifier_feature_set_sha256 = static_artifact_verification_features_sha256(verifier_feature_set)
     public_change_summary = _public_change_summary(public_gate_summary, metrics, provenance, public_claim_profile_sha256)
     certificate_bundle = {
         "certificate_schema_version": 1,
@@ -469,6 +473,8 @@ def _render_page(
                 "sha256": public_claim_profile_sha256,
             },
         },
+        "verification_schema_features": verifier_feature_set,
+        "verification_schema_features_sha256": verifier_feature_set_sha256,
         "public_change_summary": public_change_summary,
         "metrics": metrics,
         "promotion_gates": promotion_gates,
@@ -480,11 +486,16 @@ def _render_page(
         "build_provenance": provenance,
         "note": "Full theorem-suite benchmarks remain a local/CI research check; this artifact embeds a representative certificate and latest parameter-box summary.",
     }
-    claim_verification_seal = _claim_verification_seal(public_change_summary, public_claim_profile_sha256)
+    claim_verification_seal = _claim_verification_seal(
+        public_change_summary,
+        public_claim_profile_sha256,
+        verifier_feature_set_sha256,
+    )
     public_verify_command = (
         "python -m threebody.cli verify-static-artifacts "
         f"--base-url https://eljja.github.io/3body/ --require-commit {html.escape(str(provenance['commit_sha']))} "
         f"--require-profile {PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE} "
+        f"--require-feature-set-sha256 {verifier_feature_set_sha256} "
         "--output .runtime/research_runs/pages-verification-receipt.json"
     )
 
@@ -862,7 +873,11 @@ def _public_change_summary(
     ]
 
 
-def _claim_verification_seal(rows: list[dict[str, object]], profile_sha256: str) -> str:
+def _claim_verification_seal(
+    rows: list[dict[str, object]],
+    profile_sha256: str,
+    verifier_feature_set_sha256: str,
+) -> str:
     checks = "\n".join(
         (
             f'<div class="seal-check {html.escape(str(row["status"]))}">'
@@ -881,6 +896,9 @@ def _claim_verification_seal(rows: list[dict[str, object]], profile_sha256: str)
         f"<strong>{html.escape(PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE)}</strong>"
         f"<code>{html.escape(profile_sha256)}</code>"
         "<p>The verifier requires this active profile name, its digest, and the canonical descriptor to agree.</p>"
+        "<span>Verifier capability set</span>"
+        f"<code>{html.escape(verifier_feature_set_sha256)}</code>"
+        "<p>Audit commands pin the advertised verifier feature list as one ordered SHA-256 digest.</p>"
         "</div>"
         f'<div class="seal-checks">{checks}</div>'
         "</div>"
