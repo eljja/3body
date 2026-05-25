@@ -102,7 +102,7 @@ The static build includes a visual research progress map, a compact public claim
 Verify a generated static evidence bundle:
 
 ```powershell
-& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --site-dir site
+& 'D:\Codex\.venv\Scripts\python.exe' -m threebody.cli verify-static-artifacts --site-dir site --require-commit local --require-profile public-claims-v1 --require-current-feature-set
 ```
 
 Verify the public GitHub Pages evidence bundle directly:

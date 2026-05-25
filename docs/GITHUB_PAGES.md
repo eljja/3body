@@ -19,7 +19,7 @@ and `certificate.json`:
 commit SHA, workflow run, ref name, Python version, and UTC generation time are included beside the research
 certificate JSON.
 `manifest.json` records SHA-256 digests so downstream checks can confirm which files belong to one generated evidence bundle, including the public browser favicon.
-Run `python -m threebody.cli verify-static-artifacts --site-dir site` to verify a local or downloaded Pages artifact directory.
+Run `python -m threebody.cli verify-static-artifacts --site-dir site --require-commit local --require-profile public-claims-v1 --require-current-feature-set` to verify a local Pages artifact directory with the same public claim profile and verifier capability-set pin.
 Run `python -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/` to verify the public Pages bundle directly by URL.
 Add `--require-commit <commit-sha-or-prefix>` when citing a specific build, so the verifier fails if GitHub Pages has moved to a different evidence bundle.
 Add `--require-profile public-claims-v1` to apply the versioned public claim profile. It expands to the current required promotion gates, numeric lower bounds, numeric upper bounds, and required verifier capabilities for the Pages certificate. The generated certificate and verifier receipt include the profile's canonical SHA-256 digest, and the verifier now requires the certificate's active `publication_pipeline.verification_profile`, active profile digest, and embedded canonical descriptor to agree.

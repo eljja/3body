@@ -802,7 +802,7 @@ def _render_page(
       <a href="manifest.json">Open artifact integrity manifest</a>
     </p>
     <pre>{public_verify_command}
-python -m threebody.cli verify-static-artifacts --site-dir site</pre>
+python -m threebody.cli verify-static-artifacts --site-dir site --require-commit local --require-profile public-claims-v1 --require-current-feature-set</pre>
   </section>
 </main>
 </body>

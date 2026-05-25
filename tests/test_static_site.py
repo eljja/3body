@@ -60,7 +60,10 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "--require-current-feature-set" in content
     assert "--require-feature-set-sha256" not in content
     assert "--output .runtime/research_runs/pages-verification-receipt.json" in content
-    assert "verify-static-artifacts --site-dir site" in content
+    assert (
+        "verify-static-artifacts --site-dir site --require-commit local --require-profile public-claims-v1 "
+        "--require-current-feature-set"
+    ) in content
     assert "jacobi_parameter_interval_box_margin" not in content
     certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
     verifier_feature_set_sha256 = static_artifact_verification_features_sha256(
