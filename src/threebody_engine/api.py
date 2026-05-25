@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -99,6 +101,14 @@ def validate_public_static_artifact_receipt_contract(
         "verified": all(checks.values()),
         "checks": checks,
     }
+
+
+def public_static_artifact_audit_report_payload_sha256(audit_report: Mapping[str, object]) -> str:
+    """Return a timestamp-independent canonical SHA-256 for a public Pages audit report."""
+
+    payload = _audit_report_digest_payload(audit_report)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def verify_public_static_artifacts(
@@ -256,13 +266,27 @@ def audit_public_static_artifact_bytes(
 def _public_static_artifact_audit_report(receipt: Mapping[str, object]) -> dict[str, object]:
     contract = public_static_artifact_claim_contract()
     receipt_contract_validation = validate_public_static_artifact_receipt_contract(receipt, contract)
-    return {
+    report = {
         "audit_schema_version": 1,
         "verified": receipt.get("verified") is True and receipt_contract_validation["verified"] is True,
         "contract": contract,
         "receipt": dict(receipt),
         "receipt_contract_validation": receipt_contract_validation,
     }
+    report["audit_payload_sha256"] = public_static_artifact_audit_report_payload_sha256(report)
+    return report
+
+
+def _audit_report_digest_payload(value: object) -> object:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _audit_report_digest_payload(item)
+            for key, item in value.items()
+            if key not in {"audit_payload_sha256", "verified_at_utc"}
+        }
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [_audit_report_digest_payload(item) for item in value]
+    return value
 
 
 def _mapping_field(payload: Mapping[str, object], key: str) -> Mapping[object, object]:

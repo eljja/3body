@@ -12,6 +12,7 @@ from threebody_engine import (
     audit_public_static_artifact_bytes,
     audit_public_static_artifacts,
     audit_public_static_artifacts_from_url,
+    public_static_artifact_audit_report_payload_sha256,
     validate_public_static_artifact_receipt_contract,
     verify_public_static_artifact_bytes,
     verify_public_static_artifacts,
@@ -190,6 +191,19 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert validate_public_static_artifact_receipt_contract(public_api_receipt)["verified"] is True
     assert public_api_audit["verified"] is True
     assert public_api_audit["contract"]["profile"] == "public-claims-v1"
+    assert public_api_audit["audit_payload_sha256"] == public_static_artifact_audit_report_payload_sha256(
+        public_api_audit
+    )
+    retimestamped_audit = {
+        **public_api_audit,
+        "receipt": {**public_api_audit["receipt"], "verified_at_utc": "2099-01-01T00:00:00Z"},
+    }
+    assert (
+        public_static_artifact_audit_report_payload_sha256(retimestamped_audit)
+        == public_api_audit["audit_payload_sha256"]
+    )
+    tampered_audit = {**public_api_audit, "verified": False}
+    assert public_static_artifact_audit_report_payload_sha256(tampered_audit) != public_api_audit["audit_payload_sha256"]
     assert public_api_audit["receipt_contract_validation"]["verified"] is True
     assert public_api_audit["receipt_contract_validation"]["checks"]["receipt_payload_sha256_matches"] is True
     assert direct_bytes_receipt["verified"] is True

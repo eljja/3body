@@ -10,6 +10,7 @@ from threebody_engine import (
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
+    public_static_artifact_audit_report_payload_sha256,
     public_static_artifact_claim_contract,
     run_verification_report,
     select_hysteresis_markov_order,
@@ -29,6 +30,7 @@ def test_engine_api_integrates_reference_scenario() -> None:
     assert callable(verify_public_static_artifacts)
     assert callable(verify_public_static_artifacts_from_url)
     assert callable(verify_public_static_artifact_bytes)
+    assert callable(public_static_artifact_audit_report_payload_sha256)
 
     scenario, trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=30)
 
