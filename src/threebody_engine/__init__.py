@@ -1,6 +1,9 @@
 """Public API surface for the ThreeBody verification engine."""
 
 from .api import (
+    audit_public_static_artifact_bytes,
+    audit_public_static_artifacts,
+    audit_public_static_artifacts_from_url,
     build_hysteresis_markov_chain,
     compare_hysteresis_markov_to_baseline,
     compare_hysteresis_markov_to_baseline_with_uncertainty,
@@ -19,6 +22,9 @@ from .api import (
 )
 
 __all__ = [
+    "audit_public_static_artifact_bytes",
+    "audit_public_static_artifacts",
+    "audit_public_static_artifacts_from_url",
     "build_hysteresis_markov_chain",
     "compare_hysteresis_markov_to_baseline",
     "compare_hysteresis_markov_to_baseline_with_uncertainty",

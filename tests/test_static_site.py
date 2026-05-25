@@ -9,6 +9,9 @@ from threebody.cli import (
     static_artifact_verification_features_sha256,
 )
 from threebody_engine import (
+    audit_public_static_artifact_bytes,
+    audit_public_static_artifacts,
+    audit_public_static_artifacts_from_url,
     validate_public_static_artifact_receipt_contract,
     verify_public_static_artifact_bytes,
     verify_public_static_artifacts,
@@ -70,9 +73,9 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert (
         "verify-static-artifacts --site-dir site --require-commit local --require-public-claim"
     ) in content
-    assert "verify_public_static_artifacts_from_url" in content
+    assert "audit_public_static_artifacts_from_url" in content
     assert "public_static_artifact_claim_contract" in content
-    assert "validate_public_static_artifact_receipt_contract" in content
+    assert "audit = audit_public_static_artifacts_from_url" in content
     assert "CLI and threebody_engine API callers can apply the same public claim contract" in content
     assert "jacobi_parameter_interval_box_margin" not in content
     certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
@@ -119,7 +122,17 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert manifest["artifacts"]["favicon.svg"]["bytes"] == favicon_path.stat().st_size
     assert 'viewBox="0 0 64 64"' in favicon_path.read_text(encoding="utf-8")
     public_api_receipt = verify_public_static_artifacts(tmp_path, require_commit="local")
+    public_api_audit = audit_public_static_artifacts(tmp_path, require_commit="local")
     direct_bytes_receipt = verify_public_static_artifact_bytes(
+        {
+            "index.html": index_path.read_bytes(),
+            "certificate.json": certificate_path.read_bytes(),
+            "favicon.svg": favicon_path.read_bytes(),
+            "manifest.json": manifest_path.read_bytes(),
+        },
+        require_commit="local",
+    )
+    direct_bytes_audit = audit_public_static_artifact_bytes(
         {
             "index.html": index_path.read_bytes(),
             "certificate.json": certificate_path.read_bytes(),
@@ -154,17 +167,25 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
 
     monkeypatch.setattr("threebody.cli.urlopen", fake_urlopen)
     public_url_receipt = verify_public_static_artifacts_from_url("https://example.test/3body/", require_commit="local")
+    public_url_audit = audit_public_static_artifacts_from_url("https://example.test/3body/", require_commit="local")
 
     assert public_api_receipt["verified"] is True
     assert public_api_receipt["required_profiles"] == ["public-claims-v1"]
     assert public_api_receipt["required_feature_set_sha256"] == verifier_feature_set_sha256
     assert validate_public_static_artifact_receipt_contract(public_api_receipt)["verified"] is True
+    assert public_api_audit["verified"] is True
+    assert public_api_audit["contract"]["profile"] == "public-claims-v1"
+    assert public_api_audit["receipt_contract_validation"]["verified"] is True
     assert direct_bytes_receipt["verified"] is True
     assert direct_bytes_receipt["required_profiles"] == ["public-claims-v1"]
+    assert direct_bytes_audit["verified"] is True
+    assert direct_bytes_audit["receipt"]["required_feature_set_sha256"] == verifier_feature_set_sha256
     assert public_url_receipt["verified"] is True
     assert public_url_receipt["required_profiles"] == ["public-claims-v1"]
     assert public_url_receipt["required_feature_set_sha256"] == verifier_feature_set_sha256
     assert validate_public_static_artifact_receipt_contract(public_url_receipt)["verified"] is True
+    assert public_url_audit["verified"] is True
+    assert public_url_audit["receipt_contract_validation"]["checks"]["certificate_feature_set_sha256_matches"] is True
 
 
 def _sha256(path) -> str:

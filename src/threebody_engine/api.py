@@ -120,6 +120,30 @@ def verify_public_static_artifacts(
     )
 
 
+def audit_public_static_artifacts(
+    site_dir: str | Path,
+    *,
+    require_commit: str | None = None,
+    require_gates: Sequence[str] | None = None,
+    require_minimums: Sequence[str] | None = None,
+    require_maximums: Sequence[str] | None = None,
+    require_features: Sequence[str] | None = None,
+    require_feature_set_sha256: str | None = None,
+) -> dict[str, object]:
+    """Return a self-contained public Pages audit report for a generated static directory."""
+
+    receipt = verify_public_static_artifacts(
+        site_dir,
+        require_commit=require_commit,
+        require_gates=require_gates,
+        require_minimums=require_minimums,
+        require_maximums=require_maximums,
+        require_features=require_features,
+        require_feature_set_sha256=require_feature_set_sha256,
+    )
+    return _public_static_artifact_audit_report(receipt)
+
+
 def verify_public_static_artifacts_from_url(
     base_url: str,
     *,
@@ -142,6 +166,30 @@ def verify_public_static_artifacts_from_url(
         require_feature_set_sha256=require_feature_set_sha256,
         require_public_claim=True,
     )
+
+
+def audit_public_static_artifacts_from_url(
+    base_url: str,
+    *,
+    require_commit: str | None = None,
+    require_gates: Sequence[str] | None = None,
+    require_minimums: Sequence[str] | None = None,
+    require_maximums: Sequence[str] | None = None,
+    require_features: Sequence[str] | None = None,
+    require_feature_set_sha256: str | None = None,
+) -> dict[str, object]:
+    """Return a self-contained public Pages audit report for a public static URL."""
+
+    receipt = verify_public_static_artifacts_from_url(
+        base_url,
+        require_commit=require_commit,
+        require_gates=require_gates,
+        require_minimums=require_minimums,
+        require_maximums=require_maximums,
+        require_features=require_features,
+        require_feature_set_sha256=require_feature_set_sha256,
+    )
+    return _public_static_artifact_audit_report(receipt)
 
 
 def verify_public_static_artifact_bytes(
@@ -170,6 +218,46 @@ def verify_public_static_artifact_bytes(
         require_feature_set_sha256=require_feature_set_sha256,
         require_public_claim=True,
     )
+
+
+def audit_public_static_artifact_bytes(
+    artifacts: dict[str, bytes],
+    *,
+    source: str = "direct-bytes",
+    artifact_errors: dict[str, str | None] | None = None,
+    require_commit: str | None = None,
+    require_gates: Sequence[str] | None = None,
+    require_minimums: Sequence[str] | None = None,
+    require_maximums: Sequence[str] | None = None,
+    require_features: Sequence[str] | None = None,
+    require_feature_set_sha256: str | None = None,
+) -> dict[str, object]:
+    """Return a self-contained public Pages audit report for in-memory static artifacts."""
+
+    receipt = verify_public_static_artifact_bytes(
+        artifacts,
+        source=source,
+        artifact_errors=artifact_errors,
+        require_commit=require_commit,
+        require_gates=require_gates,
+        require_minimums=require_minimums,
+        require_maximums=require_maximums,
+        require_features=require_features,
+        require_feature_set_sha256=require_feature_set_sha256,
+    )
+    return _public_static_artifact_audit_report(receipt)
+
+
+def _public_static_artifact_audit_report(receipt: Mapping[str, object]) -> dict[str, object]:
+    contract = public_static_artifact_claim_contract()
+    receipt_contract_validation = validate_public_static_artifact_receipt_contract(receipt, contract)
+    return {
+        "audit_schema_version": 1,
+        "verified": receipt.get("verified") is True and receipt_contract_validation["verified"] is True,
+        "contract": contract,
+        "receipt": dict(receipt),
+        "receipt_contract_validation": receipt_contract_validation,
+    }
 
 
 def _mapping_field(payload: Mapping[str, object], key: str) -> Mapping[object, object]:

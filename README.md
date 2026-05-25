@@ -63,6 +63,9 @@ The research implementation remains importable as `threebody`, while the stable 
 
 ```python
 from threebody_engine import (
+    audit_public_static_artifact_bytes,
+    audit_public_static_artifacts,
+    audit_public_static_artifacts_from_url,
     build_hysteresis_markov_chain,
     compare_hysteresis_markov_to_baseline,
     compare_hysteresis_markov_to_baseline_with_uncertainty,
@@ -83,7 +86,7 @@ from threebody_engine import (
 
 The hysteresis helpers accept `word_mode="refined"`, `"return"`, or `"poincare"`.
 The default promotion path uses refined chart words; Poincare-section words, section sweeps, multi-coordinate sweeps, held-out binary-phase validation, permutation controls, section-robustness checks, and stride-perturbation checks as stricter diagnostics when a scenario has enough crossings.
-Use `public_static_artifact_claim_contract()` to inspect the versioned public claim profile and verifier feature-set digest, then `verify_public_static_artifacts_from_url("https://eljja.github.io/3body/", require_commit="<sha>")` to audit the public Pages evidence bundle through the stable engine API. `validate_public_static_artifact_receipt_contract(receipt)` checks that a receipt matches the same public contract without requiring callers to compare individual digest fields by hand.
+Use `public_static_artifact_claim_contract()` to inspect the versioned public claim profile and verifier feature-set digest, then `verify_public_static_artifacts_from_url("https://eljja.github.io/3body/", require_commit="<sha>")` to audit the public Pages evidence bundle through the stable engine API. `validate_public_static_artifact_receipt_contract(receipt)` checks that a receipt matches the same public contract without requiring callers to compare individual digest fields by hand. Use `audit_public_static_artifacts_from_url(...)` when a paper supplement or CI job needs one JSON-ready object containing the contract, receipt, and receipt-contract validation.
 
 Run the test suite:
 

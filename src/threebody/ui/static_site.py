@@ -803,10 +803,9 @@ def _render_page(
     </p>
     <pre>{public_verify_command}
 python -m threebody.cli verify-static-artifacts --site-dir site --require-commit local --require-public-claim
-from threebody_engine import public_static_artifact_claim_contract, validate_public_static_artifact_receipt_contract, verify_public_static_artifacts_from_url
+from threebody_engine import audit_public_static_artifacts_from_url, public_static_artifact_claim_contract
 contract = public_static_artifact_claim_contract()
-receipt = verify_public_static_artifacts_from_url("https://eljja.github.io/3body/", require_commit="{html.escape(str(provenance['commit_sha']))}")
-validate_public_static_artifact_receipt_contract(receipt)</pre>
+audit = audit_public_static_artifacts_from_url("https://eljja.github.io/3body/", require_commit="{html.escape(str(provenance['commit_sha']))}")</pre>
   </section>
 </main>
 </body>

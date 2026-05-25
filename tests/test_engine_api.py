@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from threebody_engine import (
+    audit_public_static_artifact_bytes,
+    audit_public_static_artifacts,
+    audit_public_static_artifacts_from_url,
     build_hysteresis_markov_chain,
     compare_hysteresis_markov_to_baseline,
     compare_hysteresis_markov_to_baseline_with_uncertainty,
@@ -20,6 +23,9 @@ from threebody_engine import (
 
 
 def test_engine_api_integrates_reference_scenario() -> None:
+    assert callable(audit_public_static_artifacts)
+    assert callable(audit_public_static_artifacts_from_url)
+    assert callable(audit_public_static_artifact_bytes)
     assert callable(verify_public_static_artifacts)
     assert callable(verify_public_static_artifacts_from_url)
     assert callable(verify_public_static_artifact_bytes)
