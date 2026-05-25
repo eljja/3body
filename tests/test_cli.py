@@ -152,6 +152,8 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["verification_schema_features_sha256"] == cli_module.static_artifact_verification_features_sha256(
         receipt["verification_schema_features"]
     )
+    assert receipt["required_feature_set_sha256"] is None
+    assert receipt["checks"]["required_feature_set_sha256"] is True
     assert receipt["verifier"] == "threebody.cli verify-static-artifacts"
     assert receipt["verified_at_utc"].endswith("Z")
     assert receipt["verified"] is True
@@ -255,6 +257,33 @@ def test_verify_static_artifacts_cli_rejects_missing_required_feature(tmp_path) 
     assert receipt["checks"]["required_features"] is False
     assert receipt["required_features"] == ["not-a-real-feature"]
     assert receipt["required_feature_results"] == [{"feature": "not-a-real-feature", "passed": False}]
+    assert receipt["checks"]["index_hash"] is True
+
+
+def test_verify_static_artifacts_cli_rejects_feature_set_digest_mismatch(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    receipt_path = tmp_path / "feature-set-digest-receipt.json"
+    wrong_digest = "0" * 64
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-commit",
+            "abc123",
+            "--require-feature-set-sha256",
+            wrong_digest,
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert receipt["verified"] is False
+    assert receipt["required_feature_set_sha256"] == wrong_digest
+    assert receipt["checks"]["required_feature_set_sha256"] is False
     assert receipt["checks"]["index_hash"] is True
 
 
@@ -656,6 +685,9 @@ def test_verify_static_artifacts_from_url_reports_fetch_error(monkeypatch, tmp_p
         require_commit="abc123",
         require_profiles=["public-claims-v1"],
         require_features=["manifest-hash-algorithm"],
+        require_feature_set_sha256=cli_module.static_artifact_verification_features_sha256(
+            cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES
+        ),
     )
 
     assert result["verified"] is False
@@ -793,6 +825,9 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
         require_commit="abc123",
         require_profiles=["public-claims-v1"],
         require_features=["manifest-hash-algorithm"],
+        require_feature_set_sha256=cli_module.static_artifact_verification_features_sha256(
+            cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES
+        ),
     )
 
     assert result["verified"] is True
@@ -803,6 +838,8 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert "active-profile-descriptor" in result["verification_schema_features"]
     assert "manifest-hash-algorithm" in result["required_features"]
     assert "index-artifact-discoverability" in result["required_features"]
+    assert result["required_feature_set_sha256"] == result["verification_schema_features_sha256"]
+    assert result["checks"]["required_feature_set_sha256"] is True
     assert all(row["passed"] for row in result["required_feature_results"])
     assert result["verified_at_utc"].endswith("Z")
     assert result["checks"]["manifest_artifact"] is True

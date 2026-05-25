@@ -314,6 +314,12 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     verify_static.add_argument(
+        "--require-feature-set-sha256",
+        default=None,
+        metavar="SHA256",
+        help="Require verification_schema_features_sha256 to match this canonical verifier capability-set digest.",
+    )
+    verify_static.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -645,6 +651,7 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             require_maximums=args.require_max,
             require_profiles=args.require_profile,
             require_features=args.require_feature,
+            require_feature_set_sha256=args.require_feature_set_sha256,
         )
         if args.base_url
         else verify_static_artifacts(
@@ -655,6 +662,7 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             require_maximums=args.require_max,
             require_profiles=args.require_profile,
             require_features=args.require_feature,
+            require_feature_set_sha256=args.require_feature_set_sha256,
         )
     )
     if args.output is not None:
@@ -672,6 +680,7 @@ def verify_static_artifacts(
     require_maximums: Sequence[str] | None = None,
     require_profiles: Sequence[str] | None = None,
     require_features: Sequence[str] | None = None,
+    require_feature_set_sha256: str | None = None,
 ) -> dict[str, object]:
     artifacts, artifact_errors = _read_static_artifacts_from_dir(site_dir)
     return verify_static_artifact_bytes(
@@ -684,6 +693,7 @@ def verify_static_artifacts(
         require_maximums=require_maximums,
         require_profiles=require_profiles,
         require_features=require_features,
+        require_feature_set_sha256=require_feature_set_sha256,
     )
 
 
@@ -695,6 +705,7 @@ def verify_static_artifacts_from_url(
     require_maximums: Sequence[str] | None = None,
     require_profiles: Sequence[str] | None = None,
     require_features: Sequence[str] | None = None,
+    require_feature_set_sha256: str | None = None,
 ) -> dict[str, object]:
     normalized_base_url = base_url if base_url.endswith("/") else f"{base_url}/"
     artifacts, artifact_errors = _fetch_static_artifacts_from_url(normalized_base_url)
@@ -708,6 +719,7 @@ def verify_static_artifacts_from_url(
         require_maximums=require_maximums,
         require_profiles=require_profiles,
         require_features=require_features,
+        require_feature_set_sha256=require_feature_set_sha256,
     )
 
 
@@ -721,6 +733,7 @@ def verify_static_artifact_bytes(
     require_maximums: Sequence[str] | None = None,
     require_profiles: Sequence[str] | None = None,
     require_features: Sequence[str] | None = None,
+    require_feature_set_sha256: str | None = None,
 ) -> dict[str, object]:
     artifacts, artifact_payload_errors, provided_artifact_names = _normalize_static_artifact_bytes(artifacts)
     artifact_errors = _normalize_artifact_errors(artifact_errors, provided_artifact_names, artifact_payload_errors)
@@ -761,6 +774,10 @@ def verify_static_artifact_bytes(
         "required_minimums": all(row["passed"] for row in required_minimum_results),
         "required_maximums": all(row["passed"] for row in required_maximum_results),
         "required_features": all(row["passed"] for row in required_feature_results),
+        "required_feature_set_sha256": _required_feature_set_sha256_matches(
+            verification_schema_features_sha256,
+            require_feature_set_sha256,
+        ),
         "index_certificate_link": _index_links_to_artifact(artifacts["index.html"], "certificate.json"),
         "index_manifest_link": _index_links_to_artifact(artifacts["index.html"], "manifest.json"),
         "index_favicon_link": _index_links_to_artifact(artifacts["index.html"], "favicon.svg"),
@@ -782,6 +799,7 @@ def verify_static_artifact_bytes(
         "required_commit": require_commit,
         "required_profiles": list(require_profiles or []),
         "required_features": expanded_required_features,
+        "required_feature_set_sha256": require_feature_set_sha256,
         "required_feature_results": required_feature_results,
         "required_profile_requirements": profile_requirements,
         "required_profile_hashes": profile_hashes,
@@ -1070,6 +1088,10 @@ def _required_feature_results(
         }
         for feature in (required_features or [])
     ]
+
+
+def _required_feature_set_sha256_matches(actual_sha256: str, required_sha256: str | None) -> bool:
+    return required_sha256 is None or actual_sha256 == required_sha256
 
 
 def _merge_requirements(profile_requirements: Sequence[str], explicit_requirements: Sequence[str] | None) -> list[str]:
