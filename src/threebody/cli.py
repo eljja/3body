@@ -49,7 +49,10 @@ PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES = (
     "numeric-minimums",
     "numeric-maximums",
 )
-STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES = (*PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES,)
+STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES = (
+    *PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES,
+    "certificate-verifier-capability-digest",
+)
 STATIC_ARTIFACT_REQUIREMENT_PROFILES: dict[str, dict[str, tuple[str, ...]]] = {
     PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE: {
         "require_gates": (
@@ -766,6 +769,12 @@ def verify_static_artifact_bytes(
         "certificate_schema": certificate.get("certificate_schema_version") == 1,
         "certificate_artifact": certificate.get("artifact") == "threebody-static-research-certificate",
         "certificate_manifest_link": certificate.get("artifact_manifest") == "manifest.json",
+        "certificate_verification_schema_features": _certificate_verification_schema_features_match(
+            certificate,
+            verification_schema_features,
+        ),
+        "certificate_verification_schema_features_sha256": certificate.get("verification_schema_features_sha256")
+        == verification_schema_features_sha256,
         "publication_pipeline_links": _publication_pipeline_links_match(certificate),
         "provenance_commit_match": _provenance_commits_match(certificate_commit, manifest_commit),
         "required_commit": _required_commit_matches(certificate_commit, manifest_commit, require_commit),
@@ -966,6 +975,14 @@ def _publication_pipeline_links_match(certificate: dict[str, object]) -> bool:
         and publication_pipeline.get("machine_readable_certificate") == "certificate.json"
         and publication_pipeline.get("integrity_manifest") == "manifest.json"
     )
+
+
+def _certificate_verification_schema_features_match(
+    certificate: dict[str, object],
+    expected_features: Sequence[str],
+) -> bool:
+    certificate_features = certificate.get("verification_schema_features")
+    return certificate_features == list(expected_features)
 
 
 def _provenance_commits_match(certificate_commit: object, manifest_commit: object) -> bool:

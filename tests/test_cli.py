@@ -148,6 +148,7 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
         "profile-gates",
         "numeric-minimums",
         "numeric-maximums",
+        "certificate-verifier-capability-digest",
     ]
     assert receipt["verification_schema_features_sha256"] == cli_module.static_artifact_verification_features_sha256(
         receipt["verification_schema_features"]
@@ -160,6 +161,8 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["checks"]["manifest_json"] is True
     assert receipt["checks"]["manifest_hash_algorithm"] is True
     assert receipt["checks"]["certificate_json"] is True
+    assert receipt["checks"]["certificate_verification_schema_features"] is True
+    assert receipt["checks"]["certificate_verification_schema_features_sha256"] is True
     assert receipt["parse_errors"] == {"certificate.json": None, "manifest.json": None}
     assert receipt["artifact_errors"] == {
         "certificate.json": None,
@@ -285,6 +288,39 @@ def test_verify_static_artifacts_cli_rejects_feature_set_digest_mismatch(tmp_pat
     assert receipt["required_feature_set_sha256"] == wrong_digest
     assert receipt["checks"]["required_feature_set_sha256"] is False
     assert receipt["checks"]["index_hash"] is True
+
+
+def test_verify_static_artifacts_cli_rejects_certificate_verifier_feature_digest_mismatch(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    certificate_path = tmp_path / "certificate.json"
+    receipt_path = tmp_path / "certificate-feature-digest-receipt.json"
+    certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
+    certificate["verification_schema_features"] = ["artifact-availability"]
+    certificate["verification_schema_features_sha256"] = "0" * 64
+    certificate_path.write_text(json.dumps(certificate, indent=2, sort_keys=True), encoding="utf-8")
+    _refresh_manifest_hashes(tmp_path)
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-commit",
+            "abc123",
+            "--require-profile",
+            "public-claims-v1",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert receipt["verified"] is False
+    assert receipt["checks"]["certificate_hash"] is True
+    assert receipt["checks"]["certificate_verification_schema_features"] is False
+    assert receipt["checks"]["certificate_verification_schema_features_sha256"] is False
+    assert receipt["checks"]["required_profile_hashes"] is True
 
 
 def test_verify_static_artifacts_cli_rejects_index_without_manifest_link(tmp_path) -> None:
@@ -421,7 +457,9 @@ def test_public_claim_profile_features_are_explicitly_versioned() -> None:
 
     assert tuple(required_features) == cli_module.PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES
     assert required_features == list(cli_module.PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES)
-    assert required_features == list(cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
+    assert set(required_features).issubset(set(cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES))
+    assert "certificate-verifier-capability-digest" in cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES
+    assert "certificate-verifier-capability-digest" not in required_features
     assert required_features is not cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES
 
 
@@ -884,6 +922,8 @@ def _write_static_artifact_bundle(site_dir) -> None:
     )
     favicon_path.write_text("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"></svg>\n", encoding="utf-8")
     profile_sha256 = cli_module.static_artifact_requirement_profile_sha256("public-claims-v1")
+    verifier_feature_set = list(cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
+    verifier_feature_set_sha256 = cli_module.static_artifact_verification_features_sha256(verifier_feature_set)
     certificate = {
         "certificate_schema_version": 1,
         "artifact": "threebody-static-research-certificate",
@@ -902,6 +942,8 @@ def _write_static_artifact_bundle(site_dir) -> None:
                 "sha256": profile_sha256,
             },
         },
+        "verification_schema_features": verifier_feature_set,
+        "verification_schema_features_sha256": verifier_feature_set_sha256,
         "metrics": {
             "general_max_energy_drift": 1.0e-10,
             "picard_max_contraction": 0.01,
