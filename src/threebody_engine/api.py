@@ -7,6 +7,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Literal
 
+import numpy as np
+
 from threebody.analysis import (
     AnalysisAtlas,
     ChartWordMarkovChain,
@@ -42,8 +44,10 @@ from threebody.cli import (
     verify_static_artifacts,
     verify_static_artifacts_from_url,
 )
+from threebody.diagnostics import noether_invariant_drift_certificate
 from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
+from threebody.systems import GeneralThreeBodySystem
 from threebody.types import Scenario, TrajectoryResult
 
 ReferenceScenario = Literal["figure-eight", "hierarchical-flyby", "restricted-l4", "restricted-l5"]
@@ -299,6 +303,320 @@ def _sequence_field(payload: Mapping[str, object], key: str) -> tuple[object, ..
     if isinstance(value, str) or not isinstance(value, Sequence):
         return ()
     return tuple(value)
+
+
+def predict_three_body_positions(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    samples: int = 256,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+    max_step: float = math.inf,
+) -> dict[str, object]:
+    """Predict the three body positions at ``target_time`` by high-precision integration.
+
+    This is the practical answer to the generic three-body prediction problem:
+    for arbitrary masses and initial state, the engine returns a controlled
+    numerical forecast plus conservation diagnostics rather than claiming a
+    global closed-form solution.
+    """
+
+    system, initial_state = _general_prediction_system(
+        masses,
+        positions,
+        velocities,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+    )
+    target_time = _finite_float(target_time, "target_time")
+    sample_count = _validated_sample_count(samples)
+    t_eval = _prediction_times(target_time, sample_count)
+    if target_time == 0.0:
+        trajectory = TrajectoryResult(
+            t=np.array([0.0], dtype=float),
+            y=np.asarray([initial_state], dtype=float),
+            success=True,
+            message="target_time is zero; returned the initial state.",
+            metadata={"method": "identity", "nfev": 0, "njev": 0, "nlu": 0},
+        )
+    else:
+        trajectory = AdaptiveIntegrator(rtol=rtol, atol=atol, max_step=max_step).integrate(
+            system,
+            (0.0, target_time),
+            initial_state,
+            t_eval=t_eval,
+        )
+    final_state = trajectory.y[-1] if len(trajectory.y) else np.full(system.state_dim, np.nan)
+    final_positions, final_velocities = system.split_state(final_state)
+    invariant_certificate = noether_invariant_drift_certificate(system, trajectory).as_dict()
+    return {
+        "prediction_schema_version": 1,
+        "prediction_type": "deterministic-position",
+        "method": "adaptive-DOP853",
+        "target_time": target_time,
+        "dimension": system.dimension,
+        "masses": [float(mass) for mass in system.masses],
+        "gravitational_constant": float(system.gravitational_constant),
+        "softening": float(system.softening),
+        "success": trajectory.success,
+        "message": trajectory.message,
+        "positions": final_positions.tolist(),
+        "velocities": final_velocities.tolist(),
+        "final_state": final_state.tolist(),
+        "sample_count": int(len(trajectory.t)),
+        "solver": dict(trajectory.metadata),
+        "invariant_certificate": invariant_certificate,
+    }
+
+
+def predict_three_body_position_distribution(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    count: int = 64,
+    position_scale: float = 1.0e-6,
+    velocity_scale: float = 1.0e-6,
+    seed: int = 0,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    samples: int = 256,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+    max_step: float = math.inf,
+    preserve_center_of_mass: bool = True,
+    include_sample_positions: bool = False,
+) -> dict[str, object]:
+    """Return an empirical final-position distribution from perturbed initial states."""
+
+    system, initial_state = _general_prediction_system(
+        masses,
+        positions,
+        velocities,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+    )
+    target_time = _finite_float(target_time, "target_time")
+    count = _validated_positive_int(count, "count")
+    sample_count = _validated_sample_count(samples)
+    position_scale = _nonnegative_float(position_scale, "position_scale")
+    velocity_scale = _nonnegative_float(velocity_scale, "velocity_scale")
+    rng = np.random.default_rng(seed)
+    initial_states = _perturbed_initial_states(
+        system,
+        initial_state,
+        count=count,
+        rng=rng,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        preserve_center_of_mass=preserve_center_of_mass,
+    )
+    t_eval = _prediction_times(target_time, sample_count)
+    integrator = AdaptiveIntegrator(rtol=rtol, atol=atol, max_step=max_step)
+    successful_positions: list[np.ndarray] = []
+    sample_rows: list[dict[str, object]] = []
+    failures: list[dict[str, object]] = []
+    for index, state in enumerate(initial_states):
+        if target_time == 0.0:
+            trajectory = TrajectoryResult(
+                t=np.array([0.0], dtype=float),
+                y=np.asarray([state], dtype=float),
+                success=True,
+                message="target_time is zero; returned the initial state.",
+                metadata={"method": "identity", "nfev": 0, "njev": 0, "nlu": 0},
+            )
+        else:
+            trajectory = integrator.integrate(system, (0.0, target_time), state, t_eval=t_eval)
+        if not trajectory.success or len(trajectory.y) == 0:
+            failures.append({"index": index, "message": trajectory.message})
+            continue
+        final_positions, final_velocities = system.split_state(trajectory.y[-1])
+        successful_positions.append(final_positions)
+        if include_sample_positions:
+            sample_rows.append(
+                {
+                    "index": index,
+                    "positions": final_positions.tolist(),
+                    "velocities": final_velocities.tolist(),
+                }
+            )
+    summary = _position_distribution_summary(successful_positions, system.dimension)
+    base_prediction = predict_three_body_positions(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+    )
+    result: dict[str, object] = {
+        "prediction_schema_version": 1,
+        "prediction_type": "empirical-position-distribution",
+        "method": "adaptive-DOP853-ensemble",
+        "target_time": target_time,
+        "dimension": system.dimension,
+        "masses": [float(mass) for mass in system.masses],
+        "gravitational_constant": float(system.gravitational_constant),
+        "softening": float(system.softening),
+        "uncertainty_model": {
+            "type": "gaussian_initial_state",
+            "count": count,
+            "seed": int(seed),
+            "position_scale": position_scale,
+            "velocity_scale": velocity_scale,
+            "preserve_center_of_mass": preserve_center_of_mass,
+        },
+        "success_count": len(successful_positions),
+        "failure_count": len(failures),
+        "failures": failures,
+        "base_prediction": base_prediction,
+        "position_distribution": summary,
+    }
+    if include_sample_positions:
+        result["sample_predictions"] = sample_rows
+    return result
+
+
+def _general_prediction_system(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    *,
+    gravitational_constant: float,
+    softening: float,
+) -> tuple[GeneralThreeBodySystem, np.ndarray]:
+    masses_array = np.asarray(masses, dtype=float)
+    positions_array = np.asarray(positions, dtype=float)
+    velocities_array = np.asarray(velocities, dtype=float)
+    if masses_array.shape != (3,):
+        raise ValueError("masses must contain exactly three values.")
+    if np.any(~np.isfinite(masses_array)) or np.any(masses_array <= 0.0):
+        raise ValueError("masses must be finite positive values.")
+    if positions_array.ndim != 2 or positions_array.shape[0] != 3 or positions_array.shape[1] not in (2, 3):
+        raise ValueError("positions must have shape (3, 2) or (3, 3).")
+    if velocities_array.shape != positions_array.shape:
+        raise ValueError("velocities must have the same shape as positions.")
+    if np.any(~np.isfinite(positions_array)) or np.any(~np.isfinite(velocities_array)):
+        raise ValueError("positions and velocities must contain only finite values.")
+    gravitational_constant = _positive_float(gravitational_constant, "gravitational_constant")
+    softening = _nonnegative_float(softening, "softening")
+    system = GeneralThreeBodySystem(
+        masses=tuple(float(mass) for mass in masses_array),
+        gravitational_constant=gravitational_constant,
+        dimension=int(positions_array.shape[1]),
+        softening=softening,
+    )
+    return system, system.flatten_state(positions_array, velocities_array)
+
+
+def _finite_float(value: float, name: str) -> float:
+    value = float(value)
+    if not math.isfinite(value):
+        raise ValueError(f"{name} must be finite.")
+    return value
+
+
+def _positive_float(value: float, name: str) -> float:
+    value = _finite_float(value, name)
+    if value <= 0.0:
+        raise ValueError(f"{name} must be positive.")
+    return value
+
+
+def _nonnegative_float(value: float, name: str) -> float:
+    value = _finite_float(value, name)
+    if value < 0.0:
+        raise ValueError(f"{name} must be nonnegative.")
+    return value
+
+
+def _validated_positive_int(value: int, name: str) -> int:
+    value = int(value)
+    if value < 1:
+        raise ValueError(f"{name} must be >= 1.")
+    return value
+
+
+def _validated_sample_count(samples: int) -> int:
+    samples = int(samples)
+    if samples < 2:
+        raise ValueError("samples must be >= 2.")
+    return samples
+
+
+def _prediction_times(target_time: float, samples: int) -> np.ndarray:
+    if target_time == 0.0:
+        return np.array([0.0], dtype=float)
+    return np.linspace(0.0, target_time, samples)
+
+
+def _perturbed_initial_states(
+    system: GeneralThreeBodySystem,
+    initial_state: np.ndarray,
+    *,
+    count: int,
+    rng: np.random.Generator,
+    position_scale: float,
+    velocity_scale: float,
+    preserve_center_of_mass: bool,
+) -> list[np.ndarray]:
+    positions, velocities = system.split_state(initial_state)
+    states = [initial_state.copy()]
+    masses = np.asarray(system.masses, dtype=float)
+    for _index in range(1, count):
+        position_noise = rng.normal(0.0, position_scale, size=positions.shape)
+        velocity_noise = rng.normal(0.0, velocity_scale, size=velocities.shape)
+        if preserve_center_of_mass:
+            position_noise = position_noise - np.average(position_noise, axis=0, weights=masses)
+            velocity_noise = velocity_noise - np.average(velocity_noise, axis=0, weights=masses)
+        states.append(system.flatten_state(positions + position_noise, velocities + velocity_noise))
+    return states
+
+
+def _position_distribution_summary(positions: list[np.ndarray], dimension: int) -> dict[str, object]:
+    if not positions:
+        return {
+            "mean_positions": [],
+            "median_positions": [],
+            "q05_positions": [],
+            "q95_positions": [],
+            "flat_covariance": [],
+            "body_covariances": [],
+            "max_body_radius_from_mean": math.inf,
+        }
+    stack = np.asarray(positions, dtype=float)
+    flat = stack.reshape(stack.shape[0], 3 * dimension)
+    mean = np.mean(stack, axis=0)
+    quantiles = np.quantile(stack, [0.05, 0.5, 0.95], axis=0)
+    if flat.shape[0] > 1:
+        flat_covariance = np.cov(flat, rowvar=False)
+        body_covariances = [
+            np.cov(stack[:, body_index, :], rowvar=False).reshape(dimension, dimension)
+            for body_index in range(3)
+        ]
+    else:
+        flat_covariance = np.zeros((3 * dimension, 3 * dimension), dtype=float)
+        body_covariances = [np.zeros((dimension, dimension), dtype=float) for _body in range(3)]
+    body_radii = np.linalg.norm(stack - mean[None, :, :], axis=2)
+    return {
+        "mean_positions": mean.tolist(),
+        "median_positions": quantiles[1].tolist(),
+        "q05_positions": quantiles[0].tolist(),
+        "q95_positions": quantiles[2].tolist(),
+        "flat_covariance": flat_covariance.tolist(),
+        "body_covariances": [covariance.tolist() for covariance in body_covariances],
+        "max_body_radius_from_mean": float(np.max(body_radii)),
+    }
 
 
 def integrate_reference_scenario(

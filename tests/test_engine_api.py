@@ -10,6 +10,8 @@ from threebody_engine import (
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
+    predict_three_body_position_distribution,
+    predict_three_body_positions,
     public_static_artifact_audit_report_payload_sha256,
     public_static_artifact_claim_contract,
     run_verification_report,
@@ -37,6 +39,52 @@ def test_engine_api_integrates_reference_scenario() -> None:
     assert scenario.name == "general-figure-eight"
     assert trajectory.success is True
     assert len(trajectory.t) == 30
+
+
+def test_engine_api_predicts_three_body_positions_from_initial_state() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    prediction = predict_three_body_positions(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        samples=16,
+    )
+
+    assert prediction["prediction_type"] == "deterministic-position"
+    assert prediction["success"] is True
+    assert prediction["dimension"] == 2
+    assert len(prediction["positions"]) == 3
+    assert len(prediction["positions"][0]) == 2
+    assert prediction["invariant_certificate"]["maximum_relative_energy_drift"] < 1.0e-8
+
+
+def test_engine_api_builds_three_body_position_distribution() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    distribution = predict_three_body_position_distribution(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        count=7,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        seed=4,
+        samples=16,
+        include_sample_positions=True,
+    )
+
+    assert distribution["prediction_type"] == "empirical-position-distribution"
+    assert distribution["success_count"] == 7
+    assert distribution["failure_count"] == 0
+    assert distribution["uncertainty_model"]["preserve_center_of_mass"] is True
+    assert len(distribution["position_distribution"]["mean_positions"]) == 3
+    assert len(distribution["position_distribution"]["flat_covariance"]) == 6
+    assert len(distribution["sample_predictions"]) == 7
 
 
 def test_engine_api_exposes_public_static_claim_contract() -> None:

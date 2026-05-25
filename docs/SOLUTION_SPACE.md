@@ -26,6 +26,15 @@ They can miss at least four mechanisms:
 - Variational stability: use tangent dynamics, finite-time Lyapunov exponents, and monodromy/Floquet data where periodic orbits exist.
 - Invariant-preserving surrogates: learn only residual corrections that preserve energy, momentum, angular momentum, or Jacobi structure.
 
+## Operational Prediction Layer
+
+The original practical target is now exposed as two engine calls:
+
+- `threebody_engine.predict_three_body_positions(...)` answers: given three masses, initial positions, initial velocities, and a target time, where are the three bodies? It integrates the Newtonian equations directly and returns final positions, velocities, solver metadata, and energy/momentum/angular-momentum drift diagnostics.
+- `threebody_engine.predict_three_body_position_distribution(...)` answers the uncertainty version: if the initial condition is only known up to position and velocity perturbation scales, what empirical distribution of final positions should be expected? It returns mean positions, 5/50/95 percentiles, flat covariance over the full position vector, and per-body covariance matrices.
+
+This is deliberately not advertised as a global closed-form solution for the generic three-body problem. The mathematical statement is narrower and defensible: the engine computes a reproducible flow map sample, and when initial data are uncertain it pushes that uncertainty through the same flow to estimate the final-position distribution. The atlas, symbolic dynamics, and theorem-candidate work then describe where such forecasts are stable, where they are regime-local, and where only probabilistic claims are scientifically honest.
+
 ## Near-Term Research Priority
 
 The immediate priority is no longer the phase-resolved scalar scattering map.

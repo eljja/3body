@@ -72,6 +72,8 @@ from threebody_engine import (
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
+    predict_three_body_position_distribution,
+    predict_three_body_positions,
     public_static_artifact_claim_contract,
     run_verification_report,
     select_hysteresis_markov_order,
@@ -83,6 +85,29 @@ from threebody_engine import (
     verify_public_static_artifacts_from_url,
 )
 ```
+
+For an arbitrary Newtonian three-body initial state, use the prediction API rather than a claimed global closed-form solution:
+
+```python
+from threebody_engine import predict_three_body_position_distribution, predict_three_body_positions
+
+masses = (1.0, 1.0, 1.0)
+positions = [[0.97000436, -0.24308753], [-0.97000436, 0.24308753], [0.0, 0.0]]
+velocities = [[0.466203685, 0.43236573], [0.466203685, 0.43236573], [-0.93240737, -0.86473146]]
+
+point_forecast = predict_three_body_positions(masses, positions, velocities, target_time=0.5)
+distribution = predict_three_body_position_distribution(
+    masses,
+    positions,
+    velocities,
+    target_time=0.5,
+    count=64,
+    position_scale=1.0e-6,
+    velocity_scale=1.0e-6,
+)
+```
+
+`predict_three_body_positions` returns the final positions, velocities, solver metadata, and Noether invariant drift diagnostics. `predict_three_body_position_distribution` perturbs the initial state and returns empirical mean positions, quantiles, covariances, and the deterministic base forecast.
 
 The hysteresis helpers accept `word_mode="refined"`, `"return"`, or `"poincare"`.
 The default promotion path uses refined chart words; Poincare-section words, section sweeps, multi-coordinate sweeps, held-out binary-phase validation, permutation controls, section-robustness checks, and stride-perturbation checks as stricter diagnostics when a scenario has enough crossings.
