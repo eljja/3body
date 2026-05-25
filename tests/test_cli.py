@@ -223,8 +223,42 @@ def test_predict_cli_writes_interpretation_report(tmp_path) -> None:
 
     assert exit_code == 0
     assert payload["prediction_type"] == "three-body-interpretation-report"
+    assert payload["forecast_horizon"]["prediction_type"] == "linearized-forecast-horizon"
+    assert payload["forecast_horizon"]["target_time_resolved"] is True
     assert payload["verdict"]["recommended_mode"] in {"linearized-gaussian", "empirical-ensemble"}
     assert payload["comparison"]["covariance_relative_gap"] >= 0.0
+
+
+def test_predict_cli_writes_forecast_horizon(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "forecast-horizon.json"
+    _write_prediction_input(input_path)
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--horizon",
+            "--position-scale",
+            "1e-7",
+            "--velocity-scale",
+            "1e-7",
+            "--position-tolerance",
+            "1e-3",
+            "--horizon-samples",
+            "6",
+            "--output",
+            str(output_path),
+        ]
+    )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["prediction_type"] == "linearized-forecast-horizon"
+    assert payload["target_time_resolved"] is True
+    assert payload["final_uncertainty_to_tolerance_ratio"] < 1.0
+    assert len(payload["rows"]) == 6
 
 
 def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:

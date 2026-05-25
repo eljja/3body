@@ -47,15 +47,16 @@ Use `threebody_engine.predict_three_body_interpretation_report(...)` or:
 threebody predict --input initial-state.json --report --count 128 --position-scale 1e-6 --velocity-scale 1e-6 --output report.json
 ```
 
-The report runs all three prediction layers:
+The report runs four prediction layers:
 
 - deterministic flow-map evaluation
+- local forecast-horizon estimation from variational uncertainty growth
 - linearized Gaussian covariance push-forward
 - empirical ensemble push-forward
 
-It then compares the linearized and empirical final-position distributions. The comparison records the mean-position gap, covariance Frobenius gap, covariance relative gap, and mean gap in sigma units. The verdict recommends one of:
+It then compares the linearized and empirical final-position distributions. The comparison records the mean-position gap, covariance Frobenius gap, covariance relative gap, and mean gap in sigma units. The forecast-horizon section reports whether the target time remains inside the requested position-tolerance envelope. The verdict recommends one of:
 
-- `linearized-gaussian`: the variational distribution agrees with the ensemble within the configured gates.
+- `linearized-gaussian`: the variational distribution agrees with the ensemble within the configured gates and the target time remains inside the local forecast horizon.
 - `empirical-ensemble`: the ensemble is resolved, but nonlinear effects are large enough that linearization should not be promoted.
 - `deterministic-only`: only the nominal trajectory is resolved.
 - `unresolved`: the nominal or uncertainty propagation failed the diagnostics.
@@ -80,6 +81,22 @@ Output includes the mean final positions, position standard deviations, the prop
 
 This mode is the most mathematical local answer: it gives the first-order probability distribution implied by the Newtonian flow. It is valid while the initial uncertainty is small enough that nonlinear curvature of the flow is not dominant.
 
+## Forecast Horizon
+
+Use `threebody_engine.predict_three_body_forecast_horizon(...)` or:
+
+```powershell
+threebody predict --input initial-state.json --horizon --position-tolerance 1e-3 --position-scale 1e-6 --velocity-scale 1e-6 --output horizon.json
+```
+
+This mode answers the operational question that a point forecast alone cannot answer:
+
+```text
+For the declared initial uncertainty, until what time is the propagated position uncertainty still below my tolerance?
+```
+
+The engine samples the variational flow between `0` and `target_time`, propagates the initial covariance at each sample, and records `max_position_std / position_tolerance`. The forecast is `target_time_resolved=true` only when the final sampled uncertainty ratio is at most one. This does not prove global predictability; it gives a local, reproducible numerical certificate for a specific initial state, uncertainty scale, tolerance, and horizon.
+
 ## Ensemble Distribution Forecast
 
 When the initial condition is uncertain, use `threebody_engine.predict_three_body_position_distribution(...)` or:
@@ -103,6 +120,8 @@ Output includes:
 ## Scientific Interpretation
 
 The deterministic API answers "where are the bodies at time `t` if the initial state is exactly known?"
+
+The forecast-horizon API answers "up to what time is that claim still tolerance-resolved under declared initial uncertainty?"
 
 The interpretation report answers "which of the available mathematical forecasts is justified by diagnostics?"
 

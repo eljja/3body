@@ -584,6 +584,92 @@ def predict_three_body_linearized_distribution(
     }
 
 
+def predict_three_body_forecast_horizon(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    position_tolerance: float = 1.0e-3,
+    initial_state_covariance: Sequence[Sequence[float]] | None = None,
+    position_scale: float = 1.0e-6,
+    velocity_scale: float = 1.0e-6,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    horizon_samples: int = 16,
+    jacobian_step: float = 1.0e-6,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+) -> dict[str, object]:
+    """Estimate the time interval where propagated position uncertainty stays below tolerance."""
+
+    system, initial_state = _general_prediction_system(
+        masses,
+        positions,
+        velocities,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+    )
+    target_time = _finite_float(target_time, "target_time")
+    position_tolerance = _positive_float(position_tolerance, "position_tolerance")
+    horizon_samples = _validated_sample_count(horizon_samples)
+    jacobian_step = _positive_float(jacobian_step, "jacobian_step")
+    covariance0 = _initial_state_covariance(
+        initial_state.size,
+        system.dimension,
+        initial_state_covariance=initial_state_covariance,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+    )
+    flow = _linearized_flow_trace(
+        system,
+        initial_state,
+        target_time,
+        samples=horizon_samples,
+        jacobian_step=jacobian_step,
+        rtol=rtol,
+        atol=atol,
+    )
+    position_width = system.body_count * system.dimension
+    rows = _forecast_horizon_rows(
+        flow,
+        covariance0,
+        position_width=position_width,
+        physical_dimension=system.dimension,
+        position_tolerance=position_tolerance,
+    )
+    summary = _forecast_horizon_summary(rows)
+    return {
+        "prediction_schema_version": 1,
+        "prediction_type": "linearized-forecast-horizon",
+        "method": "variational-flow-uncertainty-horizon",
+        "target_time": target_time,
+        "dimension": system.dimension,
+        "masses": [float(mass) for mass in system.masses],
+        "gravitational_constant": float(system.gravitational_constant),
+        "softening": float(system.softening),
+        "success": bool(flow["success"]),
+        "message": str(flow["message"]),
+        "position_tolerance": position_tolerance,
+        "uncertainty_model": {
+            "type": "gaussian_initial_state",
+            "position_scale": float(position_scale),
+            "velocity_scale": float(velocity_scale),
+        },
+        "horizon_samples": len(rows),
+        "reliable_until": summary["reliable_until"],
+        "first_unresolved_time": summary["first_unresolved_time"],
+        "target_time_resolved": summary["target_time_resolved"],
+        "reliability_fraction": summary["reliability_fraction"],
+        "final_uncertainty_to_tolerance_ratio": summary["final_uncertainty_to_tolerance_ratio"],
+        "rows": rows,
+        "interpretation": (
+            "Local forecast horizon: the final-position claim remains tolerance-resolved while the "
+            "linearized propagated position standard deviation stays below position_tolerance."
+        ),
+    }
+
+
 def predict_three_body_interpretation_report(
     masses: Sequence[float],
     positions: Sequence[Sequence[float]],
@@ -601,6 +687,8 @@ def predict_three_body_interpretation_report(
     atol: float = 1.0e-12,
     max_step: float = math.inf,
     jacobian_step: float = 1.0e-6,
+    position_tolerance: float = 1.0e-3,
+    horizon_samples: int = 16,
     linearized_covariance_relative_tolerance: float = 0.75,
 ) -> dict[str, object]:
     """Return a point/linearized/ensemble prediction report with a mode recommendation."""
@@ -630,6 +718,21 @@ def predict_three_body_interpretation_report(
         rtol=rtol,
         atol=atol,
     )
+    horizon = predict_three_body_forecast_horizon(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        position_tolerance=position_tolerance,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        horizon_samples=horizon_samples,
+        jacobian_step=jacobian_step,
+        rtol=rtol,
+        atol=atol,
+    )
     empirical = predict_three_body_position_distribution(
         masses,
         positions,
@@ -652,6 +755,7 @@ def predict_three_body_interpretation_report(
         linearized,
         empirical,
         comparison,
+        horizon,
         linearized_covariance_relative_tolerance=linearized_covariance_relative_tolerance,
     )
     return {
@@ -667,6 +771,7 @@ def predict_three_body_interpretation_report(
         },
         "deterministic": deterministic,
         "linearized_gaussian": linearized,
+        "forecast_horizon": horizon,
         "empirical_distribution": empirical,
         "comparison": comparison,
         "verdict": verdict,
@@ -883,9 +988,142 @@ def _linearized_flow_map(
     }
 
 
+def _linearized_flow_trace(
+    system: GeneralThreeBodySystem,
+    initial_state: np.ndarray,
+    target_time: float,
+    *,
+    samples: int,
+    jacobian_step: float,
+    rtol: float,
+    atol: float,
+) -> dict[str, object]:
+    state_dimension = initial_state.size
+    identity = np.eye(state_dimension, dtype=float)
+    t_eval = _prediction_times(target_time, samples)
+    if target_time == 0.0:
+        return {
+            "success": True,
+            "message": "target_time is zero; returned identity state-transition matrix.",
+            "times": np.array([0.0], dtype=float),
+            "states": np.asarray([initial_state.copy()], dtype=float),
+            "transition_matrices": np.asarray([identity], dtype=float),
+        }
+    combined_initial = np.concatenate([initial_state, identity.reshape(-1)])
+
+    def combined_rhs(time: float, combined_state: np.ndarray) -> np.ndarray:
+        current_state = combined_state[:state_dimension]
+        transition = combined_state[state_dimension:].reshape(state_dimension, state_dimension)
+        jacobian = finite_difference_jacobian(system, current_state, time=time, step=jacobian_step)
+        return np.concatenate([system.rhs(time, current_state), (jacobian @ transition).reshape(-1)])
+
+    solution = solve_ivp(
+        fun=combined_rhs,
+        t_span=(0.0, target_time),
+        y0=combined_initial,
+        method="DOP853",
+        t_eval=t_eval,
+        rtol=rtol,
+        atol=atol,
+    )
+    if solution.y.size == 0:
+        return {
+            "success": False,
+            "message": str(solution.message),
+            "times": np.asarray(solution.t, dtype=float),
+            "states": np.empty((0, state_dimension), dtype=float),
+            "transition_matrices": np.empty((0, state_dimension, state_dimension), dtype=float),
+        }
+    combined = np.asarray(solution.y.T, dtype=float)
+    return {
+        "success": bool(solution.success),
+        "message": str(solution.message),
+        "times": np.asarray(solution.t, dtype=float),
+        "states": combined[:, :state_dimension],
+        "transition_matrices": combined[:, state_dimension:].reshape(-1, state_dimension, state_dimension),
+    }
+
+
 def _symmetrize_covariance(covariance: np.ndarray) -> np.ndarray:
     covariance = np.asarray(covariance, dtype=float)
     return 0.5 * (covariance + covariance.T)
+
+
+def _forecast_horizon_rows(
+    flow: Mapping[str, object],
+    covariance0: np.ndarray,
+    *,
+    position_width: int,
+    physical_dimension: int,
+    position_tolerance: float,
+) -> list[dict[str, object]]:
+    times = np.asarray(flow.get("times", []), dtype=float)
+    transitions = np.asarray(flow.get("transition_matrices", []), dtype=float)
+    rows: list[dict[str, object]] = []
+    for time, transition in zip(times, transitions, strict=False):
+        if transition.shape[0] != covariance0.shape[0] or np.any(~np.isfinite(transition)):
+            rows.append(
+                {
+                    "time": float(time),
+                    "max_position_std": math.inf,
+                    "rms_position_std": math.inf,
+                    "uncertainty_to_tolerance_ratio": math.inf,
+                    "transition_spectral_radius": math.inf,
+                    "transition_condition_number": math.inf,
+                    "resolved": False,
+                }
+            )
+            continue
+        covariance_t = _symmetrize_covariance(transition @ covariance0 @ transition.T)
+        position_covariance = covariance_t[:position_width, :position_width]
+        position_variance = np.maximum(np.diag(position_covariance), 0.0)
+        position_std = np.sqrt(position_variance).reshape(3, physical_dimension)
+        max_position_std = float(np.max(position_std))
+        rms_position_std = float(np.sqrt(np.mean(position_variance)))
+        ratio = max_position_std / position_tolerance
+        rows.append(
+            {
+                "time": float(time),
+                "max_position_std": max_position_std,
+                "rms_position_std": rms_position_std,
+                "uncertainty_to_tolerance_ratio": float(ratio),
+                "transition_spectral_radius": float(max(abs(np.linalg.eigvals(transition)))),
+                "transition_condition_number": float(np.linalg.cond(transition)),
+                "resolved": bool(ratio <= 1.0),
+            }
+        )
+    return rows
+
+
+def _forecast_horizon_summary(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    if not rows:
+        return {
+            "reliable_until": None,
+            "first_unresolved_time": None,
+            "target_time_resolved": False,
+            "reliability_fraction": 0.0,
+            "final_uncertainty_to_tolerance_ratio": math.inf,
+        }
+    reliable_until: float | None = None
+    first_unresolved_time: float | None = None
+    resolved_prefix_count = 0
+    for row in rows:
+        resolved = row.get("resolved") is True
+        if resolved and first_unresolved_time is None:
+            reliable_until = float(row.get("time", math.nan))
+            resolved_prefix_count += 1
+        elif first_unresolved_time is None:
+            first_unresolved_time = float(row.get("time", math.nan))
+    final_row = rows[-1]
+    return {
+        "reliable_until": reliable_until,
+        "first_unresolved_time": first_unresolved_time,
+        "target_time_resolved": final_row.get("resolved") is True,
+        "reliability_fraction": float(resolved_prefix_count / len(rows)),
+        "final_uncertainty_to_tolerance_ratio": float(
+            final_row.get("uncertainty_to_tolerance_ratio", math.inf)
+        ),
+    }
 
 
 def _prediction_distribution_comparison(
@@ -943,6 +1181,7 @@ def _prediction_report_verdict(
     linearized: Mapping[str, object],
     empirical: Mapping[str, object],
     comparison: Mapping[str, object],
+    horizon: Mapping[str, object],
     *,
     linearized_covariance_relative_tolerance: float,
 ) -> dict[str, object]:
@@ -956,11 +1195,13 @@ def _prediction_report_verdict(
     empirical_success_count = int(empirical.get("success_count", 0))
     empirical_failure_count = int(empirical.get("failure_count", 0))
     empirical_resolved = empirical_success_count > 0 and empirical_failure_count == 0
+    target_time_resolved = horizon.get("target_time_resolved") is True
     covariance_relative_gap = float(comparison.get("covariance_relative_gap", math.inf))
     mean_gap_in_sigma_units = float(comparison.get("mean_gap_in_sigma_units", math.inf))
     linearized_consistent = bool(
         linearized.get("success") is True
         and empirical_resolved
+        and target_time_resolved
         and covariance_relative_gap <= linearized_covariance_relative_tolerance
         and mean_gap_in_sigma_units <= 3.0
     )
@@ -976,11 +1217,13 @@ def _prediction_report_verdict(
         "deterministic_resolved": deterministic_resolved,
         "linearized_consistent_with_ensemble": linearized_consistent,
         "empirical_distribution_resolved": empirical_resolved,
+        "target_time_inside_forecast_horizon": target_time_resolved,
         "recommended_mode": recommended_mode,
         "linearized_covariance_relative_tolerance": float(linearized_covariance_relative_tolerance),
         "rationale": _prediction_verdict_rationale(
             recommended_mode,
             deterministic_resolved=deterministic_resolved,
+            target_time_resolved=target_time_resolved,
             covariance_relative_gap=covariance_relative_gap,
             mean_gap_in_sigma_units=mean_gap_in_sigma_units,
             empirical_failure_count=empirical_failure_count,
@@ -992,6 +1235,7 @@ def _prediction_verdict_rationale(
     recommended_mode: str,
     *,
     deterministic_resolved: bool,
+    target_time_resolved: bool,
     covariance_relative_gap: float,
     mean_gap_in_sigma_units: float,
     empirical_failure_count: int,
@@ -999,13 +1243,15 @@ def _prediction_verdict_rationale(
     if recommended_mode == "linearized-gaussian":
         return (
             "The deterministic trajectory is resolved, and the variational covariance push-forward agrees "
-            "with the empirical ensemble within the declared mean/covariance gates."
+            "with the empirical ensemble within the declared mean/covariance gates; the target time is inside "
+            "the declared local forecast horizon."
         )
     if recommended_mode == "empirical-ensemble":
         return (
             "The empirical ensemble integrated successfully, but the linearized Gaussian approximation is "
             f"not promoted: covariance_relative_gap={covariance_relative_gap:.3g}, "
-            f"mean_gap_in_sigma_units={mean_gap_in_sigma_units:.3g}."
+            f"mean_gap_in_sigma_units={mean_gap_in_sigma_units:.3g}, "
+            f"target_time_resolved={target_time_resolved}."
         )
     if recommended_mode == "deterministic-only":
         return (

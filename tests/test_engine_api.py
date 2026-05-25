@@ -10,6 +10,7 @@ from threebody_engine import (
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
+    predict_three_body_forecast_horizon,
     predict_three_body_interpretation_report,
     predict_three_body_linearized_distribution,
     predict_three_body_position_distribution,
@@ -129,11 +130,37 @@ def test_engine_api_builds_interpretation_prediction_report() -> None:
     assert report["prediction_type"] == "three-body-interpretation-report"
     assert report["deterministic"]["prediction_type"] == "deterministic-position"
     assert report["linearized_gaussian"]["prediction_type"] == "linearized-gaussian-position-distribution"
+    assert report["forecast_horizon"]["prediction_type"] == "linearized-forecast-horizon"
+    assert report["forecast_horizon"]["target_time_resolved"] is True
     assert report["empirical_distribution"]["prediction_type"] == "empirical-position-distribution"
     assert report["comparison"]["mean_gap_in_sigma_units"] >= 0.0
     assert report["verdict"]["deterministic_resolved"] is True
     assert report["verdict"]["empirical_distribution_resolved"] is True
+    assert report["verdict"]["target_time_inside_forecast_horizon"] is True
     assert report["verdict"]["recommended_mode"] in {"linearized-gaussian", "empirical-ensemble"}
+
+
+def test_engine_api_estimates_three_body_forecast_horizon() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    horizon = predict_three_body_forecast_horizon(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        position_tolerance=1.0e-3,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        horizon_samples=6,
+    )
+
+    assert horizon["prediction_type"] == "linearized-forecast-horizon"
+    assert horizon["success"] is True
+    assert horizon["target_time_resolved"] is True
+    assert horizon["reliable_until"] == horizon["rows"][-1]["time"]
+    assert horizon["final_uncertainty_to_tolerance_ratio"] < 1.0
+    assert len(horizon["rows"]) == 6
 
 
 def test_engine_api_exposes_public_static_claim_contract() -> None:
