@@ -657,6 +657,104 @@ def predict_three_body_distribution_ephemeris(
     return result
 
 
+def solve_three_body_prediction_problem(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    count: int = 64,
+    position_scale: float = 1.0e-6,
+    velocity_scale: float = 1.0e-6,
+    seed: int = 0,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    samples: int = 256,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+    max_step: float = math.inf,
+    jacobian_step: float = 1.0e-6,
+    position_tolerance: float = 1.0e-3,
+    horizon_samples: int = 16,
+    linearized_covariance_relative_tolerance: float = 0.75,
+) -> dict[str, object]:
+    """Return the complete operational answer to the general three-body prediction task."""
+
+    deterministic_ephemeris = predict_three_body_ephemeris(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+    )
+    distribution_ephemeris = predict_three_body_distribution_ephemeris(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        count=count,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        seed=seed,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+    )
+    interpretation_report = predict_three_body_interpretation_report(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        count=count,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        seed=seed,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+        jacobian_step=jacobian_step,
+        position_tolerance=position_tolerance,
+        horizon_samples=horizon_samples,
+        linearized_covariance_relative_tolerance=linearized_covariance_relative_tolerance,
+    )
+    verdict = interpretation_report.get("verdict", {})
+    if not isinstance(verdict, Mapping):
+        verdict = {}
+    final_distribution = _final_position_distribution_from_ephemeris(distribution_ephemeris)
+    final_positions = (
+        deterministic_ephemeris["positions"][-1]
+        if deterministic_ephemeris.get("positions")
+        else []
+    )
+    return {
+        "prediction_schema_version": 1,
+        "prediction_type": "three-body-prediction-solution",
+        "target_time": float(target_time),
+        "answer": {
+            "final_positions": final_positions,
+            "final_position_distribution": final_distribution,
+            "recommended_mode": verdict.get("recommended_mode", "unresolved"),
+            "target_time_inside_forecast_horizon": verdict.get("target_time_inside_forecast_horizon") is True,
+            "deterministic_resolved": verdict.get("deterministic_resolved") is True,
+            "empirical_distribution_resolved": verdict.get("empirical_distribution_resolved") is True,
+        },
+        "deterministic_ephemeris": deterministic_ephemeris,
+        "distribution_ephemeris": distribution_ephemeris,
+        "interpretation_report": interpretation_report,
+    }
+
+
 def predict_three_body_linearized_distribution(
     masses: Sequence[float],
     positions: Sequence[Sequence[float]],
@@ -1204,6 +1302,29 @@ def _position_distribution_ephemeris_summary(
         "q95_positions": quantiles[2].tolist(),
         "flat_covariances": flat_covariances,
         "max_body_radius_from_mean": max_body_radii,
+    }
+
+
+def _final_position_distribution_from_ephemeris(distribution_ephemeris: Mapping[str, object]) -> dict[str, object]:
+    summary = distribution_ephemeris.get("position_distribution_ephemeris", {})
+    if not isinstance(summary, Mapping):
+        summary = {}
+
+    def final_value(key: str) -> object:
+        values = summary.get(key, [])
+        if isinstance(values, Sequence) and not isinstance(values, (str, bytes, bytearray)) and values:
+            return values[-1]
+        return []
+
+    return {
+        "mean_positions": final_value("mean_positions"),
+        "median_positions": final_value("median_positions"),
+        "q05_positions": final_value("q05_positions"),
+        "q95_positions": final_value("q95_positions"),
+        "flat_covariance": final_value("flat_covariances"),
+        "max_body_radius_from_mean": final_value("max_body_radius_from_mean"),
+        "success_count": int(distribution_ephemeris.get("success_count", 0)),
+        "failure_count": int(distribution_ephemeris.get("failure_count", 0)),
     }
 
 

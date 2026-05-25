@@ -235,6 +235,44 @@ def test_predict_cli_writes_distribution_ephemeris(tmp_path) -> None:
     assert len(payload["sample_ephemerides"]) == 5
 
 
+def test_predict_cli_writes_solution_bundle(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "solution.json"
+    _write_prediction_input(input_path)
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--solution",
+            "--count",
+            "5",
+            "--position-scale",
+            "1e-7",
+            "--velocity-scale",
+            "1e-7",
+            "--samples",
+            "9",
+            "--horizon-samples",
+            "6",
+            "--output",
+            str(output_path),
+        ]
+    )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["prediction_type"] == "three-body-prediction-solution"
+    assert payload["answer"]["recommended_mode"] in {"linearized-gaussian", "empirical-ensemble"}
+    assert payload["answer"]["target_time_inside_forecast_horizon"] is True
+    assert len(payload["answer"]["final_positions"]) == 3
+    assert len(payload["answer"]["final_position_distribution"]["mean_positions"]) == 3
+    assert payload["deterministic_ephemeris"]["prediction_type"] == "deterministic-ephemeris"
+    assert payload["distribution_ephemeris"]["prediction_type"] == "empirical-position-distribution-ephemeris"
+    assert payload["interpretation_report"]["prediction_type"] == "three-body-interpretation-report"
+
+
 def test_predict_cli_writes_linearized_position_distribution(tmp_path) -> None:
     input_path = tmp_path / "initial-state.json"
     output_path = tmp_path / "linearized-distribution.json"

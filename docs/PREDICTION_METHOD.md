@@ -39,6 +39,25 @@ Input JSON:
 
 Output includes final positions, final velocities, solver metadata, and a Noether invariant drift certificate for energy, linear momentum, and angular momentum.
 
+## One-Call Solution Bundle
+
+Use `threebody_engine.solve_three_body_prediction_problem(...)` or:
+
+```powershell
+threebody predict --input initial-state.json --solution --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output solution.json
+```
+
+This is the most direct public API for the original project target. It returns:
+
+- `answer.final_positions`: the three target-time positions from the deterministic flow.
+- `answer.final_position_distribution`: mean, quantiles, covariance, and ensemble counts for the target-time position distribution.
+- `answer.recommended_mode`: the promoted interpretation mode from the diagnostic report.
+- `deterministic_ephemeris`: the sampled deterministic trajectory from `0` through `target_time`.
+- `distribution_ephemeris`: the sampled empirical position distribution from `0` through `target_time`.
+- `interpretation_report`: the linearized/ensemble comparison and forecast-horizon verdict.
+
+The bundle is intentionally not a closed-form theorem for all initial conditions. It is a reproducible computational answer: exact initial data produce a flow-map sample; uncertain initial data produce a pushed-forward empirical distribution; diagnostics say how strong the resulting claim is.
+
 ## Ephemeris Forecast
 
 Use `threebody_engine.predict_three_body_ephemeris(...)` or:
@@ -148,6 +167,8 @@ At each sampled time between now and t, what is the probability distribution of 
 ## Scientific Interpretation
 
 The deterministic API answers "where are the bodies at time `t` if the initial state is exactly known?"
+
+The solution bundle answers "what are the target-time positions, how do they evolve, what is the probability distribution, and which claim is defensible?"
 
 The ephemeris API answers "where are the bodies at each sampled time between now and `t`?"
 

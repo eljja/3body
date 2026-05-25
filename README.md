@@ -82,6 +82,7 @@ from threebody_engine import (
     public_static_artifact_claim_contract,
     run_verification_report,
     select_hysteresis_markov_order,
+    solve_three_body_prediction_problem,
     tune_jacobi_picard,
     validate_hysteresis_markov_chain,
     validate_public_static_artifact_receipt_contract,
@@ -102,12 +103,22 @@ from threebody_engine import (
     predict_three_body_linearized_distribution,
     predict_three_body_position_distribution,
     predict_three_body_positions,
+    solve_three_body_prediction_problem,
 )
 
 masses = (1.0, 1.0, 1.0)
 positions = [[0.97000436, -0.24308753], [-0.97000436, 0.24308753], [0.0, 0.0]]
 velocities = [[0.466203685, 0.43236573], [0.466203685, 0.43236573], [-0.93240737, -0.86473146]]
 
+solution = solve_three_body_prediction_problem(
+    masses,
+    positions,
+    velocities,
+    target_time=0.5,
+    count=64,
+    position_scale=1.0e-6,
+    velocity_scale=1.0e-6,
+)
 point_forecast = predict_three_body_positions(masses, positions, velocities, target_time=0.5)
 ephemeris = predict_three_body_ephemeris(masses, positions, velocities, target_time=0.5, samples=256)
 horizon = predict_three_body_forecast_horizon(
@@ -156,11 +167,12 @@ distribution_ephemeris = predict_three_body_distribution_ephemeris(
 )
 ```
 
-`predict_three_body_positions` returns the final positions, velocities, solver metadata, and Noether invariant drift diagnostics. `predict_three_body_ephemeris` returns the sampled positions and velocities from `0` through `target_time`, suitable for orbit tables, downstream visualization, and independent audit. `predict_three_body_forecast_horizon` estimates how far the target-time forecast remains locally tolerance-resolved by propagating initial covariance through the variational flow. `predict_three_body_interpretation_report` runs the point, forecast-horizon, variational Gaussian, and ensemble modes together, compares the distributions, and recommends `linearized-gaussian`, `empirical-ensemble`, `deterministic-only`, or `unresolved`. `predict_three_body_linearized_distribution` computes the variational state-transition matrix and pushes an initial covariance forward by `P(t) = D Phi_t P(0) D Phi_t^T`. `predict_three_body_position_distribution` perturbs the initial state and returns empirical mean positions, quantiles, covariances, and the deterministic base forecast. `predict_three_body_distribution_ephemeris` applies the same ensemble idea at every sampled time, returning a probability ephemeris instead of only a final-time distribution.
+`solve_three_body_prediction_problem` is the one-call solution bundle: it returns final positions, a deterministic ephemeris, a time-resolved empirical distribution ephemeris, and a verdict describing which mathematical forecast is defensible. `predict_three_body_positions` returns the final positions, velocities, solver metadata, and Noether invariant drift diagnostics. `predict_three_body_ephemeris` returns the sampled positions and velocities from `0` through `target_time`, suitable for orbit tables, downstream visualization, and independent audit. `predict_three_body_forecast_horizon` estimates how far the target-time forecast remains locally tolerance-resolved by propagating initial covariance through the variational flow. `predict_three_body_interpretation_report` runs the point, forecast-horizon, variational Gaussian, and ensemble modes together, compares the distributions, and recommends `linearized-gaussian`, `empirical-ensemble`, `deterministic-only`, or `unresolved`. `predict_three_body_linearized_distribution` computes the variational state-transition matrix and pushes an initial covariance forward by `P(t) = D Phi_t P(0) D Phi_t^T`. `predict_three_body_position_distribution` perturbs the initial state and returns empirical mean positions, quantiles, covariances, and the deterministic base forecast. `predict_three_body_distribution_ephemeris` applies the same ensemble idea at every sampled time, returning a probability ephemeris instead of only a final-time distribution.
 
 The same layer is available from the CLI:
 
 ```powershell
+threebody predict --input initial-state.json --solution --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output solution.json
 threebody predict --input initial-state.json --target-time 0.5 --output prediction.json
 threebody predict --input initial-state.json --ephemeris --samples 256 --output ephemeris.json
 threebody predict --input initial-state.json --horizon --position-tolerance 1e-3 --position-scale 1e-6 --velocity-scale 1e-6 --output horizon.json

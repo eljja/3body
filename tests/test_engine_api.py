@@ -21,6 +21,7 @@ from threebody_engine import (
     public_static_artifact_claim_contract,
     run_verification_report,
     select_hysteresis_markov_order,
+    solve_three_body_prediction_problem,
     tune_jacobi_picard,
     validate_hysteresis_markov_chain,
     validate_public_static_artifact_receipt_contract,
@@ -152,6 +153,32 @@ def test_engine_api_builds_three_body_distribution_ephemeris() -> None:
     assert len(distribution["position_distribution_ephemeris"]["flat_covariances"][0]) == 6
     assert len(distribution["sample_ephemerides"]) == 7
     assert len(distribution["sample_ephemerides"][0]["positions"]) == 9
+
+
+def test_engine_api_solves_three_body_prediction_problem() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    solution = solve_three_body_prediction_problem(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        count=5,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        samples=9,
+        horizon_samples=6,
+    )
+
+    assert solution["prediction_type"] == "three-body-prediction-solution"
+    assert solution["answer"]["recommended_mode"] in {"linearized-gaussian", "empirical-ensemble"}
+    assert solution["answer"]["target_time_inside_forecast_horizon"] is True
+    assert len(solution["answer"]["final_positions"]) == 3
+    assert len(solution["answer"]["final_position_distribution"]["mean_positions"]) == 3
+    assert solution["deterministic_ephemeris"]["prediction_type"] == "deterministic-ephemeris"
+    assert solution["distribution_ephemeris"]["prediction_type"] == "empirical-position-distribution-ephemeris"
+    assert solution["interpretation_report"]["prediction_type"] == "three-body-interpretation-report"
 
 
 def test_engine_api_builds_linearized_three_body_position_distribution() -> None:
