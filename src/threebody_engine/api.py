@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
+from scipy.integrate import solve_ivp
 
 from threebody.analysis import (
     AnalysisAtlas,
@@ -20,6 +21,7 @@ from threebody.analysis import (
     JacobiIntervalPicardFlowCertificate,
     JacobiPicardTuningCertificate,
     compare_markov_chain_to_independent_baseline,
+    finite_difference_jacobian,
     jacobi_interval_picard_flow_certificate,
     jacobi_picard_tuning_certificate,
     markov_chain_from_words,
@@ -487,6 +489,101 @@ def predict_three_body_position_distribution(
     return result
 
 
+def predict_three_body_linearized_distribution(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    initial_state_covariance: Sequence[Sequence[float]] | None = None,
+    position_scale: float = 1.0e-6,
+    velocity_scale: float = 1.0e-6,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    jacobian_step: float = 1.0e-6,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+) -> dict[str, object]:
+    """Push an initial Gaussian uncertainty through the linearized three-body flow.
+
+    If ``x(t) = Phi_t(x0)`` and ``P0`` is the initial covariance, this returns
+    the first-order Gaussian approximation ``Pt = DPhi_t P0 DPhi_t^T``.
+    """
+
+    system, initial_state = _general_prediction_system(
+        masses,
+        positions,
+        velocities,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+    )
+    target_time = _finite_float(target_time, "target_time")
+    jacobian_step = _positive_float(jacobian_step, "jacobian_step")
+    covariance0 = _initial_state_covariance(
+        initial_state.size,
+        system.dimension,
+        initial_state_covariance=initial_state_covariance,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+    )
+    flow = _linearized_flow_map(
+        system,
+        initial_state,
+        target_time,
+        jacobian_step=jacobian_step,
+        rtol=rtol,
+        atol=atol,
+    )
+    transition = flow["transition_matrix"]
+    covariance_t = _symmetrize_covariance(transition @ covariance0 @ transition.T)
+    position_width = system.body_count * system.dimension
+    position_covariance = covariance_t[:position_width, :position_width]
+    body_covariances = [
+        position_covariance[
+            body_index * system.dimension : (body_index + 1) * system.dimension,
+            body_index * system.dimension : (body_index + 1) * system.dimension,
+        ]
+        for body_index in range(system.body_count)
+    ]
+    final_positions, final_velocities = system.split_state(flow["final_state"])
+    std_positions = np.sqrt(np.maximum(np.diag(position_covariance), 0.0)).reshape(
+        system.body_count,
+        system.dimension,
+    )
+    covariance_eigenvalues = np.linalg.eigvalsh(covariance_t)
+    return {
+        "prediction_schema_version": 1,
+        "prediction_type": "linearized-gaussian-position-distribution",
+        "method": "variational-flow-covariance-pushforward",
+        "target_time": target_time,
+        "dimension": system.dimension,
+        "masses": [float(mass) for mass in system.masses],
+        "gravitational_constant": float(system.gravitational_constant),
+        "softening": float(system.softening),
+        "success": bool(flow["success"]),
+        "message": str(flow["message"]),
+        "mean_positions": final_positions.tolist(),
+        "mean_velocities": final_velocities.tolist(),
+        "std_positions": std_positions.tolist(),
+        "initial_state_covariance": covariance0.tolist(),
+        "final_state_covariance": covariance_t.tolist(),
+        "position_covariance": position_covariance.tolist(),
+        "body_position_covariances": [covariance.tolist() for covariance in body_covariances],
+        "state_transition_matrix": transition.tolist(),
+        "linearized_diagnostics": {
+            "jacobian_step": jacobian_step,
+            "transition_condition_number": float(np.linalg.cond(transition)),
+            "transition_spectral_radius": float(max(abs(np.linalg.eigvals(transition)))),
+            "minimum_covariance_eigenvalue": float(np.min(covariance_eigenvalues)),
+            "maximum_position_std": float(np.max(std_positions)),
+        },
+        "interpretation": (
+            "First-order Gaussian push-forward: valid while neglected nonlinear terms stay small relative "
+            "to the propagated covariance scale."
+        ),
+    }
+
+
 def _general_prediction_system(
     masses: Sequence[float],
     positions: Sequence[Sequence[float]],
@@ -617,6 +714,89 @@ def _position_distribution_summary(positions: list[np.ndarray], dimension: int) 
         "body_covariances": [covariance.tolist() for covariance in body_covariances],
         "max_body_radius_from_mean": float(np.max(body_radii)),
     }
+
+
+def _initial_state_covariance(
+    state_dimension: int,
+    physical_dimension: int,
+    *,
+    initial_state_covariance: Sequence[Sequence[float]] | None,
+    position_scale: float,
+    velocity_scale: float,
+) -> np.ndarray:
+    if initial_state_covariance is not None:
+        covariance = np.asarray(initial_state_covariance, dtype=float)
+        if covariance.shape != (state_dimension, state_dimension):
+            raise ValueError("initial_state_covariance must have shape (state_dim, state_dim).")
+        if np.any(~np.isfinite(covariance)):
+            raise ValueError("initial_state_covariance must contain only finite values.")
+        return _symmetrize_covariance(covariance)
+    position_scale = _nonnegative_float(position_scale, "position_scale")
+    velocity_scale = _nonnegative_float(velocity_scale, "velocity_scale")
+    position_width = 3 * physical_dimension
+    diagonal = np.concatenate(
+        [
+            np.full(position_width, position_scale**2, dtype=float),
+            np.full(state_dimension - position_width, velocity_scale**2, dtype=float),
+        ]
+    )
+    return np.diag(diagonal)
+
+
+def _linearized_flow_map(
+    system: GeneralThreeBodySystem,
+    initial_state: np.ndarray,
+    target_time: float,
+    *,
+    jacobian_step: float,
+    rtol: float,
+    atol: float,
+) -> dict[str, object]:
+    state_dimension = initial_state.size
+    identity = np.eye(state_dimension, dtype=float)
+    if target_time == 0.0:
+        return {
+            "success": True,
+            "message": "target_time is zero; returned identity state-transition matrix.",
+            "final_state": initial_state.copy(),
+            "transition_matrix": identity,
+        }
+    combined_initial = np.concatenate([initial_state, identity.reshape(-1)])
+
+    def combined_rhs(time: float, combined_state: np.ndarray) -> np.ndarray:
+        current_state = combined_state[:state_dimension]
+        transition = combined_state[state_dimension:].reshape(state_dimension, state_dimension)
+        jacobian = finite_difference_jacobian(system, current_state, time=time, step=jacobian_step)
+        return np.concatenate([system.rhs(time, current_state), (jacobian @ transition).reshape(-1)])
+
+    solution = solve_ivp(
+        fun=combined_rhs,
+        t_span=(0.0, target_time),
+        y0=combined_initial,
+        method="DOP853",
+        t_eval=(target_time,),
+        rtol=rtol,
+        atol=atol,
+    )
+    if solution.y.size == 0:
+        return {
+            "success": False,
+            "message": str(solution.message),
+            "final_state": np.full_like(initial_state, np.nan, dtype=float),
+            "transition_matrix": np.full((state_dimension, state_dimension), np.nan, dtype=float),
+        }
+    final = np.asarray(solution.y[:, -1], dtype=float)
+    return {
+        "success": bool(solution.success),
+        "message": str(solution.message),
+        "final_state": final[:state_dimension],
+        "transition_matrix": final[state_dimension:].reshape(state_dimension, state_dimension),
+    }
+
+
+def _symmetrize_covariance(covariance: np.ndarray) -> np.ndarray:
+    covariance = np.asarray(covariance, dtype=float)
+    return 0.5 * (covariance + covariance.T)
 
 
 def integrate_reference_scenario(

@@ -10,6 +10,7 @@ from threebody_engine import (
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
+    predict_three_body_linearized_distribution,
     predict_three_body_position_distribution,
     predict_three_body_positions,
     public_static_artifact_audit_report_payload_sha256,
@@ -85,6 +86,28 @@ def test_engine_api_builds_three_body_position_distribution() -> None:
     assert len(distribution["position_distribution"]["mean_positions"]) == 3
     assert len(distribution["position_distribution"]["flat_covariance"]) == 6
     assert len(distribution["sample_predictions"]) == 7
+
+
+def test_engine_api_builds_linearized_three_body_position_distribution() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    distribution = predict_three_body_linearized_distribution(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+    )
+
+    assert distribution["prediction_type"] == "linearized-gaussian-position-distribution"
+    assert distribution["success"] is True
+    assert len(distribution["mean_positions"]) == 3
+    assert len(distribution["position_covariance"]) == 6
+    assert len(distribution["state_transition_matrix"]) == 12
+    assert distribution["linearized_diagnostics"]["minimum_covariance_eigenvalue"] > -1.0e-18
+    assert distribution["linearized_diagnostics"]["maximum_position_std"] > 0.0
 
 
 def test_engine_api_exposes_public_static_claim_contract() -> None:

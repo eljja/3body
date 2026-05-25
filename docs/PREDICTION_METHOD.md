@@ -39,7 +39,25 @@ Input JSON:
 
 Output includes final positions, final velocities, solver metadata, and a Noether invariant drift certificate for energy, linear momentum, and angular momentum.
 
-## Distribution Forecast
+## Linearized Gaussian Forecast
+
+For small observational uncertainty, use `threebody_engine.predict_three_body_linearized_distribution(...)` or:
+
+```powershell
+threebody predict --input initial-state.json --linearized-distribution --position-scale 1e-6 --velocity-scale 1e-6 --output linearized.json
+```
+
+This integrates the variational equation along the nominal trajectory. If `Phi_t` is the flow map and `P0` is the initial covariance, the returned covariance is
+
+```text
+Pt = D Phi_t(x0) P0 D Phi_t(x0)^T
+```
+
+Output includes the mean final positions, position standard deviations, the propagated state covariance, the position covariance block, per-body covariance matrices, the state-transition matrix, and diagnostics such as transition condition number and spectral radius.
+
+This mode is the most mathematical local answer: it gives the first-order probability distribution implied by the Newtonian flow. It is valid while the initial uncertainty is small enough that nonlinear curvature of the flow is not dominant.
+
+## Ensemble Distribution Forecast
 
 When the initial condition is uncertain, use `threebody_engine.predict_three_body_position_distribution(...)` or:
 

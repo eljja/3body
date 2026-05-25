@@ -288,6 +288,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Propagate Gaussian initial-condition uncertainty and return a final-position distribution.",
     )
+    predict.add_argument(
+        "--linearized-distribution",
+        action="store_true",
+        help="Propagate initial covariance through the variational flow map.",
+    )
     predict.add_argument("--count", type=int, default=64, help="Distribution ensemble size.")
     predict.add_argument("--position-scale", type=float, default=1.0e-6, help="Initial position uncertainty scale.")
     predict.add_argument("--velocity-scale", type=float, default=1.0e-6, help="Initial velocity uncertainty scale.")
@@ -296,6 +301,7 @@ def build_parser() -> argparse.ArgumentParser:
     predict.add_argument("--rtol", type=float, default=1.0e-10, help="Adaptive integrator relative tolerance.")
     predict.add_argument("--atol", type=float, default=1.0e-12, help="Adaptive integrator absolute tolerance.")
     predict.add_argument("--max-step", type=float, default=float("inf"), help="Adaptive integrator maximum step.")
+    predict.add_argument("--jacobian-step", type=float, default=1.0e-6, help="Finite-difference Jacobian step for variational mode.")
     predict.add_argument("--gravitational-constant", type=float, default=1.0, help="Newtonian gravitational constant.")
     predict.add_argument("--softening", type=float, default=0.0, help="Optional Plummer-style softening length.")
     predict.add_argument(
@@ -456,19 +462,36 @@ def run_survey_command(args: argparse.Namespace) -> int:
 
 
 def run_predict_command(args: argparse.Namespace) -> int:
-    from threebody_engine import predict_three_body_position_distribution, predict_three_body_positions
+    from threebody_engine import (
+        predict_three_body_linearized_distribution,
+        predict_three_body_position_distribution,
+        predict_three_body_positions,
+    )
 
     payload = _read_prediction_input(args.input)
+    if args.distribution and args.linearized_distribution:
+        raise ValueError("Choose either --distribution or --linearized-distribution, not both.")
     target_time = args.target_time if args.target_time is not None else _required_prediction_field(payload, "target_time")
     common_kwargs = {
         "gravitational_constant": args.gravitational_constant,
         "softening": args.softening,
-        "samples": args.samples,
         "rtol": args.rtol,
         "atol": args.atol,
-        "max_step": args.max_step,
     }
-    if args.distribution:
+    if args.linearized_distribution:
+        result = predict_three_body_linearized_distribution(
+            _required_prediction_field(payload, "masses"),
+            _required_prediction_field(payload, "positions"),
+            _required_prediction_field(payload, "velocities"),
+            target_time,
+            initial_state_covariance=payload.get("initial_state_covariance"),
+            position_scale=args.position_scale,
+            velocity_scale=args.velocity_scale,
+            jacobian_step=args.jacobian_step,
+            **common_kwargs,
+        )
+        exit_code = 0 if result["success"] else 1
+    elif args.distribution:
         result = predict_three_body_position_distribution(
             _required_prediction_field(payload, "masses"),
             _required_prediction_field(payload, "positions"),
@@ -479,6 +502,8 @@ def run_predict_command(args: argparse.Namespace) -> int:
             velocity_scale=args.velocity_scale,
             seed=args.seed,
             include_sample_positions=args.include_sample_positions,
+            samples=args.samples,
+            max_step=args.max_step,
             **common_kwargs,
         )
         exit_code = 0 if result["success_count"] else 1
@@ -488,6 +513,8 @@ def run_predict_command(args: argparse.Namespace) -> int:
             _required_prediction_field(payload, "positions"),
             _required_prediction_field(payload, "velocities"),
             target_time,
+            samples=args.samples,
+            max_step=args.max_step,
             **common_kwargs,
         )
         exit_code = 0 if result["success"] else 1

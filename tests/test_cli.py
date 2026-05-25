@@ -167,6 +167,35 @@ def test_predict_cli_writes_position_distribution(tmp_path) -> None:
     assert len(payload["sample_predictions"]) == 5
 
 
+def test_predict_cli_writes_linearized_position_distribution(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "linearized-distribution.json"
+    _write_prediction_input(input_path)
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--linearized-distribution",
+            "--position-scale",
+            "1e-7",
+            "--velocity-scale",
+            "1e-7",
+            "--output",
+            str(output_path),
+        ]
+    )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["prediction_type"] == "linearized-gaussian-position-distribution"
+    assert payload["success"] is True
+    assert len(payload["mean_positions"]) == 3
+    assert len(payload["position_covariance"]) == 6
+    assert payload["linearized_diagnostics"]["maximum_position_std"] > 0.0
+
+
 def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     _write_static_artifact_bundle(tmp_path)
     receipt_path = tmp_path / "verification-receipt.json"
