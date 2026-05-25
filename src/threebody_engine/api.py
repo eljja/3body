@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
+from pathlib import Path
 from typing import Literal
 
 from threebody.analysis import (
@@ -27,12 +29,93 @@ from threebody.analysis import (
     select_markov_order,
     validate_markov_chain,
 )
+from threebody.cli import (
+    verify_static_artifact_bytes,
+    verify_static_artifacts,
+    verify_static_artifacts_from_url,
+)
 from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
 from threebody.types import Scenario, TrajectoryResult
 
 ReferenceScenario = Literal["figure-eight", "hierarchical-flyby", "restricted-l4", "restricted-l5"]
 WordMode = Literal["refined", "return", "poincare"]
+
+
+def verify_public_static_artifacts(
+    site_dir: str | Path,
+    *,
+    require_commit: str | None = None,
+    require_gates: Sequence[str] | None = None,
+    require_minimums: Sequence[str] | None = None,
+    require_maximums: Sequence[str] | None = None,
+    require_features: Sequence[str] | None = None,
+    require_feature_set_sha256: str | None = None,
+) -> dict[str, object]:
+    """Verify a generated static evidence directory against the public claim profile."""
+
+    return verify_static_artifacts(
+        Path(site_dir),
+        require_commit=require_commit,
+        require_gates=require_gates,
+        require_minimums=require_minimums,
+        require_maximums=require_maximums,
+        require_features=require_features,
+        require_feature_set_sha256=require_feature_set_sha256,
+        require_public_claim=True,
+    )
+
+
+def verify_public_static_artifacts_from_url(
+    base_url: str,
+    *,
+    require_commit: str | None = None,
+    require_gates: Sequence[str] | None = None,
+    require_minimums: Sequence[str] | None = None,
+    require_maximums: Sequence[str] | None = None,
+    require_features: Sequence[str] | None = None,
+    require_feature_set_sha256: str | None = None,
+) -> dict[str, object]:
+    """Verify a public static evidence bundle URL against the public claim profile."""
+
+    return verify_static_artifacts_from_url(
+        base_url,
+        require_commit=require_commit,
+        require_gates=require_gates,
+        require_minimums=require_minimums,
+        require_maximums=require_maximums,
+        require_features=require_features,
+        require_feature_set_sha256=require_feature_set_sha256,
+        require_public_claim=True,
+    )
+
+
+def verify_public_static_artifact_bytes(
+    artifacts: dict[str, bytes],
+    *,
+    source: str = "direct-bytes",
+    artifact_errors: dict[str, str | None] | None = None,
+    require_commit: str | None = None,
+    require_gates: Sequence[str] | None = None,
+    require_minimums: Sequence[str] | None = None,
+    require_maximums: Sequence[str] | None = None,
+    require_features: Sequence[str] | None = None,
+    require_feature_set_sha256: str | None = None,
+) -> dict[str, object]:
+    """Verify in-memory static evidence artifacts against the public claim profile."""
+
+    return verify_static_artifact_bytes(
+        artifacts,
+        source=source,
+        artifact_errors=artifact_errors,
+        require_commit=require_commit,
+        require_gates=require_gates,
+        require_minimums=require_minimums,
+        require_maximums=require_maximums,
+        require_features=require_features,
+        require_feature_set_sha256=require_feature_set_sha256,
+        require_public_claim=True,
+    )
 
 
 def integrate_reference_scenario(

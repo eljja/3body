@@ -11,6 +11,9 @@ from .api import (
     select_hysteresis_markov_order,
     tune_jacobi_picard,
     validate_hysteresis_markov_chain,
+    verify_public_static_artifact_bytes,
+    verify_public_static_artifacts,
+    verify_public_static_artifacts_from_url,
 )
 
 __all__ = [
@@ -24,4 +27,7 @@ __all__ = [
     "select_hysteresis_markov_order",
     "tune_jacobi_picard",
     "validate_hysteresis_markov_chain",
+    "verify_public_static_artifact_bytes",
+    "verify_public_static_artifacts",
+    "verify_public_static_artifacts_from_url",
 ]

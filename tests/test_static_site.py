@@ -8,6 +8,7 @@ from threebody.cli import (
     static_artifact_requirement_profile_sha256,
     static_artifact_verification_features_sha256,
 )
+from threebody_engine import verify_public_static_artifact_bytes, verify_public_static_artifacts
 from threebody.ui.static_site import build_static_site
 
 
@@ -64,8 +65,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert (
         "verify-static-artifacts --site-dir site --require-commit local --require-public-claim"
     ) in content
-    assert "require_public_claim=True" in content
-    assert "CLI and Python API callers can apply the same public claim contract" in content
+    assert "verify_public_static_artifacts_from_url" in content
+    assert "CLI and threebody_engine API callers can apply the same public claim contract" in content
     assert "jacobi_parameter_interval_box_margin" not in content
     certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
     verifier_feature_set_sha256 = static_artifact_verification_features_sha256(
@@ -95,7 +96,7 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert verifier_feature_set_sha256 in content
     assert certificate["public_change_summary"]
     assert certificate["public_change_summary"][-1]["title"] == "Active profile digest"
-    assert "public-claim shortcut" in certificate["public_change_summary"][-1]["detail"]
+    assert "public verifier shortcut" in certificate["public_change_summary"][-1]["detail"]
     assert certificate["promotion_gates"]["symbolic_passes_stride_robustness"] is True
     assert certificate["build_provenance"]["generator"] == "threebody.ui.static_site"
     assert "analysis_atlas_snapshot" in certificate
@@ -110,6 +111,21 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert manifest["artifacts"]["favicon.svg"]["sha256"] == _sha256(favicon_path)
     assert manifest["artifacts"]["favicon.svg"]["bytes"] == favicon_path.stat().st_size
     assert 'viewBox="0 0 64 64"' in favicon_path.read_text(encoding="utf-8")
+    public_api_receipt = verify_public_static_artifacts(tmp_path, require_commit="local")
+    direct_bytes_receipt = verify_public_static_artifact_bytes(
+        {
+            "index.html": index_path.read_bytes(),
+            "certificate.json": certificate_path.read_bytes(),
+            "favicon.svg": favicon_path.read_bytes(),
+            "manifest.json": manifest_path.read_bytes(),
+        },
+        require_commit="local",
+    )
+    assert public_api_receipt["verified"] is True
+    assert public_api_receipt["required_profiles"] == ["public-claims-v1"]
+    assert public_api_receipt["required_feature_set_sha256"] == verifier_feature_set_sha256
+    assert direct_bytes_receipt["verified"] is True
+    assert direct_bytes_receipt["required_profiles"] == ["public-claims-v1"]
 
 
 def _sha256(path) -> str:

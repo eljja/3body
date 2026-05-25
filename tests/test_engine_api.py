@@ -11,10 +11,17 @@ from threebody_engine import (
     select_hysteresis_markov_order,
     tune_jacobi_picard,
     validate_hysteresis_markov_chain,
+    verify_public_static_artifact_bytes,
+    verify_public_static_artifacts,
+    verify_public_static_artifacts_from_url,
 )
 
 
 def test_engine_api_integrates_reference_scenario() -> None:
+    assert callable(verify_public_static_artifacts)
+    assert callable(verify_public_static_artifacts_from_url)
+    assert callable(verify_public_static_artifact_bytes)
+
     scenario, trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=30)
 
     assert scenario.name == "general-figure-eight"

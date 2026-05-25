@@ -73,11 +73,15 @@ from threebody_engine import (
     select_hysteresis_markov_order,
     tune_jacobi_picard,
     validate_hysteresis_markov_chain,
+    verify_public_static_artifact_bytes,
+    verify_public_static_artifacts,
+    verify_public_static_artifacts_from_url,
 )
 ```
 
 The hysteresis helpers accept `word_mode="refined"`, `"return"`, or `"poincare"`.
 The default promotion path uses refined chart words; Poincare-section words, section sweeps, multi-coordinate sweeps, held-out binary-phase validation, permutation controls, section-robustness checks, and stride-perturbation checks as stricter diagnostics when a scenario has enough crossings.
+Use `verify_public_static_artifacts_from_url("https://eljja.github.io/3body/", require_commit="<sha>")` to audit the public Pages evidence bundle through the stable engine API.
 
 Run the test suite:
 
@@ -130,7 +134,7 @@ Apply the standard public claim profile when auditing the current Pages claim:
 ```
 
 `--require-public-claim` applies `public-claims-v1` and pins the running verifier's current capability-set digest in the receipt. The profile checks the active certificate profile name, the active profile digest, and the embedded canonical profile descriptor, not just the presence of a matching digest string.
-The same verifier also checks artifact identity, the declared manifest hash algorithm, index discoverability links, publication-pipeline links, and the certificate's embedded verifier capability digest, so a receipt fails if `certificate.json` no longer declares the static research certificate, `manifest.json` no longer declares the static-site manifest with `hash_algorithm: sha256`, `index.html` stops linking the public certificate/manifest/favicon artifacts, the certificate stops pointing back to the published certificate and manifest filenames, or the certificate advertises a stale verifier capability set. Receipts include both the verifier's `verification_schema_features` / `verification_schema_features_sha256` and the certificate-advertised `certificate_verification_schema_features` / `certificate_verification_schema_features_sha256`, so mismatch failures are diagnosable without reopening the certificate file. Python callers can pass `require_public_claim=True` to `verify_static_artifacts()`, `verify_static_artifacts_from_url()`, or `verify_static_artifact_bytes()` for the same public profile and verifier capability-set pin. Callers can still repeat `--require-feature <name>`, pass `--require-feature-set-sha256 <digest>`, or use `--require-current-feature-set` for lower-level audits. Missing local files, fetch failures, missing direct byte inputs, invalid JSON, and malformed nested provenance/artifact sections are reported as failed receipt checks, and commit provenance only passes when both artifacts declare the same non-empty commit string.
+The same verifier also checks artifact identity, the declared manifest hash algorithm, index discoverability links, publication-pipeline links, and the certificate's embedded verifier capability digest, so a receipt fails if `certificate.json` no longer declares the static research certificate, `manifest.json` no longer declares the static-site manifest with `hash_algorithm: sha256`, `index.html` stops linking the public certificate/manifest/favicon artifacts, the certificate stops pointing back to the published certificate and manifest filenames, or the certificate advertises a stale verifier capability set. Receipts include both the verifier's `verification_schema_features` / `verification_schema_features_sha256` and the certificate-advertised `certificate_verification_schema_features` / `certificate_verification_schema_features_sha256`, so mismatch failures are diagnosable without reopening the certificate file. Python callers can use `threebody_engine.verify_public_static_artifacts()`, `verify_public_static_artifacts_from_url()`, or `verify_public_static_artifact_bytes()` for the same public profile and verifier capability-set pin. Lower-level callers can still pass `require_public_claim=True` to the raw verifier helpers, repeat `--require-feature <name>`, pass `--require-feature-set-sha256 <digest>`, or use `--require-current-feature-set` for targeted audits. Missing local files, fetch failures, missing direct byte inputs, invalid JSON, and malformed nested provenance/artifact sections are reported as failed receipt checks, and commit provenance only passes when both artifacts declare the same non-empty commit string.
 
 `public-claims-v1` expands to the current publication gates, numeric lower and upper bounds, and required verifier capabilities used for the public certificate.
 The certificate and receipt also include the profile's canonical SHA-256 digest so reviewers can confirm the profile name and profile definition match.
