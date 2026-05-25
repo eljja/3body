@@ -299,6 +299,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Propagate initial covariance through the variational flow map.",
     )
     predict.add_argument(
+        "--linearized-ephemeris",
+        action="store_true",
+        help="Propagate initial covariance through the variational flow at every sampled time.",
+    )
+    predict.add_argument(
         "--report",
         action="store_true",
         help="Run deterministic, linearized, and ensemble predictions and return a recommendation report.",
@@ -510,6 +515,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
         predict_three_body_forecast_horizon,
         predict_three_body_interpretation_report,
         predict_three_body_linearized_distribution,
+        predict_three_body_linearized_ephemeris,
         predict_three_body_position_distribution,
         predict_three_body_positions,
         solve_three_body_prediction_problem,
@@ -522,6 +528,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             args.distribution,
             args.distribution_ephemeris,
             args.linearized_distribution,
+            args.linearized_ephemeris,
             args.report,
             args.horizon,
             args.ephemeris,
@@ -531,7 +538,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
     if selected_modes > 1:
         raise ValueError(
             "Choose only one of --distribution, --distribution-ephemeris, --linearized-distribution, "
-            "--report, --horizon, --ephemeris, or --solution."
+            "--linearized-ephemeris, --report, --horizon, --ephemeris, or --solution."
         )
     target_time = args.target_time if args.target_time is not None else _required_prediction_field(payload, "target_time")
     common_kwargs = {
@@ -612,6 +619,20 @@ def run_predict_command(args: argparse.Namespace) -> int:
             initial_state_covariance=payload.get("initial_state_covariance"),
             position_scale=args.position_scale,
             velocity_scale=args.velocity_scale,
+            jacobian_step=args.jacobian_step,
+            **common_kwargs,
+        )
+        exit_code = 0 if result["success"] else 1
+    elif args.linearized_ephemeris:
+        result = predict_three_body_linearized_ephemeris(
+            _required_prediction_field(payload, "masses"),
+            _required_prediction_field(payload, "positions"),
+            _required_prediction_field(payload, "velocities"),
+            target_time,
+            initial_state_covariance=payload.get("initial_state_covariance"),
+            position_scale=args.position_scale,
+            velocity_scale=args.velocity_scale,
+            samples=args.samples,
             jacobian_step=args.jacobian_step,
             **common_kwargs,
         )

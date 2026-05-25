@@ -270,6 +270,7 @@ def test_predict_cli_writes_solution_bundle(tmp_path) -> None:
     assert len(payload["answer"]["final_position_distribution"]["mean_positions"]) == 3
     assert payload["deterministic_ephemeris"]["prediction_type"] == "deterministic-ephemeris"
     assert payload["distribution_ephemeris"]["prediction_type"] == "empirical-position-distribution-ephemeris"
+    assert payload["linearized_gaussian_ephemeris"]["prediction_type"] == "linearized-gaussian-ephemeris"
     assert payload["interpretation_report"]["prediction_type"] == "three-body-interpretation-report"
 
 
@@ -300,6 +301,38 @@ def test_predict_cli_writes_linearized_position_distribution(tmp_path) -> None:
     assert len(payload["mean_positions"]) == 3
     assert len(payload["position_covariance"]) == 6
     assert payload["linearized_diagnostics"]["maximum_position_std"] > 0.0
+
+
+def test_predict_cli_writes_linearized_ephemeris(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "linearized-ephemeris.json"
+    _write_prediction_input(input_path)
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--linearized-ephemeris",
+            "--position-scale",
+            "1e-7",
+            "--velocity-scale",
+            "1e-7",
+            "--samples",
+            "9",
+            "--output",
+            str(output_path),
+        ]
+    )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["prediction_type"] == "linearized-gaussian-ephemeris"
+    assert payload["success"] is True
+    assert len(payload["times"]) == 9
+    assert len(payload["rows"]) == 9
+    assert len(payload["rows"][0]["mean_positions"]) == 3
+    assert len(payload["rows"][0]["position_covariance"]) == 6
 
 
 def test_predict_cli_writes_interpretation_report(tmp_path) -> None:

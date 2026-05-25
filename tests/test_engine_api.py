@@ -15,6 +15,7 @@ from threebody_engine import (
     predict_three_body_forecast_horizon,
     predict_three_body_interpretation_report,
     predict_three_body_linearized_distribution,
+    predict_three_body_linearized_ephemeris,
     predict_three_body_position_distribution,
     predict_three_body_positions,
     public_static_artifact_audit_report_payload_sha256,
@@ -177,6 +178,7 @@ def test_engine_api_solves_three_body_prediction_problem() -> None:
     assert len(solution["answer"]["final_positions"]) == 3
     assert len(solution["answer"]["final_position_distribution"]["mean_positions"]) == 3
     assert solution["deterministic_ephemeris"]["prediction_type"] == "deterministic-ephemeris"
+    assert solution["linearized_gaussian_ephemeris"]["prediction_type"] == "linearized-gaussian-ephemeris"
     assert solution["distribution_ephemeris"]["prediction_type"] == "empirical-position-distribution-ephemeris"
     assert solution["interpretation_report"]["prediction_type"] == "three-body-interpretation-report"
 
@@ -201,6 +203,30 @@ def test_engine_api_builds_linearized_three_body_position_distribution() -> None
     assert len(distribution["state_transition_matrix"]) == 12
     assert distribution["linearized_diagnostics"]["minimum_covariance_eigenvalue"] > -1.0e-18
     assert distribution["linearized_diagnostics"]["maximum_position_std"] > 0.0
+
+
+def test_engine_api_builds_linearized_three_body_ephemeris() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    ephemeris = predict_three_body_linearized_ephemeris(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        samples=9,
+    )
+
+    assert ephemeris["prediction_type"] == "linearized-gaussian-ephemeris"
+    assert ephemeris["success"] is True
+    assert len(ephemeris["times"]) == 9
+    assert len(ephemeris["rows"]) == 9
+    assert len(ephemeris["rows"][0]["mean_positions"]) == 3
+    assert len(ephemeris["rows"][0]["position_covariance"]) == 6
+    assert ephemeris["rows"][-1]["maximum_position_std"] > 0.0
+    assert ephemeris["linearized_diagnostics"]["maximum_position_std"] >= ephemeris["rows"][-1]["maximum_position_std"]
 
 
 def test_engine_api_builds_interpretation_prediction_report() -> None:

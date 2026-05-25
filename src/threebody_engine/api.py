@@ -708,6 +708,20 @@ def solve_three_body_prediction_problem(
         atol=atol,
         max_step=max_step,
     )
+    linearized_ephemeris = predict_three_body_linearized_ephemeris(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        jacobian_step=jacobian_step,
+        rtol=rtol,
+        atol=atol,
+    )
     interpretation_report = predict_three_body_interpretation_report(
         masses,
         positions,
@@ -750,6 +764,7 @@ def solve_three_body_prediction_problem(
             "empirical_distribution_resolved": verdict.get("empirical_distribution_resolved") is True,
         },
         "deterministic_ephemeris": deterministic_ephemeris,
+        "linearized_gaussian_ephemeris": linearized_ephemeris,
         "distribution_ephemeris": distribution_ephemeris,
         "interpretation_report": interpretation_report,
     }
@@ -846,6 +861,83 @@ def predict_three_body_linearized_distribution(
         "interpretation": (
             "First-order Gaussian push-forward: valid while neglected nonlinear terms stay small relative "
             "to the propagated covariance scale."
+        ),
+    }
+
+
+def predict_three_body_linearized_ephemeris(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    initial_state_covariance: Sequence[Sequence[float]] | None = None,
+    position_scale: float = 1.0e-6,
+    velocity_scale: float = 1.0e-6,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    samples: int = 256,
+    jacobian_step: float = 1.0e-6,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+) -> dict[str, object]:
+    """Return the time-resolved first-order Gaussian distribution along the nominal flow."""
+
+    system, initial_state = _general_prediction_system(
+        masses,
+        positions,
+        velocities,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+    )
+    target_time = _finite_float(target_time, "target_time")
+    samples = _validated_sample_count(samples)
+    jacobian_step = _positive_float(jacobian_step, "jacobian_step")
+    covariance0 = _initial_state_covariance(
+        initial_state.size,
+        system.dimension,
+        initial_state_covariance=initial_state_covariance,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+    )
+    flow = _linearized_flow_trace(
+        system,
+        initial_state,
+        target_time,
+        samples=samples,
+        jacobian_step=jacobian_step,
+        rtol=rtol,
+        atol=atol,
+    )
+    rows = _linearized_ephemeris_rows(system, flow, covariance0)
+    max_position_std = max((float(row["maximum_position_std"]) for row in rows), default=math.inf)
+    return {
+        "prediction_schema_version": 1,
+        "prediction_type": "linearized-gaussian-ephemeris",
+        "method": "variational-flow-covariance-ephemeris",
+        "target_time": target_time,
+        "dimension": system.dimension,
+        "masses": [float(mass) for mass in system.masses],
+        "gravitational_constant": float(system.gravitational_constant),
+        "softening": float(system.softening),
+        "success": bool(flow["success"]),
+        "message": str(flow["message"]),
+        "uncertainty_model": {
+            "type": "gaussian_initial_state",
+            "position_scale": float(position_scale),
+            "velocity_scale": float(velocity_scale),
+        },
+        "times": np.asarray(flow.get("times", []), dtype=float).tolist(),
+        "initial_state_covariance": covariance0.tolist(),
+        "rows": rows,
+        "linearized_diagnostics": {
+            "jacobian_step": jacobian_step,
+            "sample_count": len(rows),
+            "maximum_position_std": max_position_std,
+        },
+        "interpretation": (
+            "Time-resolved first-order Gaussian push-forward: each row contains the nominal positions "
+            "and the variationally propagated position covariance at that sample time."
         ),
     }
 
@@ -1460,6 +1552,49 @@ def _linearized_flow_trace(
         "states": combined[:, :state_dimension],
         "transition_matrices": combined[:, state_dimension:].reshape(-1, state_dimension, state_dimension),
     }
+
+
+def _linearized_ephemeris_rows(
+    system: GeneralThreeBodySystem,
+    flow: Mapping[str, object],
+    covariance0: np.ndarray,
+) -> list[dict[str, object]]:
+    times = np.asarray(flow.get("times", []), dtype=float)
+    states = np.asarray(flow.get("states", []), dtype=float)
+    transitions = np.asarray(flow.get("transition_matrices", []), dtype=float)
+    position_width = system.body_count * system.dimension
+    rows: list[dict[str, object]] = []
+    for time, state, transition in zip(times, states, transitions, strict=False):
+        positions, velocities = system.split_state(state)
+        if transition.shape != covariance0.shape or np.any(~np.isfinite(transition)):
+            position_covariance = np.full((position_width, position_width), math.inf, dtype=float)
+            state_covariance = np.full_like(covariance0, math.inf, dtype=float)
+            std_positions = np.full((system.body_count, system.dimension), math.inf, dtype=float)
+            transition_spectral_radius = math.inf
+            transition_condition_number = math.inf
+        else:
+            state_covariance = _symmetrize_covariance(transition @ covariance0 @ transition.T)
+            position_covariance = state_covariance[:position_width, :position_width]
+            std_positions = np.sqrt(np.maximum(np.diag(position_covariance), 0.0)).reshape(
+                system.body_count,
+                system.dimension,
+            )
+            transition_spectral_radius = float(max(abs(np.linalg.eigvals(transition))))
+            transition_condition_number = float(np.linalg.cond(transition))
+        rows.append(
+            {
+                "time": float(time),
+                "mean_positions": positions.tolist(),
+                "mean_velocities": velocities.tolist(),
+                "std_positions": std_positions.tolist(),
+                "position_covariance": position_covariance.tolist(),
+                "maximum_position_std": float(np.max(std_positions)),
+                "state_covariance_trace": float(np.trace(state_covariance)),
+                "transition_spectral_radius": transition_spectral_radius,
+                "transition_condition_number": transition_condition_number,
+            }
+        )
+    return rows
 
 
 def _symmetrize_covariance(covariance: np.ndarray) -> np.ndarray:

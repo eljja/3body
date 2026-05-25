@@ -53,6 +53,7 @@ This is the most direct public API for the original project target. It returns:
 - `answer.final_position_distribution`: mean, quantiles, covariance, and ensemble counts for the target-time position distribution.
 - `answer.recommended_mode`: the promoted interpretation mode from the diagnostic report.
 - `deterministic_ephemeris`: the sampled deterministic trajectory from `0` through `target_time`.
+- `linearized_gaussian_ephemeris`: the sampled first-order Gaussian distribution from `0` through `target_time`.
 - `distribution_ephemeris`: the sampled empirical position distribution from `0` through `target_time`.
 - `interpretation_report`: the linearized/ensemble comparison and forecast-horizon verdict.
 
@@ -111,6 +112,22 @@ Pt = D Phi_t(x0) P0 D Phi_t(x0)^T
 Output includes the mean final positions, position standard deviations, the propagated state covariance, the position covariance block, per-body covariance matrices, the state-transition matrix, and diagnostics such as transition condition number and spectral radius.
 
 This mode is the most mathematical local answer: it gives the first-order probability distribution implied by the Newtonian flow. It is valid while the initial uncertainty is small enough that nonlinear curvature of the flow is not dominant.
+
+## Linearized Gaussian Ephemeris
+
+For a time-resolved first-order probability distribution, use `threebody_engine.predict_three_body_linearized_ephemeris(...)` or:
+
+```powershell
+threebody predict --input initial-state.json --linearized-ephemeris --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output linearized-ephemeris.json
+```
+
+This is the theoretical probability ephemeris. At every sampled time it returns the nominal mean positions, mean velocities, position standard deviations, and the flattened position covariance implied by
+
+```text
+P(t_k) = D Phi_{t_k}(x0) P0 D Phi_{t_k}(x0)^T
+```
+
+Use this when the initial uncertainty is small and a local Gaussian approximation is the appropriate mathematical object. Compare it with the empirical distribution ephemeris when nonlinear curvature may matter.
 
 ## Forecast Horizon
 
@@ -177,6 +194,8 @@ The forecast-horizon API answers "up to what time is that claim still tolerance-
 The interpretation report answers "which of the available mathematical forecasts is justified by diagnostics?"
 
 The distribution API answers "where are the bodies likely to be at time `t` if the initial state has a specified observational uncertainty?"
+
+The linearized-ephemeris API answers "what Gaussian distribution does the variational flow imply at every sampled time?"
 
 The distribution-ephemeris API answers "how does that final probability distribution develop over the whole interval?"
 

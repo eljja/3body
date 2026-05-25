@@ -77,6 +77,7 @@ from threebody_engine import (
     predict_three_body_forecast_horizon,
     predict_three_body_interpretation_report,
     predict_three_body_linearized_distribution,
+    predict_three_body_linearized_ephemeris,
     predict_three_body_position_distribution,
     predict_three_body_positions,
     public_static_artifact_claim_contract,
@@ -101,6 +102,7 @@ from threebody_engine import (
     predict_three_body_forecast_horizon,
     predict_three_body_interpretation_report,
     predict_three_body_linearized_distribution,
+    predict_three_body_linearized_ephemeris,
     predict_three_body_position_distribution,
     predict_three_body_positions,
     solve_three_body_prediction_problem,
@@ -147,6 +149,15 @@ linearized = predict_three_body_linearized_distribution(
     position_scale=1.0e-6,
     velocity_scale=1.0e-6,
 )
+linearized_ephemeris = predict_three_body_linearized_ephemeris(
+    masses,
+    positions,
+    velocities,
+    target_time=0.5,
+    samples=256,
+    position_scale=1.0e-6,
+    velocity_scale=1.0e-6,
+)
 distribution = predict_three_body_position_distribution(
     masses,
     positions,
@@ -167,7 +178,7 @@ distribution_ephemeris = predict_three_body_distribution_ephemeris(
 )
 ```
 
-`solve_three_body_prediction_problem` is the one-call solution bundle: it returns final positions, a deterministic ephemeris, a time-resolved empirical distribution ephemeris, and a verdict describing which mathematical forecast is defensible. `predict_three_body_positions` returns the final positions, velocities, solver metadata, and Noether invariant drift diagnostics. `predict_three_body_ephemeris` returns the sampled positions and velocities from `0` through `target_time`, suitable for orbit tables, downstream visualization, and independent audit. `predict_three_body_forecast_horizon` estimates how far the target-time forecast remains locally tolerance-resolved by propagating initial covariance through the variational flow. `predict_three_body_interpretation_report` runs the point, forecast-horizon, variational Gaussian, and ensemble modes together, compares the distributions, and recommends `linearized-gaussian`, `empirical-ensemble`, `deterministic-only`, or `unresolved`. `predict_three_body_linearized_distribution` computes the variational state-transition matrix and pushes an initial covariance forward by `P(t) = D Phi_t P(0) D Phi_t^T`. `predict_three_body_position_distribution` perturbs the initial state and returns empirical mean positions, quantiles, covariances, and the deterministic base forecast. `predict_three_body_distribution_ephemeris` applies the same ensemble idea at every sampled time, returning a probability ephemeris instead of only a final-time distribution.
+`solve_three_body_prediction_problem` is the one-call solution bundle: it returns final positions, a deterministic ephemeris, linearized Gaussian ephemeris, time-resolved empirical distribution ephemeris, and a verdict describing which mathematical forecast is defensible. `predict_three_body_positions` returns the final positions, velocities, solver metadata, and Noether invariant drift diagnostics. `predict_three_body_ephemeris` returns the sampled positions and velocities from `0` through `target_time`, suitable for orbit tables, downstream visualization, and independent audit. `predict_three_body_forecast_horizon` estimates how far the target-time forecast remains locally tolerance-resolved by propagating initial covariance through the variational flow. `predict_three_body_interpretation_report` runs the point, forecast-horizon, variational Gaussian, and ensemble modes together, compares the distributions, and recommends `linearized-gaussian`, `empirical-ensemble`, `deterministic-only`, or `unresolved`. `predict_three_body_linearized_distribution` computes the variational state-transition matrix and pushes an initial covariance forward by `P(t) = D Phi_t P(0) D Phi_t^T`. `predict_three_body_linearized_ephemeris` performs that same covariance push-forward at every sampled time. `predict_three_body_position_distribution` perturbs the initial state and returns empirical mean positions, quantiles, covariances, and the deterministic base forecast. `predict_three_body_distribution_ephemeris` applies the same ensemble idea at every sampled time, returning a probability ephemeris instead of only a final-time distribution.
 
 The same layer is available from the CLI:
 
@@ -178,6 +189,7 @@ threebody predict --input initial-state.json --ephemeris --samples 256 --output 
 threebody predict --input initial-state.json --horizon --position-tolerance 1e-3 --position-scale 1e-6 --velocity-scale 1e-6 --output horizon.json
 threebody predict --input initial-state.json --report --count 128 --position-tolerance 1e-3 --position-scale 1e-6 --velocity-scale 1e-6 --output report.json
 threebody predict --input initial-state.json --linearized-distribution --position-scale 1e-6 --velocity-scale 1e-6 --output linearized.json
+threebody predict --input initial-state.json --linearized-ephemeris --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output linearized-ephemeris.json
 threebody predict --input initial-state.json --distribution --count 128 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution.json
 threebody predict --input initial-state.json --distribution-ephemeris --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution-ephemeris.json
 ```
