@@ -303,6 +303,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Estimate the local forecast horizon from propagated position uncertainty.",
     )
+    predict.add_argument(
+        "--ephemeris",
+        action="store_true",
+        help="Return sampled positions and velocities from time 0 through target_time.",
+    )
     predict.add_argument("--count", type=int, default=64, help="Distribution ensemble size.")
     predict.add_argument("--position-scale", type=float, default=1.0e-6, help="Initial position uncertainty scale.")
     predict.add_argument("--velocity-scale", type=float, default=1.0e-6, help="Initial velocity uncertainty scale.")
@@ -325,6 +330,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--include-sample-positions",
         action="store_true",
         help="Include every ensemble member's final positions in distribution mode.",
+    )
+    predict.add_argument(
+        "--include-invariant-series",
+        action="store_true",
+        help="Include energy and momentum time series in ephemeris mode.",
     )
     predict.add_argument("--output", type=Path, default=None, help="Optional JSON output path.")
     predict.set_defaults(func=run_predict_command)
@@ -480,6 +490,7 @@ def run_survey_command(args: argparse.Namespace) -> int:
 
 def run_predict_command(args: argparse.Namespace) -> int:
     from threebody_engine import (
+        predict_three_body_ephemeris,
         predict_three_body_forecast_horizon,
         predict_three_body_interpretation_report,
         predict_three_body_linearized_distribution,
@@ -489,10 +500,13 @@ def run_predict_command(args: argparse.Namespace) -> int:
 
     payload = _read_prediction_input(args.input)
     selected_modes = sum(
-        bool(value) for value in (args.distribution, args.linearized_distribution, args.report, args.horizon)
+        bool(value)
+        for value in (args.distribution, args.linearized_distribution, args.report, args.horizon, args.ephemeris)
     )
     if selected_modes > 1:
-        raise ValueError("Choose only one of --distribution, --linearized-distribution, --report, or --horizon.")
+        raise ValueError(
+            "Choose only one of --distribution, --linearized-distribution, --report, --horizon, or --ephemeris."
+        )
     target_time = args.target_time if args.target_time is not None else _required_prediction_field(payload, "target_time")
     common_kwargs = {
         "gravitational_constant": args.gravitational_constant,
@@ -533,6 +547,18 @@ def run_predict_command(args: argparse.Namespace) -> int:
             **common_kwargs,
         )
         exit_code = 0 if result["target_time_resolved"] else 1
+    elif args.ephemeris:
+        result = predict_three_body_ephemeris(
+            _required_prediction_field(payload, "masses"),
+            _required_prediction_field(payload, "positions"),
+            _required_prediction_field(payload, "velocities"),
+            target_time,
+            samples=args.samples,
+            max_step=args.max_step,
+            include_invariant_series=args.include_invariant_series,
+            **common_kwargs,
+        )
+        exit_code = 0 if result["success"] else 1
     elif args.linearized_distribution:
         result = predict_three_body_linearized_distribution(
             _required_prediction_field(payload, "masses"),

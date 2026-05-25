@@ -31,6 +31,7 @@ They can miss at least four mechanisms:
 The original practical target is now exposed as a small prediction API family:
 
 - `threebody_engine.predict_three_body_positions(...)` answers: given three masses, initial positions, initial velocities, and a target time, where are the three bodies? It integrates the Newtonian equations directly and returns final positions, velocities, solver metadata, and energy/momentum/angular-momentum drift diagnostics.
+- `threebody_engine.predict_three_body_ephemeris(...)` answers the orbit-table version: what are the sampled positions and velocities for all three bodies from `0` through the target time?
 - `threebody_engine.predict_three_body_interpretation_report(...)` answers the decision version: run the deterministic, variational Gaussian, and empirical ensemble forecasts together, compare the final-position distributions, and recommend which mathematical claim is defensible.
 - `threebody_engine.predict_three_body_forecast_horizon(...)` answers the tolerance version: given initial uncertainty and a position error tolerance, until what sampled time does the variationally propagated uncertainty remain below tolerance?
 - `threebody_engine.predict_three_body_linearized_distribution(...)` answers the local mathematical version: given an initial covariance, or position/velocity uncertainty scales, what Gaussian final-position distribution is implied by the variational flow map `P(t) = D Phi_t P(0) D Phi_t^T`?

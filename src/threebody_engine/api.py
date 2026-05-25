@@ -336,23 +336,15 @@ def predict_three_body_positions(
         softening=softening,
     )
     target_time = _finite_float(target_time, "target_time")
-    sample_count = _validated_sample_count(samples)
-    t_eval = _prediction_times(target_time, sample_count)
-    if target_time == 0.0:
-        trajectory = TrajectoryResult(
-            t=np.array([0.0], dtype=float),
-            y=np.asarray([initial_state], dtype=float),
-            success=True,
-            message="target_time is zero; returned the initial state.",
-            metadata={"method": "identity", "nfev": 0, "njev": 0, "nlu": 0},
-        )
-    else:
-        trajectory = AdaptiveIntegrator(rtol=rtol, atol=atol, max_step=max_step).integrate(
-            system,
-            (0.0, target_time),
-            initial_state,
-            t_eval=t_eval,
-        )
+    trajectory = _prediction_trajectory(
+        system,
+        initial_state,
+        target_time,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+    )
     final_state = trajectory.y[-1] if len(trajectory.y) else np.full(system.state_dim, np.nan)
     final_positions, final_velocities = system.split_state(final_state)
     invariant_certificate = noether_invariant_drift_certificate(system, trajectory).as_dict()
@@ -374,6 +366,66 @@ def predict_three_body_positions(
         "solver": dict(trajectory.metadata),
         "invariant_certificate": invariant_certificate,
     }
+
+
+def predict_three_body_ephemeris(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    samples: int = 256,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+    max_step: float = math.inf,
+    include_invariant_series: bool = False,
+) -> dict[str, object]:
+    """Return sampled positions and velocities from time 0 through ``target_time``."""
+
+    system, initial_state = _general_prediction_system(
+        masses,
+        positions,
+        velocities,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+    )
+    target_time = _finite_float(target_time, "target_time")
+    trajectory = _prediction_trajectory(
+        system,
+        initial_state,
+        target_time,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+    )
+    positions_series, velocities_series = _trajectory_position_velocity_series(system, trajectory)
+    final_state = trajectory.y[-1] if len(trajectory.y) else np.full(system.state_dim, np.nan)
+    invariant_certificate = noether_invariant_drift_certificate(system, trajectory).as_dict()
+    result: dict[str, object] = {
+        "prediction_schema_version": 1,
+        "prediction_type": "deterministic-ephemeris",
+        "method": "adaptive-DOP853",
+        "target_time": target_time,
+        "dimension": system.dimension,
+        "masses": [float(mass) for mass in system.masses],
+        "gravitational_constant": float(system.gravitational_constant),
+        "softening": float(system.softening),
+        "success": trajectory.success,
+        "message": trajectory.message,
+        "times": trajectory.t.tolist(),
+        "positions": positions_series.tolist(),
+        "velocities": velocities_series.tolist(),
+        "final_state": final_state.tolist(),
+        "sample_count": int(len(trajectory.t)),
+        "solver": dict(trajectory.metadata),
+        "invariant_certificate": invariant_certificate,
+    }
+    if include_invariant_series:
+        result["invariant_series"] = _trajectory_invariant_series(system, trajectory)
+    return result
 
 
 def predict_three_body_position_distribution(
@@ -849,6 +901,75 @@ def _prediction_times(target_time: float, samples: int) -> np.ndarray:
     if target_time == 0.0:
         return np.array([0.0], dtype=float)
     return np.linspace(0.0, target_time, samples)
+
+
+def _prediction_trajectory(
+    system: GeneralThreeBodySystem,
+    initial_state: np.ndarray,
+    target_time: float,
+    *,
+    samples: int,
+    rtol: float,
+    atol: float,
+    max_step: float,
+) -> TrajectoryResult:
+    sample_count = _validated_sample_count(samples)
+    t_eval = _prediction_times(target_time, sample_count)
+    if target_time == 0.0:
+        return TrajectoryResult(
+            t=np.array([0.0], dtype=float),
+            y=np.asarray([initial_state], dtype=float),
+            success=True,
+            message="target_time is zero; returned the initial state.",
+            metadata={"method": "identity", "nfev": 0, "njev": 0, "nlu": 0},
+        )
+    return AdaptiveIntegrator(rtol=rtol, atol=atol, max_step=max_step).integrate(
+        system,
+        (0.0, target_time),
+        initial_state,
+        t_eval=t_eval,
+    )
+
+
+def _trajectory_position_velocity_series(
+    system: GeneralThreeBodySystem,
+    trajectory: TrajectoryResult,
+) -> tuple[np.ndarray, np.ndarray]:
+    if len(trajectory.y) == 0:
+        empty_shape = (0, system.body_count, system.dimension)
+        return np.empty(empty_shape, dtype=float), np.empty(empty_shape, dtype=float)
+    positions: list[np.ndarray] = []
+    velocities: list[np.ndarray] = []
+    for state in trajectory.y:
+        state_positions, state_velocities = system.split_state(state)
+        positions.append(state_positions)
+        velocities.append(state_velocities)
+    return np.asarray(positions, dtype=float), np.asarray(velocities, dtype=float)
+
+
+def _trajectory_invariant_series(
+    system: GeneralThreeBodySystem,
+    trajectory: TrajectoryResult,
+) -> dict[str, object]:
+    if len(trajectory.y) == 0:
+        return {
+            "energy": [],
+            "energy_drift": [],
+            "linear_momentum_norm": [],
+            "angular_momentum_norm": [],
+            "angular_momentum_drift_norm": [],
+        }
+    energies = np.array([system.total_energy(state) for state in trajectory.y], dtype=float)
+    linear_momenta = np.array([np.linalg.norm(system.linear_momentum(state)) for state in trajectory.y], dtype=float)
+    angular_momenta = np.array([system.angular_momentum(state) for state in trajectory.y], dtype=float)
+    angular_drift = np.linalg.norm(angular_momenta - angular_momenta[0], axis=1)
+    return {
+        "energy": energies.tolist(),
+        "energy_drift": (energies - energies[0]).tolist(),
+        "linear_momentum_norm": linear_momenta.tolist(),
+        "angular_momentum_norm": np.linalg.norm(angular_momenta, axis=1).tolist(),
+        "angular_momentum_drift_norm": angular_drift.tolist(),
+    }
 
 
 def _perturbed_initial_states(

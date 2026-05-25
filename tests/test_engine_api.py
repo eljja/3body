@@ -10,6 +10,7 @@ from threebody_engine import (
     certify_jacobi_escape,
     certify_jacobi_escape_report,
     integrate_reference_scenario,
+    predict_three_body_ephemeris,
     predict_three_body_forecast_horizon,
     predict_three_body_interpretation_report,
     predict_three_body_linearized_distribution,
@@ -62,6 +63,39 @@ def test_engine_api_predicts_three_body_positions_from_initial_state() -> None:
     assert len(prediction["positions"]) == 3
     assert len(prediction["positions"][0]) == 2
     assert prediction["invariant_certificate"]["maximum_relative_energy_drift"] < 1.0e-8
+
+
+def test_engine_api_builds_three_body_ephemeris() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    ephemeris = predict_three_body_ephemeris(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        samples=9,
+        include_invariant_series=True,
+    )
+    point_prediction = predict_three_body_positions(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        samples=9,
+    )
+
+    assert ephemeris["prediction_type"] == "deterministic-ephemeris"
+    assert ephemeris["success"] is True
+    assert ephemeris["sample_count"] == 9
+    assert len(ephemeris["times"]) == 9
+    assert len(ephemeris["positions"]) == 9
+    assert len(ephemeris["positions"][0]) == 3
+    assert len(ephemeris["positions"][0][0]) == 2
+    assert ephemeris["positions"][-1] == point_prediction["positions"]
+    assert ephemeris["velocities"][-1] == point_prediction["velocities"]
+    assert len(ephemeris["invariant_series"]["energy"]) == 9
+    assert ephemeris["invariant_certificate"]["maximum_relative_energy_drift"] < 1.0e-8
 
 
 def test_engine_api_builds_three_body_position_distribution() -> None:

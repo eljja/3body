@@ -39,6 +39,18 @@ Input JSON:
 
 Output includes final positions, final velocities, solver metadata, and a Noether invariant drift certificate for energy, linear momentum, and angular momentum.
 
+## Ephemeris Forecast
+
+Use `threebody_engine.predict_three_body_ephemeris(...)` or:
+
+```powershell
+threebody predict --input initial-state.json --ephemeris --samples 256 --output ephemeris.json
+```
+
+This returns the sampled orbit table from `0` through `target_time`: times, positions for all three bodies, velocities for all three bodies, solver metadata, and the same Noether invariant certificate used by the final-state forecast. With `--include-invariant-series`, the JSON also includes energy and momentum diagnostics at each sampled time.
+
+The ephemeris mode is the most direct answer to "where are the bodies over the forecast interval?" The final row is the same target-time position claim produced by the deterministic forecast, but the intermediate rows make the claim inspectable and reusable for visualization or external analysis.
+
 ## Interpretation Report
 
 Use `threebody_engine.predict_three_body_interpretation_report(...)` or:
@@ -120,6 +132,8 @@ Output includes:
 ## Scientific Interpretation
 
 The deterministic API answers "where are the bodies at time `t` if the initial state is exactly known?"
+
+The ephemeris API answers "where are the bodies at each sampled time between now and `t`?"
 
 The forecast-horizon API answers "up to what time is that claim still tolerance-resolved under declared initial uncertainty?"
 
