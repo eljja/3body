@@ -731,11 +731,12 @@ def verify_static_artifact_bytes(
     expanded_required_gates = _merge_requirements(profile_requirements["require_gates"], require_gates)
     expanded_required_minimums = _merge_requirements(profile_requirements["require_minimums"], require_minimums)
     expanded_required_maximums = _merge_requirements(profile_requirements["require_maximums"], require_maximums)
+    verification_schema_features = list(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
     required_gate_results = _required_gate_results(certificate, expanded_required_gates)
     required_minimum_results = _required_minimum_results(certificate, expanded_required_minimums)
     required_maximum_results = _required_maximum_results(certificate, expanded_required_maximums)
     expanded_required_features = _merge_requirements(profile_requirements["require_features"], require_features)
-    required_feature_results = _required_feature_results(expanded_required_features)
+    required_feature_results = _required_feature_results(expanded_required_features, verification_schema_features)
     checks = {
         **_artifact_available_checks(artifact_errors),
         "manifest_json": manifest_parse_error is None,
@@ -766,7 +767,7 @@ def verify_static_artifact_bytes(
     }
     return {
         "verification_schema_version": 1,
-        "verification_schema_features": list(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES),
+        "verification_schema_features": verification_schema_features,
         "verified_at_utc": _utc_timestamp(),
         "verifier": "threebody.cli verify-static-artifacts",
         "verified": all(checks.values()),
@@ -1050,8 +1051,11 @@ def _required_profile_results(certificate: dict[str, object], required_profile_h
     return results
 
 
-def _required_feature_results(required_features: Sequence[str] | None) -> list[dict[str, object]]:
-    available_features = set(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
+def _required_feature_results(
+    required_features: Sequence[str] | None,
+    verification_schema_features: Sequence[str],
+) -> list[dict[str, object]]:
+    available_features = set(verification_schema_features)
     return [
         {
             "feature": feature,

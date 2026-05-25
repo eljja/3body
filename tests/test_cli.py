@@ -380,6 +380,7 @@ def test_verify_static_artifacts_cli_applies_public_claim_profile(tmp_path) -> N
     assert receipt["checks"]["required_minimums"] is True
     assert receipt["checks"]["required_maximums"] is True
     assert receipt["checks"]["required_features"] is True
+    assert all(row["feature"] in receipt["verification_schema_features"] for row in receipt["required_feature_results"])
 
 
 def test_public_claim_profile_features_are_explicitly_versioned() -> None:
@@ -390,6 +391,19 @@ def test_public_claim_profile_features_are_explicitly_versioned() -> None:
     assert required_features == list(cli_module.PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES)
     assert required_features == list(cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
     assert required_features is not cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES
+
+
+def test_required_feature_results_are_based_on_advertised_features() -> None:
+    required = ["artifact-availability", "numeric-maximums", "missing-capability"]
+    advertised = ["artifact-availability", "numeric-maximums"]
+
+    results = cli_module._required_feature_results(required, advertised)
+
+    assert results == [
+        {"feature": "artifact-availability", "passed": True},
+        {"feature": "numeric-maximums", "passed": True},
+        {"feature": "missing-capability", "passed": False},
+    ]
 
 
 def test_verify_static_artifacts_cli_rejects_inactive_required_profile(tmp_path) -> None:
