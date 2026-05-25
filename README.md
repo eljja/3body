@@ -109,6 +109,13 @@ distribution = predict_three_body_position_distribution(
 
 `predict_three_body_positions` returns the final positions, velocities, solver metadata, and Noether invariant drift diagnostics. `predict_three_body_position_distribution` perturbs the initial state and returns empirical mean positions, quantiles, covariances, and the deterministic base forecast.
 
+The same layer is available from the CLI:
+
+```powershell
+threebody predict --input initial-state.json --target-time 0.5 --output prediction.json
+threebody predict --input initial-state.json --distribution --count 128 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution.json
+```
+
 The hysteresis helpers accept `word_mode="refined"`, `"return"`, or `"poincare"`.
 The default promotion path uses refined chart words; Poincare-section words, section sweeps, multi-coordinate sweeps, held-out binary-phase validation, permutation controls, section-robustness checks, and stride-perturbation checks as stricter diagnostics when a scenario has enough crossings.
 Use `public_static_artifact_claim_contract()` to inspect the versioned public claim profile and verifier feature-set digest, then `verify_public_static_artifacts_from_url("https://eljja.github.io/3body/", require_commit="<sha>")` to audit the public Pages evidence bundle through the stable engine API. `validate_public_static_artifact_receipt_contract(receipt)` checks that a receipt matches the same public contract without requiring callers to compare individual digest fields by hand. Use `audit_public_static_artifacts_from_url(...)` when a paper supplement or CI job needs one JSON-ready object containing the contract, receipt, and receipt-contract validation.
@@ -200,6 +207,7 @@ Run a transition survey:
 - [Current Hypotheses](docs/CURRENT_HYPOTHESES.md)
 - [Jacobi Escape Cone Theorem](docs/JACOBI_ESCAPE_CONE_THEOREM.md)
 - [GitHub Pages Static Visualizer](docs/GITHUB_PAGES.md)
+- [Three-Body Prediction Method](docs/PREDICTION_METHOD.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## Suggested Workflow

@@ -105,6 +105,68 @@ def test_atlas_benchmark_cli_writes_reproducible_cases(tmp_path) -> None:
     assert "threebody interpret" in payload["cases"][0]["reproduce"]
 
 
+def test_predict_cli_writes_deterministic_three_body_forecast(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "prediction.json"
+    _write_prediction_input(input_path)
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--target-time",
+            "0.05",
+            "--samples",
+            "16",
+            "--output",
+            str(output_path),
+        ]
+    )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["prediction_type"] == "deterministic-position"
+    assert payload["success"] is True
+    assert payload["dimension"] == 2
+    assert len(payload["positions"]) == 3
+    assert payload["invariant_certificate"]["maximum_relative_energy_drift"] < 1.0e-8
+
+
+def test_predict_cli_writes_position_distribution(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "distribution.json"
+    _write_prediction_input(input_path)
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--distribution",
+            "--count",
+            "5",
+            "--position-scale",
+            "1e-7",
+            "--velocity-scale",
+            "1e-7",
+            "--samples",
+            "16",
+            "--include-sample-positions",
+            "--output",
+            str(output_path),
+        ]
+    )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["prediction_type"] == "empirical-position-distribution"
+    assert payload["success_count"] == 5
+    assert payload["failure_count"] == 0
+    assert len(payload["position_distribution"]["mean_positions"]) == 3
+    assert len(payload["sample_predictions"]) == 5
+
+
 def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     _write_static_artifact_bundle(tmp_path)
     receipt_path = tmp_path / "verification-receipt.json"
@@ -1159,6 +1221,24 @@ def _write_static_artifact_bundle(site_dir) -> None:
         },
     }
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _write_prediction_input(path) -> None:
+    payload = {
+        "masses": [1.0, 1.0, 1.0],
+        "positions": [
+            [0.97000436, -0.24308753],
+            [-0.97000436, 0.24308753],
+            [0.0, 0.0],
+        ],
+        "velocities": [
+            [0.466203685, 0.43236573],
+            [0.466203685, 0.43236573],
+            [-0.93240737, -0.86473146],
+        ],
+        "target_time": 0.05,
+    }
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def _refresh_manifest_hashes(site_dir) -> None:

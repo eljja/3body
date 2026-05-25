@@ -267,6 +267,44 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON output path. Defaults to .runtime/research_runs/<timestamp>-atlas-benchmark.json.",
     )
     benchmark.set_defaults(func=run_atlas_benchmark_command)
+    predict = subparsers.add_parser(
+        "predict",
+        help="Predict general three-body positions or an empirical final-position distribution from JSON input.",
+    )
+    predict.add_argument(
+        "--input",
+        type=Path,
+        required=True,
+        help="JSON file with masses, positions, velocities, and target_time.",
+    )
+    predict.add_argument(
+        "--target-time",
+        type=float,
+        default=None,
+        help="Override target_time from the input JSON.",
+    )
+    predict.add_argument(
+        "--distribution",
+        action="store_true",
+        help="Propagate Gaussian initial-condition uncertainty and return a final-position distribution.",
+    )
+    predict.add_argument("--count", type=int, default=64, help="Distribution ensemble size.")
+    predict.add_argument("--position-scale", type=float, default=1.0e-6, help="Initial position uncertainty scale.")
+    predict.add_argument("--velocity-scale", type=float, default=1.0e-6, help="Initial velocity uncertainty scale.")
+    predict.add_argument("--seed", type=int, default=0, help="Distribution ensemble random seed.")
+    predict.add_argument("--samples", type=int, default=256, help="Number of solver sample times.")
+    predict.add_argument("--rtol", type=float, default=1.0e-10, help="Adaptive integrator relative tolerance.")
+    predict.add_argument("--atol", type=float, default=1.0e-12, help="Adaptive integrator absolute tolerance.")
+    predict.add_argument("--max-step", type=float, default=float("inf"), help="Adaptive integrator maximum step.")
+    predict.add_argument("--gravitational-constant", type=float, default=1.0, help="Newtonian gravitational constant.")
+    predict.add_argument("--softening", type=float, default=0.0, help="Optional Plummer-style softening length.")
+    predict.add_argument(
+        "--include-sample-positions",
+        action="store_true",
+        help="Include every ensemble member's final positions in distribution mode.",
+    )
+    predict.add_argument("--output", type=Path, default=None, help="Optional JSON output path.")
+    predict.set_defaults(func=run_predict_command)
     verify_static = subparsers.add_parser(
         "verify-static-artifacts",
         help="Verify static Pages certificate and manifest artifact integrity.",
@@ -415,6 +453,48 @@ def run_survey_command(args: argparse.Namespace) -> int:
     print(f"trajectories={trajectory_count} transitions={transition_count}")
     print(f"candidate_laws={candidate_law_count}")
     return 0
+
+
+def run_predict_command(args: argparse.Namespace) -> int:
+    from threebody_engine import predict_three_body_position_distribution, predict_three_body_positions
+
+    payload = _read_prediction_input(args.input)
+    target_time = args.target_time if args.target_time is not None else _required_prediction_field(payload, "target_time")
+    common_kwargs = {
+        "gravitational_constant": args.gravitational_constant,
+        "softening": args.softening,
+        "samples": args.samples,
+        "rtol": args.rtol,
+        "atol": args.atol,
+        "max_step": args.max_step,
+    }
+    if args.distribution:
+        result = predict_three_body_position_distribution(
+            _required_prediction_field(payload, "masses"),
+            _required_prediction_field(payload, "positions"),
+            _required_prediction_field(payload, "velocities"),
+            target_time,
+            count=args.count,
+            position_scale=args.position_scale,
+            velocity_scale=args.velocity_scale,
+            seed=args.seed,
+            include_sample_positions=args.include_sample_positions,
+            **common_kwargs,
+        )
+        exit_code = 0 if result["success_count"] else 1
+    else:
+        result = predict_three_body_positions(
+            _required_prediction_field(payload, "masses"),
+            _required_prediction_field(payload, "positions"),
+            _required_prediction_field(payload, "velocities"),
+            target_time,
+            **common_kwargs,
+        )
+        exit_code = 0 if result["success"] else 1
+    _write_json_result(result, args.output)
+    if args.output is not None:
+        print(f"wrote {args.output}")
+    return exit_code
 
 
 def run_flyby_sweep_command(args: argparse.Namespace) -> int:
@@ -1298,6 +1378,28 @@ def _scenario_from_name(library: OrbitLibrary, scenario: str, periods: float, sa
     if scenario == "restricted-l5":
         return library.restricted_l5(periods=periods, samples=samples)
     raise ValueError(f"Unknown scenario: {scenario}")
+
+
+def _read_prediction_input(path: Path) -> dict[str, object]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("prediction input JSON must be an object.")
+    return value
+
+
+def _required_prediction_field(payload: dict[str, object], key: str) -> object:
+    if key not in payload:
+        raise ValueError(f"prediction input JSON must include {key!r}.")
+    return payload[key]
+
+
+def _write_json_result(result: dict[str, object], output: Path | None) -> None:
+    text = json.dumps(result, indent=2, sort_keys=True)
+    if output is None:
+        print(text)
+        return
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(text, encoding="utf-8")
 
 
 def _default_output_path(scenario: str) -> Path:
