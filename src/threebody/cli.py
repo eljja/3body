@@ -759,6 +759,8 @@ def verify_static_artifact_bytes(
     expanded_required_features = _merge_requirements(profile_requirements["require_features"], require_features)
     required_feature_results = _required_feature_results(expanded_required_features, verification_schema_features)
     verification_schema_features_sha256 = static_artifact_verification_features_sha256(verification_schema_features)
+    certificate_verification_schema_features = certificate.get("verification_schema_features")
+    certificate_verification_schema_features_sha256 = certificate.get("verification_schema_features_sha256")
     checks = {
         **_artifact_available_checks(artifact_errors),
         "manifest_json": manifest_parse_error is None,
@@ -770,10 +772,10 @@ def verify_static_artifact_bytes(
         "certificate_artifact": certificate.get("artifact") == "threebody-static-research-certificate",
         "certificate_manifest_link": certificate.get("artifact_manifest") == "manifest.json",
         "certificate_verification_schema_features": _certificate_verification_schema_features_match(
-            certificate,
+            certificate_verification_schema_features,
             verification_schema_features,
         ),
-        "certificate_verification_schema_features_sha256": certificate.get("verification_schema_features_sha256")
+        "certificate_verification_schema_features_sha256": certificate_verification_schema_features_sha256
         == verification_schema_features_sha256,
         "publication_pipeline_links": _publication_pipeline_links_match(certificate),
         "provenance_commit_match": _provenance_commits_match(certificate_commit, manifest_commit),
@@ -801,6 +803,8 @@ def verify_static_artifact_bytes(
         "verification_schema_version": 1,
         "verification_schema_features": verification_schema_features,
         "verification_schema_features_sha256": verification_schema_features_sha256,
+        "certificate_verification_schema_features": certificate_verification_schema_features,
+        "certificate_verification_schema_features_sha256": certificate_verification_schema_features_sha256,
         "verified_at_utc": _utc_timestamp(),
         "verifier": "threebody.cli verify-static-artifacts",
         "verified": all(checks.values()),
@@ -978,10 +982,9 @@ def _publication_pipeline_links_match(certificate: dict[str, object]) -> bool:
 
 
 def _certificate_verification_schema_features_match(
-    certificate: dict[str, object],
+    certificate_features: object,
     expected_features: Sequence[str],
 ) -> bool:
-    certificate_features = certificate.get("verification_schema_features")
     return certificate_features == list(expected_features)
 
 

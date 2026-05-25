@@ -153,6 +153,10 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["verification_schema_features_sha256"] == cli_module.static_artifact_verification_features_sha256(
         receipt["verification_schema_features"]
     )
+    assert receipt["certificate_verification_schema_features"] == receipt["verification_schema_features"]
+    assert (
+        receipt["certificate_verification_schema_features_sha256"] == receipt["verification_schema_features_sha256"]
+    )
     assert receipt["required_feature_set_sha256"] is None
     assert receipt["checks"]["required_feature_set_sha256"] is True
     assert receipt["verifier"] == "threebody.cli verify-static-artifacts"
@@ -318,6 +322,8 @@ def test_verify_static_artifacts_cli_rejects_certificate_verifier_feature_digest
     assert exit_code == 1
     assert receipt["verified"] is False
     assert receipt["checks"]["certificate_hash"] is True
+    assert receipt["certificate_verification_schema_features"] == ["artifact-availability"]
+    assert receipt["certificate_verification_schema_features_sha256"] == "0" * 64
     assert receipt["checks"]["certificate_verification_schema_features"] is False
     assert receipt["checks"]["certificate_verification_schema_features_sha256"] is False
     assert receipt["checks"]["required_profile_hashes"] is True
