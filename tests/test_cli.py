@@ -291,6 +291,7 @@ def test_predict_cli_writes_linearized_position_distribution(tmp_path) -> None:
             "1e-7",
             "--velocity-scale",
             "1e-7",
+            "--preserve-center-of-mass",
             "--output",
             str(output_path),
         ]
@@ -300,6 +301,7 @@ def test_predict_cli_writes_linearized_position_distribution(tmp_path) -> None:
     assert exit_code == 0
     assert payload["prediction_type"] == "linearized-gaussian-position-distribution"
     assert payload["success"] is True
+    assert payload["uncertainty_model"]["preserve_center_of_mass"] is True
     assert len(payload["mean_positions"]) == 3
     assert len(payload["position_covariance"]) == 6
     assert payload["linearized_diagnostics"]["maximum_position_std"] > 0.0
@@ -320,6 +322,7 @@ def test_predict_cli_writes_linearized_ephemeris(tmp_path) -> None:
             "1e-7",
             "--velocity-scale",
             "1e-7",
+            "--preserve-center-of-mass",
             "--samples",
             "9",
             "--output",
@@ -331,6 +334,7 @@ def test_predict_cli_writes_linearized_ephemeris(tmp_path) -> None:
     assert exit_code == 0
     assert payload["prediction_type"] == "linearized-gaussian-ephemeris"
     assert payload["success"] is True
+    assert payload["uncertainty_model"]["preserve_center_of_mass"] is True
     assert len(payload["times"]) == 9
     assert len(payload["rows"]) == 9
     assert len(payload["rows"][0]["mean_positions"]) == 3
@@ -364,6 +368,7 @@ def test_predict_cli_writes_interpretation_report(tmp_path) -> None:
 
     assert exit_code == 0
     assert payload["prediction_type"] == "three-body-interpretation-report"
+    assert payload["uncertainty_model"]["preserve_center_of_mass"] is True
     assert payload["forecast_horizon"]["prediction_type"] == "linearized-forecast-horizon"
     assert payload["forecast_horizon"]["target_time_resolved"] is True
     assert payload["verdict"]["recommended_mode"] in {"linearized-gaussian", "empirical-ensemble"}
@@ -387,6 +392,7 @@ def test_predict_cli_writes_forecast_horizon(tmp_path) -> None:
             "1e-7",
             "--position-tolerance",
             "1e-3",
+            "--preserve-center-of-mass",
             "--horizon-samples",
             "6",
             "--output",
@@ -398,6 +404,7 @@ def test_predict_cli_writes_forecast_horizon(tmp_path) -> None:
     assert exit_code == 0
     assert payload["prediction_type"] == "linearized-forecast-horizon"
     assert payload["target_time_resolved"] is True
+    assert payload["uncertainty_model"]["preserve_center_of_mass"] is True
     assert payload["final_uncertainty_to_tolerance_ratio"] < 1.0
     assert len(payload["rows"]) == 6
 

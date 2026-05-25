@@ -60,6 +60,8 @@ This is the most direct public API for the original project target. It returns:
 
 The bundle is intentionally not a closed-form theorem for all initial conditions. It is a reproducible computational answer: exact initial data produce a flow-map sample; uncertain initial data produce a pushed-forward empirical distribution; diagnostics say how strong the resulting claim is.
 
+By default, the bundle uses a center-of-mass-preserving uncertainty model for both the empirical ensemble and the linearized Gaussian covariance. This keeps mass-weighted center-of-mass position and velocity fixed under initial perturbations, avoiding a comparison where the ensemble and Gaussian forecast start from different physical assumptions.
+
 ## Ephemeris Forecast
 
 Use `threebody_engine.predict_three_body_ephemeris(...)` or:
@@ -101,7 +103,7 @@ This is the default scientific handoff format because it answers not only "where
 For small observational uncertainty, use `threebody_engine.predict_three_body_linearized_distribution(...)` or:
 
 ```powershell
-threebody predict --input initial-state.json --linearized-distribution --position-scale 1e-6 --velocity-scale 1e-6 --output linearized.json
+threebody predict --input initial-state.json --linearized-distribution --preserve-center-of-mass --position-scale 1e-6 --velocity-scale 1e-6 --output linearized.json
 ```
 
 This integrates the variational equation along the nominal trajectory. If `Phi_t` is the flow map and `P0` is the initial covariance, the returned covariance is
@@ -112,14 +114,14 @@ Pt = D Phi_t(x0) P0 D Phi_t(x0)^T
 
 Output includes the mean final positions, position standard deviations, the propagated state covariance, the position covariance block, per-body covariance matrices, the state-transition matrix, and diagnostics such as transition condition number and spectral radius.
 
-This mode is the most mathematical local answer: it gives the first-order probability distribution implied by the Newtonian flow. It is valid while the initial uncertainty is small enough that nonlinear curvature of the flow is not dominant.
+This mode is the most mathematical local answer: it gives the first-order probability distribution implied by the Newtonian flow. If no explicit `initial_state_covariance` is supplied, `preserve_center_of_mass=True` constructs `P0` on the subspace where mass-weighted center-of-mass position and velocity are unchanged. It is valid while the initial uncertainty is small enough that nonlinear curvature of the flow is not dominant.
 
 ## Linearized Gaussian Ephemeris
 
 For a time-resolved first-order probability distribution, use `threebody_engine.predict_three_body_linearized_ephemeris(...)` or:
 
 ```powershell
-threebody predict --input initial-state.json --linearized-ephemeris --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output linearized-ephemeris.json
+threebody predict --input initial-state.json --linearized-ephemeris --preserve-center-of-mass --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output linearized-ephemeris.json
 ```
 
 This is the theoretical probability ephemeris. At every sampled time it returns the nominal mean positions, mean velocities, position standard deviations, and the flattened position covariance implied by
@@ -145,6 +147,8 @@ For the declared initial uncertainty, until what time is the propagated position
 ```
 
 The engine samples the variational flow between `0` and `target_time`, propagates the initial covariance at each sample, and records `max_position_std / position_tolerance`. The forecast is `target_time_resolved=true` only when the final sampled uncertainty ratio is at most one. This does not prove global predictability; it gives a local, reproducible numerical certificate for a specific initial state, uncertainty scale, tolerance, and horizon.
+
+Use `--preserve-center-of-mass` with standalone linearized or horizon CLI modes when the uncertainty should match the ensemble default. Use `--independent-body-uncertainty` in report or solution mode only when independent body-wise observational errors are the intended model.
 
 ## Ensemble Distribution Forecast
 

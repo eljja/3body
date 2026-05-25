@@ -677,6 +677,7 @@ def solve_three_body_prediction_problem(
     position_tolerance: float = 1.0e-3,
     horizon_samples: int = 16,
     linearized_covariance_relative_tolerance: float = 0.75,
+    preserve_center_of_mass: bool = True,
 ) -> dict[str, object]:
     """Return the complete operational answer to the general three-body prediction task."""
 
@@ -707,6 +708,7 @@ def solve_three_body_prediction_problem(
         rtol=rtol,
         atol=atol,
         max_step=max_step,
+        preserve_center_of_mass=preserve_center_of_mass,
     )
     linearized_ephemeris = predict_three_body_linearized_ephemeris(
         masses,
@@ -721,6 +723,7 @@ def solve_three_body_prediction_problem(
         jacobian_step=jacobian_step,
         rtol=rtol,
         atol=atol,
+        preserve_center_of_mass=preserve_center_of_mass,
     )
     interpretation_report = predict_three_body_interpretation_report(
         masses,
@@ -741,6 +744,7 @@ def solve_three_body_prediction_problem(
         position_tolerance=position_tolerance,
         horizon_samples=horizon_samples,
         linearized_covariance_relative_tolerance=linearized_covariance_relative_tolerance,
+        preserve_center_of_mass=preserve_center_of_mass,
     )
     ephemeris_comparison = _linearized_empirical_ephemeris_comparison(
         linearized_ephemeris,
@@ -792,6 +796,7 @@ def predict_three_body_linearized_distribution(
     jacobian_step: float = 1.0e-6,
     rtol: float = 1.0e-10,
     atol: float = 1.0e-12,
+    preserve_center_of_mass: bool = False,
 ) -> dict[str, object]:
     """Push an initial Gaussian uncertainty through the linearized three-body flow.
 
@@ -808,12 +813,15 @@ def predict_three_body_linearized_distribution(
     )
     target_time = _finite_float(target_time, "target_time")
     jacobian_step = _positive_float(jacobian_step, "jacobian_step")
+    generated_center_of_mass_covariance = initial_state_covariance is None and preserve_center_of_mass
     covariance0 = _initial_state_covariance(
         initial_state.size,
         system.dimension,
         initial_state_covariance=initial_state_covariance,
         position_scale=position_scale,
         velocity_scale=velocity_scale,
+        masses=system.masses,
+        preserve_center_of_mass=preserve_center_of_mass,
     )
     flow = _linearized_flow_map(
         system,
@@ -851,6 +859,13 @@ def predict_three_body_linearized_distribution(
         "softening": float(system.softening),
         "success": bool(flow["success"]),
         "message": str(flow["message"]),
+        "uncertainty_model": {
+            "type": "gaussian_initial_state",
+            "position_scale": float(position_scale),
+            "velocity_scale": float(velocity_scale),
+            "preserve_center_of_mass": bool(generated_center_of_mass_covariance),
+            "initial_state_covariance_supplied": initial_state_covariance is not None,
+        },
         "mean_positions": final_positions.tolist(),
         "mean_velocities": final_velocities.tolist(),
         "std_positions": std_positions.tolist(),
@@ -888,6 +903,7 @@ def predict_three_body_linearized_ephemeris(
     jacobian_step: float = 1.0e-6,
     rtol: float = 1.0e-10,
     atol: float = 1.0e-12,
+    preserve_center_of_mass: bool = False,
 ) -> dict[str, object]:
     """Return the time-resolved first-order Gaussian distribution along the nominal flow."""
 
@@ -901,12 +917,15 @@ def predict_three_body_linearized_ephemeris(
     target_time = _finite_float(target_time, "target_time")
     samples = _validated_sample_count(samples)
     jacobian_step = _positive_float(jacobian_step, "jacobian_step")
+    generated_center_of_mass_covariance = initial_state_covariance is None and preserve_center_of_mass
     covariance0 = _initial_state_covariance(
         initial_state.size,
         system.dimension,
         initial_state_covariance=initial_state_covariance,
         position_scale=position_scale,
         velocity_scale=velocity_scale,
+        masses=system.masses,
+        preserve_center_of_mass=preserve_center_of_mass,
     )
     flow = _linearized_flow_trace(
         system,
@@ -934,6 +953,8 @@ def predict_three_body_linearized_ephemeris(
             "type": "gaussian_initial_state",
             "position_scale": float(position_scale),
             "velocity_scale": float(velocity_scale),
+            "preserve_center_of_mass": bool(generated_center_of_mass_covariance),
+            "initial_state_covariance_supplied": initial_state_covariance is not None,
         },
         "times": np.asarray(flow.get("times", []), dtype=float).tolist(),
         "initial_state_covariance": covariance0.tolist(),
@@ -966,6 +987,7 @@ def predict_three_body_forecast_horizon(
     jacobian_step: float = 1.0e-6,
     rtol: float = 1.0e-10,
     atol: float = 1.0e-12,
+    preserve_center_of_mass: bool = False,
 ) -> dict[str, object]:
     """Estimate the time interval where propagated position uncertainty stays below tolerance."""
 
@@ -980,12 +1002,15 @@ def predict_three_body_forecast_horizon(
     position_tolerance = _positive_float(position_tolerance, "position_tolerance")
     horizon_samples = _validated_sample_count(horizon_samples)
     jacobian_step = _positive_float(jacobian_step, "jacobian_step")
+    generated_center_of_mass_covariance = initial_state_covariance is None and preserve_center_of_mass
     covariance0 = _initial_state_covariance(
         initial_state.size,
         system.dimension,
         initial_state_covariance=initial_state_covariance,
         position_scale=position_scale,
         velocity_scale=velocity_scale,
+        masses=system.masses,
+        preserve_center_of_mass=preserve_center_of_mass,
     )
     flow = _linearized_flow_trace(
         system,
@@ -1021,6 +1046,8 @@ def predict_three_body_forecast_horizon(
             "type": "gaussian_initial_state",
             "position_scale": float(position_scale),
             "velocity_scale": float(velocity_scale),
+            "preserve_center_of_mass": bool(generated_center_of_mass_covariance),
+            "initial_state_covariance_supplied": initial_state_covariance is not None,
         },
         "horizon_samples": len(rows),
         "reliable_until": summary["reliable_until"],
@@ -1056,6 +1083,7 @@ def predict_three_body_interpretation_report(
     position_tolerance: float = 1.0e-3,
     horizon_samples: int = 16,
     linearized_covariance_relative_tolerance: float = 0.75,
+    preserve_center_of_mass: bool = True,
 ) -> dict[str, object]:
     """Return a point/linearized/ensemble prediction report with a mode recommendation."""
 
@@ -1083,6 +1111,7 @@ def predict_three_body_interpretation_report(
         jacobian_step=jacobian_step,
         rtol=rtol,
         atol=atol,
+        preserve_center_of_mass=preserve_center_of_mass,
     )
     horizon = predict_three_body_forecast_horizon(
         masses,
@@ -1098,6 +1127,7 @@ def predict_three_body_interpretation_report(
         jacobian_step=jacobian_step,
         rtol=rtol,
         atol=atol,
+        preserve_center_of_mass=preserve_center_of_mass,
     )
     empirical = predict_three_body_position_distribution(
         masses,
@@ -1114,6 +1144,7 @@ def predict_three_body_interpretation_report(
         rtol=rtol,
         atol=atol,
         max_step=max_step,
+        preserve_center_of_mass=preserve_center_of_mass,
     )
     comparison = _prediction_distribution_comparison(linearized, empirical)
     verdict = _prediction_report_verdict(
@@ -1134,6 +1165,7 @@ def predict_three_body_interpretation_report(
             "seed": int(seed),
             "position_scale": float(position_scale),
             "velocity_scale": float(velocity_scale),
+            "preserve_center_of_mass": bool(preserve_center_of_mass),
         },
         "deterministic": deterministic,
         "linearized_gaussian": linearized,
@@ -1535,6 +1567,8 @@ def _initial_state_covariance(
     initial_state_covariance: Sequence[Sequence[float]] | None,
     position_scale: float,
     velocity_scale: float,
+    masses: Sequence[float] | None = None,
+    preserve_center_of_mass: bool = False,
 ) -> np.ndarray:
     if initial_state_covariance is not None:
         covariance = np.asarray(initial_state_covariance, dtype=float)
@@ -1546,6 +1580,23 @@ def _initial_state_covariance(
     position_scale = _nonnegative_float(position_scale, "position_scale")
     velocity_scale = _nonnegative_float(velocity_scale, "velocity_scale")
     position_width = 3 * physical_dimension
+    if preserve_center_of_mass:
+        if masses is None:
+            raise ValueError("masses are required when preserve_center_of_mass is true.")
+        position_covariance = _center_of_mass_preserving_covariance_block(
+            masses,
+            physical_dimension,
+            position_scale,
+        )
+        velocity_covariance = _center_of_mass_preserving_covariance_block(
+            masses,
+            physical_dimension,
+            velocity_scale,
+        )
+        covariance = np.zeros((state_dimension, state_dimension), dtype=float)
+        covariance[:position_width, :position_width] = position_covariance
+        covariance[position_width:, position_width:] = velocity_covariance
+        return covariance
     diagonal = np.concatenate(
         [
             np.full(position_width, position_scale**2, dtype=float),
@@ -1553,6 +1604,26 @@ def _initial_state_covariance(
         ]
     )
     return np.diag(diagonal)
+
+
+def _center_of_mass_preserving_covariance_block(
+    masses: Sequence[float],
+    physical_dimension: int,
+    scale: float,
+) -> np.ndarray:
+    masses_array = np.asarray(masses, dtype=float)
+    if masses_array.shape != (3,) or np.any(~np.isfinite(masses_array)) or np.any(masses_array <= 0.0):
+        raise ValueError("masses must contain exactly three finite positive values.")
+    if physical_dimension not in (2, 3):
+        raise ValueError("physical_dimension must be 2 or 3.")
+    weights = masses_array / np.sum(masses_array)
+    body_projection = np.eye(3, dtype=float) - np.ones((3, 1), dtype=float) @ weights[None, :]
+    body_covariance = (scale**2) * (body_projection @ body_projection.T)
+    covariance = np.zeros((3 * physical_dimension, 3 * physical_dimension), dtype=float)
+    for axis in range(physical_dimension):
+        indices = [body_index * physical_dimension + axis for body_index in range(3)]
+        covariance[np.ix_(indices, indices)] = body_covariance
+    return _symmetrize_covariance(covariance)
 
 
 def _linearized_flow_map(

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import numpy as np
+
 from threebody_engine import (
     audit_public_static_artifact_bytes,
     audit_public_static_artifacts,
@@ -179,6 +181,7 @@ def test_engine_api_solves_three_body_prediction_problem() -> None:
     assert len(solution["answer"]["final_position_distribution"]["mean_positions"]) == 3
     assert solution["deterministic_ephemeris"]["prediction_type"] == "deterministic-ephemeris"
     assert solution["linearized_gaussian_ephemeris"]["prediction_type"] == "linearized-gaussian-ephemeris"
+    assert solution["linearized_gaussian_ephemeris"]["uncertainty_model"]["preserve_center_of_mass"] is True
     assert solution["distribution_ephemeris"]["prediction_type"] == "empirical-position-distribution-ephemeris"
     assert solution["ephemeris_distribution_comparison"]["row_count"] == 9
     assert solution["ephemeris_distribution_comparison"]["final_covariance_relative_gap"] >= 0.0
@@ -198,15 +201,25 @@ def test_engine_api_builds_linearized_three_body_position_distribution() -> None
         0.05,
         position_scale=1.0e-7,
         velocity_scale=1.0e-7,
+        preserve_center_of_mass=True,
     )
 
     assert distribution["prediction_type"] == "linearized-gaussian-position-distribution"
     assert distribution["success"] is True
+    assert distribution["uncertainty_model"]["preserve_center_of_mass"] is True
     assert len(distribution["mean_positions"]) == 3
     assert len(distribution["position_covariance"]) == 6
     assert len(distribution["state_transition_matrix"]) == 12
     assert distribution["linearized_diagnostics"]["minimum_covariance_eigenvalue"] > -1.0e-18
     assert distribution["linearized_diagnostics"]["maximum_position_std"] > 0.0
+    covariance0 = np.asarray(distribution["initial_state_covariance"], dtype=float)
+    weights = np.asarray(scenario.system.masses, dtype=float)
+    weights = weights / np.sum(weights)
+    for offset in (0, 3 * scenario.system.dimension):
+        for axis in range(scenario.system.dimension):
+            indices = [offset + body_index * scenario.system.dimension + axis for body_index in range(3)]
+            axis_covariance = covariance0[np.ix_(indices, indices)]
+            assert abs(float(weights @ axis_covariance @ weights)) < 1.0e-30
 
 
 def test_engine_api_builds_linearized_three_body_ephemeris() -> None:
@@ -221,10 +234,12 @@ def test_engine_api_builds_linearized_three_body_ephemeris() -> None:
         position_scale=1.0e-7,
         velocity_scale=1.0e-7,
         samples=9,
+        preserve_center_of_mass=True,
     )
 
     assert ephemeris["prediction_type"] == "linearized-gaussian-ephemeris"
     assert ephemeris["success"] is True
+    assert ephemeris["uncertainty_model"]["preserve_center_of_mass"] is True
     assert len(ephemeris["times"]) == 9
     assert len(ephemeris["rows"]) == 9
     assert len(ephemeris["rows"][0]["mean_positions"]) == 3
@@ -251,6 +266,8 @@ def test_engine_api_builds_interpretation_prediction_report() -> None:
     assert report["prediction_type"] == "three-body-interpretation-report"
     assert report["deterministic"]["prediction_type"] == "deterministic-position"
     assert report["linearized_gaussian"]["prediction_type"] == "linearized-gaussian-position-distribution"
+    assert report["uncertainty_model"]["preserve_center_of_mass"] is True
+    assert report["linearized_gaussian"]["uncertainty_model"]["preserve_center_of_mass"] is True
     assert report["forecast_horizon"]["prediction_type"] == "linearized-forecast-horizon"
     assert report["forecast_horizon"]["target_time_resolved"] is True
     assert report["empirical_distribution"]["prediction_type"] == "empirical-position-distribution"
@@ -274,10 +291,12 @@ def test_engine_api_estimates_three_body_forecast_horizon() -> None:
         position_scale=1.0e-7,
         velocity_scale=1.0e-7,
         horizon_samples=6,
+        preserve_center_of_mass=True,
     )
 
     assert horizon["prediction_type"] == "linearized-forecast-horizon"
     assert horizon["success"] is True
+    assert horizon["uncertainty_model"]["preserve_center_of_mass"] is True
     assert horizon["target_time_resolved"] is True
     assert horizon["reliable_until"] == horizon["rows"][-1]["time"]
     assert horizon["final_uncertainty_to_tolerance_ratio"] < 1.0

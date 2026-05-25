@@ -326,6 +326,20 @@ def build_parser() -> argparse.ArgumentParser:
     predict.add_argument("--count", type=int, default=64, help="Distribution ensemble size.")
     predict.add_argument("--position-scale", type=float, default=1.0e-6, help="Initial position uncertainty scale.")
     predict.add_argument("--velocity-scale", type=float, default=1.0e-6, help="Initial velocity uncertainty scale.")
+    center_of_mass_group = predict.add_mutually_exclusive_group()
+    center_of_mass_group.add_argument(
+        "--preserve-center-of-mass",
+        dest="preserve_center_of_mass",
+        action="store_true",
+        default=None,
+        help="Couple initial perturbations/covariance so mass-weighted center-of-mass position and velocity are unchanged.",
+    )
+    center_of_mass_group.add_argument(
+        "--independent-body-uncertainty",
+        dest="preserve_center_of_mass",
+        action="store_false",
+        help="Use independent per-body initial position/velocity uncertainty instead of preserving center of mass.",
+    )
     predict.add_argument(
         "--position-tolerance",
         type=float,
@@ -547,6 +561,12 @@ def run_predict_command(args: argparse.Namespace) -> int:
         "rtol": args.rtol,
         "atol": args.atol,
     }
+    preserve_center_of_mass = args.preserve_center_of_mass
+    solution_preserve_center_of_mass = True if preserve_center_of_mass is None else bool(preserve_center_of_mass)
+    standalone_preserve_center_of_mass = bool(preserve_center_of_mass)
+    empirical_uncertainty_kwargs = (
+        {} if preserve_center_of_mass is None else {"preserve_center_of_mass": bool(preserve_center_of_mass)}
+    )
     if args.report:
         result = predict_three_body_interpretation_report(
             _required_prediction_field(payload, "masses"),
@@ -562,6 +582,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             jacobian_step=args.jacobian_step,
             position_tolerance=args.position_tolerance,
             horizon_samples=args.horizon_samples,
+            preserve_center_of_mass=solution_preserve_center_of_mass,
             **common_kwargs,
         )
         exit_code = 0 if result["verdict"]["recommended_mode"] != "unresolved" else 1
@@ -580,6 +601,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             jacobian_step=args.jacobian_step,
             position_tolerance=args.position_tolerance,
             horizon_samples=args.horizon_samples,
+            preserve_center_of_mass=solution_preserve_center_of_mass,
             **common_kwargs,
         )
         exit_code = 0 if result["answer"]["recommended_mode"] != "unresolved" else 1
@@ -595,6 +617,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             position_tolerance=args.position_tolerance,
             horizon_samples=args.horizon_samples,
             jacobian_step=args.jacobian_step,
+            preserve_center_of_mass=standalone_preserve_center_of_mass,
             **common_kwargs,
         )
         exit_code = 0 if result["target_time_resolved"] else 1
@@ -620,6 +643,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             position_scale=args.position_scale,
             velocity_scale=args.velocity_scale,
             jacobian_step=args.jacobian_step,
+            preserve_center_of_mass=standalone_preserve_center_of_mass,
             **common_kwargs,
         )
         exit_code = 0 if result["success"] else 1
@@ -634,6 +658,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             velocity_scale=args.velocity_scale,
             samples=args.samples,
             jacobian_step=args.jacobian_step,
+            preserve_center_of_mass=standalone_preserve_center_of_mass,
             **common_kwargs,
         )
         exit_code = 0 if result["success"] else 1
@@ -650,6 +675,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             include_sample_ephemerides=args.include_sample_ephemerides,
             samples=args.samples,
             max_step=args.max_step,
+            **empirical_uncertainty_kwargs,
             **common_kwargs,
         )
         exit_code = 0 if result["success_count"] else 1
@@ -666,6 +692,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             include_sample_positions=args.include_sample_positions,
             samples=args.samples,
             max_step=args.max_step,
+            **empirical_uncertainty_kwargs,
             **common_kwargs,
         )
         exit_code = 0 if result["success_count"] else 1
