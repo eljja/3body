@@ -183,12 +183,15 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     public_url_audit = audit_public_static_artifacts_from_url("https://example.test/3body/", require_commit="local")
 
     assert public_api_receipt["verified"] is True
+    assert isinstance(public_api_receipt["receipt_payload_sha256"], str)
+    assert len(public_api_receipt["receipt_payload_sha256"]) == 64
     assert public_api_receipt["required_profiles"] == ["public-claims-v1"]
     assert public_api_receipt["required_feature_set_sha256"] == verifier_feature_set_sha256
     assert validate_public_static_artifact_receipt_contract(public_api_receipt)["verified"] is True
     assert public_api_audit["verified"] is True
     assert public_api_audit["contract"]["profile"] == "public-claims-v1"
     assert public_api_audit["receipt_contract_validation"]["verified"] is True
+    assert public_api_audit["receipt_contract_validation"]["checks"]["receipt_payload_sha256_matches"] is True
     assert direct_bytes_receipt["verified"] is True
     assert direct_bytes_receipt["required_profiles"] == ["public-claims-v1"]
     assert direct_bytes_audit["verified"] is True

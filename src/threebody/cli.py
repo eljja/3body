@@ -101,6 +101,16 @@ def static_artifact_verification_features_sha256(features: Sequence[str]) -> str
     return hashlib.sha256(canonical).hexdigest()
 
 
+def static_artifact_receipt_payload_sha256(receipt: Mapping[str, object]) -> str:
+    payload = {
+        key: value
+        for key, value in receipt.items()
+        if key not in {"verified_at_utc", "receipt_payload_sha256"}
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="threebody",
@@ -834,7 +844,7 @@ def verify_static_artifact_bytes(
         "gitattributes_size": _manifest_size_matches(manifest, ".gitattributes", artifacts[".gitattributes"]),
         "gitattributes_policy": artifacts[".gitattributes"] == STATIC_SITE_GITATTRIBUTES_POLICY,
     }
-    return {
+    receipt = {
         "verification_schema_version": 1,
         "verification_schema_features": verification_schema_features,
         "verification_schema_features_sha256": verification_schema_features_sha256,
@@ -867,6 +877,8 @@ def verify_static_artifact_bytes(
         "artifact_errors": artifact_errors,
         "checks": checks,
     }
+    receipt["receipt_payload_sha256"] = static_artifact_receipt_payload_sha256(receipt)
+    return receipt
 
 
 def _read_static_artifacts_from_dir(site_dir: Path) -> tuple[dict[str, bytes], dict[str, str | None]]:

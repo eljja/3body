@@ -32,6 +32,7 @@ from threebody.analysis import (
 from threebody.cli import (
     PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE,
     STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES,
+    static_artifact_receipt_payload_sha256,
     static_artifact_requirement_profile_descriptor,
     static_artifact_requirement_profile_sha256,
     static_artifact_verification_features_sha256,
@@ -75,8 +76,11 @@ def validate_public_static_artifact_receipt_contract(
     profile_sha256 = contract.get("profile_sha256")
     feature_set_sha256 = contract.get("verification_schema_features_sha256")
     required_profile_hashes = _mapping_field(receipt, "required_profile_hashes")
+    receipt_payload_sha256 = receipt.get("receipt_payload_sha256")
     checks = {
         "receipt_verified": receipt.get("verified") is True,
+        "receipt_payload_sha256_present": isinstance(receipt_payload_sha256, str) and len(receipt_payload_sha256) == 64,
+        "receipt_payload_sha256_matches": receipt_payload_sha256 == static_artifact_receipt_payload_sha256(receipt),
         "required_profile_declared": profile in _sequence_field(receipt, "required_profiles"),
         "required_profile_hash_matches": required_profile_hashes.get(profile) == profile_sha256,
         "required_feature_set_sha256_matches": receipt.get("required_feature_set_sha256") == feature_set_sha256,
@@ -91,6 +95,7 @@ def validate_public_static_artifact_receipt_contract(
         "profile": profile,
         "profile_sha256": profile_sha256,
         "verification_schema_features_sha256": feature_set_sha256,
+        "receipt_payload_sha256": receipt_payload_sha256,
         "verified": all(checks.values()),
         "checks": checks,
     }

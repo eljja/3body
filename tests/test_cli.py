@@ -154,6 +154,11 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["verification_schema_features_sha256"] == cli_module.static_artifact_verification_features_sha256(
         receipt["verification_schema_features"]
     )
+    assert receipt["receipt_payload_sha256"] == cli_module.static_artifact_receipt_payload_sha256(receipt)
+    retimestamped_receipt = {**receipt, "verified_at_utc": "2099-01-01T00:00:00Z"}
+    assert cli_module.static_artifact_receipt_payload_sha256(retimestamped_receipt) == receipt["receipt_payload_sha256"]
+    tampered_receipt = {**receipt, "verified": False}
+    assert cli_module.static_artifact_receipt_payload_sha256(tampered_receipt) != receipt["receipt_payload_sha256"]
     assert receipt["certificate_verification_schema_features"] == receipt["verification_schema_features"]
     assert (
         receipt["certificate_verification_schema_features_sha256"] == receipt["verification_schema_features_sha256"]

@@ -56,6 +56,8 @@ def test_engine_api_receipt_contract_validator_reports_missing_fields() -> None:
 
     assert result["verified"] is False
     assert result["checks"]["receipt_verified"] is False
+    assert result["checks"]["receipt_payload_sha256_present"] is False
+    assert result["checks"]["receipt_payload_sha256_matches"] is False
     assert result["checks"]["required_profile_declared"] is False
     assert result["checks"]["required_profile_hash_matches"] is False
     assert result["checks"]["required_feature_set_sha256_matches"] is False
