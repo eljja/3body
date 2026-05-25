@@ -18,6 +18,16 @@ def test_general_classifier_detects_hierarchical_binary_chart() -> None:
 
     assert report.primary_chart in {ChartType.CLOSE_ENCOUNTER, ChartType.TWO_BODY_HIERARCHY}
     assert any(score.chart == ChartType.TWO_BODY_HIERARCHY and score.score > 0.5 for score in report.scores)
+    assert report.reduced_state is not None
+    assert report.reduced_state.nearest_pair == report.features.nearest_pair
+    assert report.reduced_state.hierarchy_ratio == report.features.hierarchy_ratio
+    assert report.reduced_state.reduced_regime_hint in {
+        "collision_boundary",
+        "escape_boundary",
+        "hierarchy_chart",
+        "democratic_shape",
+        "transition_region",
+    }
 
 
 def test_restricted_classifier_detects_lagrange_neighborhood() -> None:
@@ -29,6 +39,7 @@ def test_restricted_classifier_detects_lagrange_neighborhood() -> None:
 
     assert report.primary_chart == ChartType.RESTRICTED_LAGRANGE
     assert report.confidence > 0.8
+    assert report.reduced_state is None
 
 
 def test_analysis_atlas_follows_trajectory_and_reports_distribution() -> None:
@@ -45,4 +56,5 @@ def test_analysis_atlas_follows_trajectory_and_reports_distribution() -> None:
     distribution = atlas.chart_distribution(reports)
 
     assert reports
+    assert all(report.reduced_state is not None for report in reports)
     assert abs(sum(distribution.values()) - 1.0) < 1.0e-12

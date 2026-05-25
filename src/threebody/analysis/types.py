@@ -40,6 +40,7 @@ class AnalysisReport:
     primary_chart: ChartType
     scores: tuple[ChartScore, ...]
     features: Any
+    reduced_state: Any | None = None
 
     @property
     def confidence(self) -> float:

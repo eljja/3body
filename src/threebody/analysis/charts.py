@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .coordinates import general_three_body_features, restricted_three_body_features
+from .reduced_state import reduced_three_body_state
 from .types import AnalysisReport, ChartScore, ChartType
 
 
@@ -28,6 +29,7 @@ class ChartClassifier:
 
     def classify_general(self, system: object, state: np.ndarray) -> AnalysisReport:
         features = general_three_body_features(system, state)
+        reduced = reduced_three_body_state(system, state)
         scores = [
             self._score_close_encounter(features),
             self._score_hierarchy(features),
@@ -37,7 +39,7 @@ class ChartClassifier:
             self._score_democratic(features),
         ]
         ranked = tuple(sorted(scores, key=lambda item: item.score, reverse=True))
-        return AnalysisReport(primary_chart=ranked[0].chart, scores=ranked, features=features)
+        return AnalysisReport(primary_chart=ranked[0].chart, scores=ranked, features=features, reduced_state=reduced)
 
     def classify_restricted(self, system: object, state: np.ndarray) -> AnalysisReport:
         features = restricted_three_body_features(system, state)

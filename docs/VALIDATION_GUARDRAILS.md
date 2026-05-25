@@ -34,7 +34,7 @@ Forbidden claims:
 
 ## Current Gaps
 
-- `ReducedThreeBodyState` now centralizes shape-scale-invariant coordinates, but the main classifier still partly uses older feature objects. Migration should be gradual and tested against existing chart labels.
+- `AnalysisReport` now carries `ReducedThreeBodyState` snapshots for general three-body classifier outputs, so downstream models can read the shared shape-scale coordinates without recomputing them. The main classifier scoring still partly uses older feature objects, so any scoring migration must remain gradual and tested against existing chart labels.
 - Periapsis phase is now measured from the trajectory, and the first `scattering_map` collapse includes periapsis distance and deflection angle. The scattering diagnostic now also reports outgoing semimajor axis, eccentricity, periapsis distance, and escape speed at infinity.
 - The stricter `theorem-suite` currently does not reproduce the low-crossing scattering-map win from the smaller smoke run. This blocks any breakthrough claim based on that model.
 - The current `theorem-suite` partially supports `low_crossing_impulse`, but the high-crossing best model does not yet pass the paper threshold. A two-sided hierarchy-boundary theorem is not justified.
