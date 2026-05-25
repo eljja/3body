@@ -316,11 +316,17 @@ def build_parser() -> argparse.ArgumentParser:
             "Repeat for multiple capabilities."
         ),
     )
-    verify_static.add_argument(
+    feature_set_group = verify_static.add_mutually_exclusive_group()
+    feature_set_group.add_argument(
         "--require-feature-set-sha256",
         default=None,
         metavar="SHA256",
         help="Require verification_schema_features_sha256 to match this canonical verifier capability-set digest.",
+    )
+    feature_set_group.add_argument(
+        "--require-current-feature-set",
+        action="store_true",
+        help="Pin required_feature_set_sha256 to this verifier build's current canonical capability-set digest.",
     )
     verify_static.add_argument(
         "--output",
@@ -645,6 +651,11 @@ def run_atlas_benchmark_command(args: argparse.Namespace) -> int:
 
 
 def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
+    require_feature_set_sha256 = (
+        static_artifact_verification_features_sha256(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
+        if args.require_current_feature_set
+        else args.require_feature_set_sha256
+    )
     result = (
         verify_static_artifacts_from_url(
             args.base_url,
@@ -654,7 +665,7 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             require_maximums=args.require_max,
             require_profiles=args.require_profile,
             require_features=args.require_feature,
-            require_feature_set_sha256=args.require_feature_set_sha256,
+            require_feature_set_sha256=require_feature_set_sha256,
         )
         if args.base_url
         else verify_static_artifacts(
@@ -665,7 +676,7 @@ def run_verify_static_artifacts_command(args: argparse.Namespace) -> int:
             require_maximums=args.require_max,
             require_profiles=args.require_profile,
             require_features=args.require_feature,
-            require_feature_set_sha256=args.require_feature_set_sha256,
+            require_feature_set_sha256=require_feature_set_sha256,
         )
     )
     if args.output is not None:

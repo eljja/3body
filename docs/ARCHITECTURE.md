@@ -51,7 +51,7 @@ Runs repeatable research jobs from the command line.
 - `threebody survey`
 - `python -m threebody.cli survey`
 - `python -m threebody.cli verify-static-artifacts --site-dir site`
-- `python -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <sha-or-prefix> --require-profile public-claims-v1 --require-feature-set-sha256 <verification-schema-features-sha256> --output .runtime/research_runs/pages-verification-receipt.json`
+- `python -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <sha-or-prefix> --require-profile public-claims-v1 --require-current-feature-set --output .runtime/research_runs/pages-verification-receipt.json`
 
 ### `src/threebody/experiments`
 

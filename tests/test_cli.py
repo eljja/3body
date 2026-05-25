@@ -267,6 +267,34 @@ def test_verify_static_artifacts_cli_rejects_missing_required_feature(tmp_path) 
     assert receipt["checks"]["index_hash"] is True
 
 
+def test_verify_static_artifacts_cli_can_pin_current_feature_set_digest(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    receipt_path = tmp_path / "current-feature-set-digest-receipt.json"
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-commit",
+            "abc123",
+            "--require-current-feature-set",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    expected_digest = cli_module.static_artifact_verification_features_sha256(
+        cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES
+    )
+
+    assert exit_code == 0
+    assert receipt["verified"] is True
+    assert receipt["required_feature_set_sha256"] == expected_digest
+    assert receipt["checks"]["required_feature_set_sha256"] is True
+    assert receipt["checks"]["certificate_verification_schema_features_sha256"] is True
+
+
 def test_verify_static_artifacts_cli_rejects_feature_set_digest_mismatch(tmp_path) -> None:
     _write_static_artifact_bundle(tmp_path)
     receipt_path = tmp_path / "feature-set-digest-receipt.json"
