@@ -37,6 +37,8 @@ Input JSON:
 }
 ```
 
+For probability forecasts, the same input may include `initial_state_covariance`. Its shape must match the flattened state dimension, `2 * 3 * dimension`: `12 x 12` in 2D or `18 x 18` in 3D. Empirical modes sample that covariance directly, and linearized modes propagate the same `P0` by the variational flow.
+
 Output includes final positions, final velocities, solver metadata, and a Noether invariant drift certificate for energy, linear momentum, and angular momentum.
 
 ## One-Call Solution Bundle
@@ -60,7 +62,7 @@ This is the most direct public API for the original project target. It returns:
 
 The bundle is intentionally not a closed-form theorem for all initial conditions. It is a reproducible computational answer: exact initial data produce a flow-map sample; uncertain initial data produce a pushed-forward empirical distribution; diagnostics say how strong the resulting claim is.
 
-By default, the bundle uses a center-of-mass-preserving uncertainty model for both the empirical ensemble and the linearized Gaussian covariance. This keeps mass-weighted center-of-mass position and velocity fixed under initial perturbations, avoiding a comparison where the ensemble and Gaussian forecast start from different physical assumptions.
+By default, the bundle uses a center-of-mass-preserving uncertainty model for both the empirical ensemble and the linearized Gaussian covariance. This keeps mass-weighted center-of-mass position and velocity fixed under initial perturbations, avoiding a comparison where the ensemble and Gaussian forecast start from different physical assumptions. When `initial_state_covariance` is supplied in the API call or input JSON, that full state covariance replaces the generated scale-based covariance in the empirical ensemble, linearized Gaussian ephemeris, forecast horizon, and interpretation report.
 
 ## Ephemeris Forecast
 
@@ -158,7 +160,7 @@ When the initial condition is uncertain, use `threebody_engine.predict_three_bod
 threebody predict --input initial-state.json --distribution --count 128 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution.json
 ```
 
-The distribution mode samples a Gaussian perturbation ensemble around the initial state, optionally preserving center-of-mass position and velocity, integrates each member, and summarizes the final position distribution.
+The distribution mode samples a Gaussian perturbation ensemble around the initial state, optionally preserving center-of-mass position and velocity, integrates each member, and summarizes the final position distribution. If `initial_state_covariance` is supplied, the ensemble is drawn from that covariance directly; otherwise the engine builds the covariance from `position_scale`, `velocity_scale`, and the center-of-mass option.
 
 Output includes:
 

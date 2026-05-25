@@ -435,6 +435,7 @@ def predict_three_body_position_distribution(
     target_time: float,
     *,
     count: int = 64,
+    initial_state_covariance: Sequence[Sequence[float]] | None = None,
     position_scale: float = 1.0e-6,
     velocity_scale: float = 1.0e-6,
     seed: int = 0,
@@ -459,17 +460,23 @@ def predict_three_body_position_distribution(
     target_time = _finite_float(target_time, "target_time")
     count = _validated_positive_int(count, "count")
     sample_count = _validated_sample_count(samples)
-    position_scale = _nonnegative_float(position_scale, "position_scale")
-    velocity_scale = _nonnegative_float(velocity_scale, "velocity_scale")
+    generated_center_of_mass_covariance = initial_state_covariance is None and preserve_center_of_mass
+    covariance0 = _initial_state_covariance(
+        initial_state.size,
+        system.dimension,
+        initial_state_covariance=initial_state_covariance,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        masses=system.masses,
+        preserve_center_of_mass=preserve_center_of_mass,
+    )
     rng = np.random.default_rng(seed)
     initial_states = _perturbed_initial_states(
         system,
         initial_state,
         count=count,
         rng=rng,
-        position_scale=position_scale,
-        velocity_scale=velocity_scale,
-        preserve_center_of_mass=preserve_center_of_mass,
+        initial_state_covariance=covariance0,
     )
     t_eval = _prediction_times(target_time, sample_count)
     integrator = AdaptiveIntegrator(rtol=rtol, atol=atol, max_step=max_step)
@@ -526,10 +533,12 @@ def predict_three_body_position_distribution(
             "type": "gaussian_initial_state",
             "count": count,
             "seed": int(seed),
-            "position_scale": position_scale,
-            "velocity_scale": velocity_scale,
-            "preserve_center_of_mass": preserve_center_of_mass,
+            "position_scale": float(position_scale),
+            "velocity_scale": float(velocity_scale),
+            "preserve_center_of_mass": bool(generated_center_of_mass_covariance),
+            "initial_state_covariance_supplied": initial_state_covariance is not None,
         },
+        "initial_state_covariance": covariance0.tolist(),
         "success_count": len(successful_positions),
         "failure_count": len(failures),
         "failures": failures,
@@ -548,6 +557,7 @@ def predict_three_body_distribution_ephemeris(
     target_time: float,
     *,
     count: int = 64,
+    initial_state_covariance: Sequence[Sequence[float]] | None = None,
     position_scale: float = 1.0e-6,
     velocity_scale: float = 1.0e-6,
     seed: int = 0,
@@ -572,17 +582,23 @@ def predict_three_body_distribution_ephemeris(
     target_time = _finite_float(target_time, "target_time")
     count = _validated_positive_int(count, "count")
     sample_count = _validated_sample_count(samples)
-    position_scale = _nonnegative_float(position_scale, "position_scale")
-    velocity_scale = _nonnegative_float(velocity_scale, "velocity_scale")
+    generated_center_of_mass_covariance = initial_state_covariance is None and preserve_center_of_mass
+    covariance0 = _initial_state_covariance(
+        initial_state.size,
+        system.dimension,
+        initial_state_covariance=initial_state_covariance,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        masses=system.masses,
+        preserve_center_of_mass=preserve_center_of_mass,
+    )
     rng = np.random.default_rng(seed)
     initial_states = _perturbed_initial_states(
         system,
         initial_state,
         count=count,
         rng=rng,
-        position_scale=position_scale,
-        velocity_scale=velocity_scale,
-        preserve_center_of_mass=preserve_center_of_mass,
+        initial_state_covariance=covariance0,
     )
     integrator = AdaptiveIntegrator(rtol=rtol, atol=atol, max_step=max_step)
     successful_positions: list[np.ndarray] = []
@@ -638,10 +654,12 @@ def predict_three_body_distribution_ephemeris(
             "type": "gaussian_initial_state",
             "count": count,
             "seed": int(seed),
-            "position_scale": position_scale,
-            "velocity_scale": velocity_scale,
-            "preserve_center_of_mass": preserve_center_of_mass,
+            "position_scale": float(position_scale),
+            "velocity_scale": float(velocity_scale),
+            "preserve_center_of_mass": bool(generated_center_of_mass_covariance),
+            "initial_state_covariance_supplied": initial_state_covariance is not None,
         },
+        "initial_state_covariance": covariance0.tolist(),
         "success_count": len(successful_positions),
         "failure_count": len(failures),
         "failures": failures,
@@ -664,6 +682,7 @@ def solve_three_body_prediction_problem(
     target_time: float,
     *,
     count: int = 64,
+    initial_state_covariance: Sequence[Sequence[float]] | None = None,
     position_scale: float = 1.0e-6,
     velocity_scale: float = 1.0e-6,
     seed: int = 0,
@@ -699,6 +718,7 @@ def solve_three_body_prediction_problem(
         velocities,
         target_time,
         count=count,
+        initial_state_covariance=initial_state_covariance,
         position_scale=position_scale,
         velocity_scale=velocity_scale,
         seed=seed,
@@ -715,6 +735,7 @@ def solve_three_body_prediction_problem(
         positions,
         velocities,
         target_time,
+        initial_state_covariance=initial_state_covariance,
         position_scale=position_scale,
         velocity_scale=velocity_scale,
         gravitational_constant=gravitational_constant,
@@ -731,6 +752,7 @@ def solve_three_body_prediction_problem(
         velocities,
         target_time,
         count=count,
+        initial_state_covariance=initial_state_covariance,
         position_scale=position_scale,
         velocity_scale=velocity_scale,
         seed=seed,
@@ -1070,6 +1092,7 @@ def predict_three_body_interpretation_report(
     target_time: float,
     *,
     count: int = 64,
+    initial_state_covariance: Sequence[Sequence[float]] | None = None,
     position_scale: float = 1.0e-6,
     velocity_scale: float = 1.0e-6,
     seed: int = 0,
@@ -1087,6 +1110,7 @@ def predict_three_body_interpretation_report(
 ) -> dict[str, object]:
     """Return a point/linearized/ensemble prediction report with a mode recommendation."""
 
+    generated_center_of_mass_covariance = initial_state_covariance is None and preserve_center_of_mass
     deterministic = predict_three_body_positions(
         masses,
         positions,
@@ -1104,6 +1128,7 @@ def predict_three_body_interpretation_report(
         positions,
         velocities,
         target_time,
+        initial_state_covariance=initial_state_covariance,
         position_scale=position_scale,
         velocity_scale=velocity_scale,
         gravitational_constant=gravitational_constant,
@@ -1119,6 +1144,7 @@ def predict_three_body_interpretation_report(
         velocities,
         target_time,
         position_tolerance=position_tolerance,
+        initial_state_covariance=initial_state_covariance,
         position_scale=position_scale,
         velocity_scale=velocity_scale,
         gravitational_constant=gravitational_constant,
@@ -1135,6 +1161,7 @@ def predict_three_body_interpretation_report(
         velocities,
         target_time,
         count=count,
+        initial_state_covariance=initial_state_covariance,
         position_scale=position_scale,
         velocity_scale=velocity_scale,
         seed=seed,
@@ -1165,7 +1192,8 @@ def predict_three_body_interpretation_report(
             "seed": int(seed),
             "position_scale": float(position_scale),
             "velocity_scale": float(velocity_scale),
-            "preserve_center_of_mass": bool(preserve_center_of_mass),
+            "preserve_center_of_mass": bool(generated_center_of_mass_covariance),
+            "initial_state_covariance_supplied": initial_state_covariance is not None,
         },
         "deterministic": deterministic,
         "linearized_gaussian": linearized,
@@ -1344,10 +1372,18 @@ def _perturbed_initial_states(
     *,
     count: int,
     rng: np.random.Generator,
-    position_scale: float,
-    velocity_scale: float,
-    preserve_center_of_mass: bool,
+    initial_state_covariance: np.ndarray | None = None,
+    position_scale: float = 1.0e-6,
+    velocity_scale: float = 1.0e-6,
+    preserve_center_of_mass: bool = True,
 ) -> list[np.ndarray]:
+    if initial_state_covariance is not None:
+        return _covariance_perturbed_initial_states(
+            initial_state,
+            covariance=initial_state_covariance,
+            count=count,
+            rng=rng,
+        )
     positions, velocities = system.split_state(initial_state)
     states = [initial_state.copy()]
     masses = np.asarray(system.masses, dtype=float)
@@ -1358,6 +1394,31 @@ def _perturbed_initial_states(
             position_noise = position_noise - np.average(position_noise, axis=0, weights=masses)
             velocity_noise = velocity_noise - np.average(velocity_noise, axis=0, weights=masses)
         states.append(system.flatten_state(positions + position_noise, velocities + velocity_noise))
+    return states
+
+
+def _covariance_perturbed_initial_states(
+    initial_state: np.ndarray,
+    *,
+    covariance: np.ndarray,
+    count: int,
+    rng: np.random.Generator,
+) -> list[np.ndarray]:
+    covariance = np.asarray(covariance, dtype=float)
+    if covariance.shape != (initial_state.size, initial_state.size):
+        raise ValueError("initial_state_covariance must have shape (state_dim, state_dim).")
+    covariance = _symmetrize_covariance(covariance)
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+    spectral_scale = max(float(np.max(np.abs(eigenvalues))), 1.0)
+    tolerance = 1.0e-12 * spectral_scale
+    if float(np.min(eigenvalues)) < -tolerance:
+        raise ValueError("initial_state_covariance must be positive semidefinite.")
+    square_roots = np.sqrt(np.maximum(eigenvalues, 0.0))
+    states = [initial_state.copy()]
+    for _index in range(1, count):
+        standard_normal = rng.normal(0.0, 1.0, size=initial_state.size)
+        perturbation = eigenvectors @ (square_roots * standard_normal)
+        states.append(initial_state + perturbation)
     return states
 
 

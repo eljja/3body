@@ -129,6 +129,44 @@ def test_engine_api_builds_three_body_position_distribution() -> None:
     assert len(distribution["sample_predictions"]) == 7
 
 
+def test_engine_api_pushes_explicit_initial_covariance_through_distribution_modes() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+    covariance = np.eye(scenario.initial_state.size, dtype=float) * 1.0e-14
+    covariance[0, 2] = covariance[2, 0] = 2.0e-15
+
+    distribution = predict_three_body_position_distribution(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        count=7,
+        initial_state_covariance=covariance,
+        seed=4,
+        samples=16,
+    )
+    solution = solve_three_body_prediction_problem(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        count=7,
+        initial_state_covariance=covariance,
+        samples=9,
+        horizon_samples=6,
+    )
+
+    assert distribution["uncertainty_model"]["initial_state_covariance_supplied"] is True
+    assert distribution["uncertainty_model"]["preserve_center_of_mass"] is False
+    assert np.allclose(np.asarray(distribution["initial_state_covariance"], dtype=float), covariance)
+    assert solution["linearized_gaussian_ephemeris"]["uncertainty_model"]["initial_state_covariance_supplied"] is True
+    assert solution["distribution_ephemeris"]["uncertainty_model"]["initial_state_covariance_supplied"] is True
+    assert np.allclose(
+        np.asarray(solution["distribution_ephemeris"]["initial_state_covariance"], dtype=float),
+        covariance,
+    )
+
+
 def test_engine_api_builds_three_body_distribution_ephemeris() -> None:
     scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
     positions, velocities = scenario.system.split_state(scenario.initial_state)

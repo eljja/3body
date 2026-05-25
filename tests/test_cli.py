@@ -307,6 +307,39 @@ def test_predict_cli_writes_linearized_position_distribution(tmp_path) -> None:
     assert payload["linearized_diagnostics"]["maximum_position_std"] > 0.0
 
 
+def test_predict_cli_uses_explicit_initial_covariance_for_distribution(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "distribution.json"
+    _write_prediction_input(input_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    covariance = [[0.0 for _column in range(12)] for _row in range(12)]
+    for index in range(12):
+        covariance[index][index] = 1.0e-14
+    covariance[0][2] = covariance[2][0] = 2.0e-15
+    payload["initial_state_covariance"] = covariance
+    input_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--distribution",
+            "--count",
+            "7",
+            "--output",
+            str(output_path),
+        ]
+    )
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert result["prediction_type"] == "empirical-position-distribution"
+    assert result["uncertainty_model"]["initial_state_covariance_supplied"] is True
+    assert result["uncertainty_model"]["preserve_center_of_mass"] is False
+    assert result["initial_state_covariance"] == covariance
+
+
 def test_predict_cli_writes_linearized_ephemeris(tmp_path) -> None:
     input_path = tmp_path / "initial-state.json"
     output_path = tmp_path / "linearized-ephemeris.json"
