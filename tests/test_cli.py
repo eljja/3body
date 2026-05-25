@@ -143,6 +143,7 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
         "manifest-hash-algorithm",
         "index-artifact-discoverability",
         "publication-pipeline-links",
+        "published-branch-line-ending-policy",
         "commit-provenance",
         "active-profile-descriptor",
         "profile-gates",
@@ -171,12 +172,14 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["artifact_errors"] == {
         "certificate.json": None,
         "favicon.svg": None,
+        ".gitattributes": None,
         "index.html": None,
         "manifest.json": None,
     }
     assert receipt["checks"]["index_available"] is True
     assert receipt["checks"]["certificate_available"] is True
     assert receipt["checks"]["favicon_available"] is True
+    assert receipt["checks"]["gitattributes_available"] is True
     assert receipt["checks"]["manifest_available"] is True
     assert receipt["checks"]["required_commit"] is True
     assert receipt["checks"]["required_gates"] is True
@@ -193,6 +196,9 @@ def test_verify_static_artifacts_cli_checks_manifest_hashes(tmp_path) -> None:
     assert receipt["checks"]["index_favicon_link"] is True
     assert receipt["checks"]["favicon_hash"] is True
     assert receipt["checks"]["favicon_size"] is True
+    assert receipt["checks"]["gitattributes_hash"] is True
+    assert receipt["checks"]["gitattributes_size"] is True
+    assert receipt["checks"]["gitattributes_policy"] is True
     assert receipt["required_gates"] == ["symbolic_passes_stride_robustness"]
     assert receipt["required_gate_results"]["symbolic_passes_stride_robustness"] is True
     assert receipt["required_minimum_results"][0]["path"] == "promotion_gates.picard_contraction_reserve"
@@ -238,6 +244,35 @@ def test_verify_static_artifacts_cli_rejects_manifest_hash_algorithm_mismatch(tm
     assert receipt["checks"]["index_hash"] is True
     assert receipt["checks"]["certificate_hash"] is True
     assert receipt["checks"]["favicon_hash"] is True
+
+
+def test_verify_static_artifacts_cli_rejects_wrong_gitattributes_policy(tmp_path) -> None:
+    _write_static_artifact_bundle(tmp_path)
+    receipt_path = tmp_path / "gitattributes-policy-receipt.json"
+    (tmp_path / ".gitattributes").write_text("* text=auto\n", encoding="utf-8", newline="\n")
+    _refresh_manifest_hashes(tmp_path)
+
+    exit_code = main(
+        [
+            "verify-static-artifacts",
+            "--site-dir",
+            str(tmp_path),
+            "--require-commit",
+            "abc123",
+            "--require-public-claim",
+            "--output",
+            str(receipt_path),
+        ]
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert receipt["verified"] is False
+    assert receipt["checks"]["gitattributes_available"] is True
+    assert receipt["checks"]["gitattributes_hash"] is True
+    assert receipt["checks"]["gitattributes_size"] is True
+    assert receipt["checks"]["gitattributes_policy"] is False
+    assert "published-branch-line-ending-policy" in receipt["verification_schema_features"]
 
 
 def test_verify_static_artifacts_cli_rejects_missing_required_feature(tmp_path) -> None:
@@ -354,6 +389,7 @@ def test_verify_static_artifact_bytes_api_can_require_public_claim(tmp_path) -> 
         "index.html": (tmp_path / "index.html").read_bytes(),
         "certificate.json": (tmp_path / "certificate.json").read_bytes(),
         "favicon.svg": (tmp_path / "favicon.svg").read_bytes(),
+        ".gitattributes": (tmp_path / ".gitattributes").read_bytes(),
         "manifest.json": (tmp_path / "manifest.json").read_bytes(),
     }
 
@@ -807,6 +843,7 @@ def test_verify_static_artifacts_from_url_reports_fetch_error(monkeypatch, tmp_p
     artifacts = {
         "index.html": (tmp_path / "index.html").read_bytes(),
         "certificate.json": (tmp_path / "certificate.json").read_bytes(),
+        ".gitattributes": (tmp_path / ".gitattributes").read_bytes(),
         "manifest.json": (tmp_path / "manifest.json").read_bytes(),
     }
 
@@ -855,6 +892,7 @@ def test_verify_static_artifact_bytes_reports_missing_direct_artifact_key(tmp_pa
     artifacts = {
         "index.html": (tmp_path / "index.html").read_bytes(),
         "certificate.json": (tmp_path / "certificate.json").read_bytes(),
+        ".gitattributes": (tmp_path / ".gitattributes").read_bytes(),
         "manifest.json": (tmp_path / "manifest.json").read_bytes(),
     }
 
@@ -878,6 +916,7 @@ def test_verify_static_artifact_bytes_does_not_let_partial_error_map_hide_missin
     artifacts = {
         "index.html": (tmp_path / "index.html").read_bytes(),
         "certificate.json": (tmp_path / "certificate.json").read_bytes(),
+        ".gitattributes": (tmp_path / ".gitattributes").read_bytes(),
         "manifest.json": (tmp_path / "manifest.json").read_bytes(),
     }
 
@@ -900,6 +939,7 @@ def test_verify_static_artifact_bytes_reports_malformed_error_map_without_crashi
         "index.html": (tmp_path / "index.html").read_bytes(),
         "certificate.json": (tmp_path / "certificate.json").read_bytes(),
         "favicon.svg": (tmp_path / "favicon.svg").read_bytes(),
+        ".gitattributes": (tmp_path / ".gitattributes").read_bytes(),
         "manifest.json": (tmp_path / "manifest.json").read_bytes(),
     }
 
@@ -923,6 +963,7 @@ def test_verify_static_artifact_bytes_reports_non_bytes_payload_without_crashing
         "index.html": (tmp_path / "index.html").read_bytes(),
         "certificate.json": (tmp_path / "certificate.json").read_bytes(),
         "favicon.svg": "<svg></svg>",
+        ".gitattributes": (tmp_path / ".gitattributes").read_bytes(),
         "manifest.json": (tmp_path / "manifest.json").read_bytes(),
     }
 
@@ -947,6 +988,7 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
         "index.html": (tmp_path / "index.html").read_bytes(),
         "certificate.json": (tmp_path / "certificate.json").read_bytes(),
         "favicon.svg": (tmp_path / "favicon.svg").read_bytes(),
+        ".gitattributes": (tmp_path / ".gitattributes").read_bytes(),
         "manifest.json": (tmp_path / "manifest.json").read_bytes(),
     }
     requested_urls: list[str] = []
@@ -1009,6 +1051,9 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
     assert result["checks"]["index_favicon_link"] is True
     assert result["checks"]["favicon_hash"] is True
     assert result["checks"]["favicon_size"] is True
+    assert result["checks"]["gitattributes_hash"] is True
+    assert result["checks"]["gitattributes_size"] is True
+    assert result["checks"]["gitattributes_policy"] is True
     assert result["required_gate_results"]["picard_certified"] is True
     assert result["required_minimum_results"][0]["passed"] is True
     assert result["required_maximum_results"][0]["passed"] is True
@@ -1016,6 +1061,7 @@ def test_verify_static_artifacts_cli_checks_public_url_manifest(monkeypatch, tmp
         "https://example.test/3body/index.html",
         "https://example.test/3body/certificate.json",
         "https://example.test/3body/favicon.svg",
+        "https://example.test/3body/.gitattributes",
         "https://example.test/3body/manifest.json",
     ]
 
@@ -1024,6 +1070,7 @@ def _write_static_artifact_bundle(site_dir) -> None:
     index_path = site_dir / "index.html"
     certificate_path = site_dir / "certificate.json"
     favicon_path = site_dir / "favicon.svg"
+    gitattributes_path = site_dir / ".gitattributes"
     manifest_path = site_dir / "manifest.json"
     index_path.write_text(
         (
@@ -1034,6 +1081,7 @@ def _write_static_artifact_bundle(site_dir) -> None:
         encoding="utf-8",
     )
     favicon_path.write_text("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"></svg>\n", encoding="utf-8")
+    gitattributes_path.write_text("* text eol=lf\n", encoding="utf-8", newline="\n")
     profile_sha256 = cli_module.static_artifact_requirement_profile_sha256("public-claims-v1")
     verifier_feature_set = list(cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
     verifier_feature_set_sha256 = cli_module.static_artifact_verification_features_sha256(verifier_feature_set)
@@ -1099,6 +1147,10 @@ def _write_static_artifact_bundle(site_dir) -> None:
                 "sha256": _sha256(favicon_path),
                 "bytes": favicon_path.stat().st_size,
             },
+            ".gitattributes": {
+                "sha256": _sha256(gitattributes_path),
+                "bytes": gitattributes_path.stat().st_size,
+            },
         },
     }
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
@@ -1107,7 +1159,7 @@ def _write_static_artifact_bundle(site_dir) -> None:
 def _refresh_manifest_hashes(site_dir) -> None:
     manifest_path = site_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    for artifact_name in ("index.html", "certificate.json", "favicon.svg"):
+    for artifact_name in ("index.html", "certificate.json", "favicon.svg", ".gitattributes"):
         artifact_path = site_dir / artifact_name
         manifest["artifacts"][artifact_name]["sha256"] = _sha256(artifact_path)
         manifest["artifacts"][artifact_name]["bytes"] = artifact_path.stat().st_size

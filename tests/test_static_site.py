@@ -122,6 +122,8 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert manifest["artifacts"]["certificate.json"]["bytes"] == certificate_path.stat().st_size
     assert manifest["artifacts"]["favicon.svg"]["sha256"] == _sha256(favicon_path)
     assert manifest["artifacts"]["favicon.svg"]["bytes"] == favicon_path.stat().st_size
+    assert manifest["artifacts"][".gitattributes"]["sha256"] == _sha256(gitattributes_path)
+    assert manifest["artifacts"][".gitattributes"]["bytes"] == gitattributes_path.stat().st_size
     assert 'viewBox="0 0 64 64"' in favicon_path.read_text(encoding="utf-8")
     assert b"\r\n" not in index_path.read_bytes()
     assert b"\r\n" not in certificate_path.read_bytes()
@@ -136,6 +138,7 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
             "index.html": index_path.read_bytes(),
             "certificate.json": certificate_path.read_bytes(),
             "favicon.svg": favicon_path.read_bytes(),
+            ".gitattributes": gitattributes_path.read_bytes(),
             "manifest.json": manifest_path.read_bytes(),
         },
         require_commit="local",
@@ -145,6 +148,7 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
             "index.html": index_path.read_bytes(),
             "certificate.json": certificate_path.read_bytes(),
             "favicon.svg": favicon_path.read_bytes(),
+            ".gitattributes": gitattributes_path.read_bytes(),
             "manifest.json": manifest_path.read_bytes(),
         },
         require_commit="local",
@@ -153,6 +157,7 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
         "index.html": index_path.read_bytes(),
         "certificate.json": certificate_path.read_bytes(),
         "favicon.svg": favicon_path.read_bytes(),
+        ".gitattributes": gitattributes_path.read_bytes(),
         "manifest.json": manifest_path.read_bytes(),
     }
 

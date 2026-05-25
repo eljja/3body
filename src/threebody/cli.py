@@ -34,8 +34,9 @@ from .types import Scenario
 
 
 PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE = "public-claims-v1"
-STATIC_SITE_ARTIFACT_NAMES = ("index.html", "certificate.json", "favicon.svg")
+STATIC_SITE_ARTIFACT_NAMES = ("index.html", "certificate.json", "favicon.svg", ".gitattributes")
 STATIC_SITE_BUNDLE_NAMES = (*STATIC_SITE_ARTIFACT_NAMES, "manifest.json")
+STATIC_SITE_GITATTRIBUTES_POLICY = b"* text eol=lf\n"
 PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES = (
     "artifact-availability",
     "json-parse-errors",
@@ -43,6 +44,7 @@ PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES = (
     "manifest-hash-algorithm",
     "index-artifact-discoverability",
     "publication-pipeline-links",
+    "published-branch-line-ending-policy",
     "commit-provenance",
     "active-profile-descriptor",
     "profile-gates",
@@ -263,12 +265,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--site-dir",
         type=Path,
         default=Path("site"),
-        help="Directory containing index.html, certificate.json, favicon.svg, and manifest.json.",
+        help="Directory containing index.html, certificate.json, favicon.svg, .gitattributes, and manifest.json.",
     )
     verify_static.add_argument(
         "--base-url",
         default=None,
-        help="Base URL containing index.html, certificate.json, favicon.svg, and manifest.json.",
+        help="Base URL containing index.html, certificate.json, favicon.svg, .gitattributes, and manifest.json.",
     )
     verify_static.add_argument(
         "--require-commit",
@@ -825,9 +827,12 @@ def verify_static_artifact_bytes(
         "index_hash": _manifest_hash_matches(manifest, "index.html", artifacts["index.html"]),
         "certificate_hash": _manifest_hash_matches(manifest, "certificate.json", artifacts["certificate.json"]),
         "favicon_hash": _manifest_hash_matches(manifest, "favicon.svg", artifacts["favicon.svg"]),
+        "gitattributes_hash": _manifest_hash_matches(manifest, ".gitattributes", artifacts[".gitattributes"]),
         "index_size": _manifest_size_matches(manifest, "index.html", artifacts["index.html"]),
         "certificate_size": _manifest_size_matches(manifest, "certificate.json", artifacts["certificate.json"]),
         "favicon_size": _manifest_size_matches(manifest, "favicon.svg", artifacts["favicon.svg"]),
+        "gitattributes_size": _manifest_size_matches(manifest, ".gitattributes", artifacts[".gitattributes"]),
+        "gitattributes_policy": artifacts[".gitattributes"] == STATIC_SITE_GITATTRIBUTES_POLICY,
     }
     return {
         "verification_schema_version": 1,
@@ -898,6 +903,8 @@ def _artifact_available_checks(artifact_errors: dict[str, str | None]) -> dict[s
 
 
 def _artifact_check_prefix(artifact_name: str) -> str:
+    if artifact_name == ".gitattributes":
+        return "gitattributes"
     return artifact_name.rsplit(".", 1)[0]
 
 

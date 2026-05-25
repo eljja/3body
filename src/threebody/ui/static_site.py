@@ -15,6 +15,7 @@ import plotly.io as pio
 
 from threebody.cli import (
     PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE,
+    STATIC_SITE_GITATTRIBUTES_POLICY,
     STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES,
     STATIC_SITE_ARTIFACT_NAMES,
     static_artifact_requirement_profile_descriptor,
@@ -127,12 +128,12 @@ def build_static_site(output_dir: str | Path) -> Path:
         json.dumps(certificate_bundle, indent=2, sort_keys=True),
     )
     _write_text_lf(favicon_path, _favicon_svg())
+    _write_text_lf(output_path / ".nojekyll", "")
+    _write_text_lf(output_path / ".gitattributes", STATIC_SITE_GITATTRIBUTES_POLICY.decode("ascii"))
     _write_text_lf(
         manifest_path,
         json.dumps(_artifact_manifest(output_path, provenance), indent=2, sort_keys=True),
     )
-    _write_text_lf(output_path / ".nojekyll", "")
-    _write_text_lf(output_path / ".gitattributes", "* text eol=lf\n")
     return index_path
 
 
@@ -858,7 +859,7 @@ def _public_change_summary(
             "title": "Commit-pinned build",
             "status": "pass",
             "value": str(provenance["commit_sha_short"]),
-            "detail": "The visible page, certificate, and manifest are tied to one build provenance record.",
+            "detail": "The visible page, certificate, manifest, and branch line-ending policy are tied to one build provenance record.",
         },
         {
             "title": "Scientific gate profile",
