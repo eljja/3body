@@ -495,7 +495,7 @@ def _render_page(
         "python -m threebody.cli verify-static-artifacts "
         f"--base-url https://eljja.github.io/3body/ --require-commit {html.escape(str(provenance['commit_sha']))} "
         f"--require-profile {PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE} "
-        f"--require-feature-set-sha256 {verifier_feature_set_sha256} "
+        "--require-current-feature-set "
         "--output .runtime/research_runs/pages-verification-receipt.json"
     )
 

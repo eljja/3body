@@ -57,7 +57,8 @@ def test_static_site_builder_writes_index(tmp_path) -> None:
     assert "verify-static-artifacts --base-url https://eljja.github.io/3body/" in content
     assert "--require-commit local" in content
     assert "--require-profile public-claims-v1" in content
-    assert "--require-feature-set-sha256" in content
+    assert "--require-current-feature-set" in content
+    assert "--require-feature-set-sha256" not in content
     assert "--output .runtime/research_runs/pages-verification-receipt.json" in content
     assert "verify-static-artifacts --site-dir site" in content
     assert "jacobi_parameter_interval_box_margin" not in content
