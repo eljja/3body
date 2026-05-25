@@ -382,6 +382,16 @@ def test_verify_static_artifacts_cli_applies_public_claim_profile(tmp_path) -> N
     assert receipt["checks"]["required_features"] is True
 
 
+def test_public_claim_profile_features_are_explicitly_versioned() -> None:
+    descriptor = cli_module.static_artifact_requirement_profile_descriptor("public-claims-v1")
+    required_features = descriptor["requirements"]["require_features"]
+
+    assert tuple(required_features) == cli_module.PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES
+    assert required_features == list(cli_module.PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES)
+    assert required_features == list(cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
+    assert required_features is not cli_module.STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES
+
+
 def test_verify_static_artifacts_cli_rejects_inactive_required_profile(tmp_path) -> None:
     _write_static_artifact_bundle(tmp_path)
     certificate_path = tmp_path / "certificate.json"

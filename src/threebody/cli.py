@@ -36,7 +36,7 @@ from .types import Scenario
 PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE = "public-claims-v1"
 STATIC_SITE_ARTIFACT_NAMES = ("index.html", "certificate.json", "favicon.svg")
 STATIC_SITE_BUNDLE_NAMES = (*STATIC_SITE_ARTIFACT_NAMES, "manifest.json")
-STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES = (
+PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES = (
     "artifact-availability",
     "json-parse-errors",
     "artifact-identity",
@@ -49,6 +49,7 @@ STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES = (
     "numeric-minimums",
     "numeric-maximums",
 )
+STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES = (*PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES,)
 STATIC_ARTIFACT_REQUIREMENT_PROFILES: dict[str, dict[str, tuple[str, ...]]] = {
     PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE: {
         "require_gates": (
@@ -69,7 +70,7 @@ STATIC_ARTIFACT_REQUIREMENT_PROFILES: dict[str, dict[str, tuple[str, ...]]] = {
             "metrics.restricted_max_jacobi_drift=1e-9",
             "metrics.picard_max_contraction=0.35",
         ),
-        "require_features": STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES,
+        "require_features": PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE_FEATURES,
     }
 }
 
