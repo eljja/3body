@@ -409,6 +409,19 @@ def test_predict_cli_writes_compact_target_solution(tmp_path) -> None:
         payload["probability_answer"]["mean_positions_relative_to_center_of_mass"]
         == center_frame["distribution_mean_relative_to_center"]
     )
+    pair_geometry = payload["target_pair_geometry"]
+    assert pair_geometry["geometry_schema_version"] == 1
+    assert pair_geometry["pair_order"] == [[0, 1], [0, 2], [1, 2]]
+    assert len(pair_geometry["pair_distances"]) == 3
+    assert pair_geometry["pair_distances"][0]["body_pair"] == [0, 1]
+    assert pair_geometry["pair_distances"][0]["deterministic_distance"] > 0.0
+    assert pair_geometry["pair_distances"][0]["probability_mean_distance"] > 0.0
+    assert pair_geometry["pair_distances"][0]["central_90_distance_interval_from_coordinate_box"]["upper"] > 0.0
+    assert pair_geometry["deterministic"]["perimeter"] > 0.0
+    assert pair_geometry["deterministic"]["triangle_area"] >= 0.0
+    assert pair_geometry["probability"]["mean_perimeter"] > 0.0
+    assert payload["deterministic_flow_answer"]["pair_geometry"] == pair_geometry["deterministic"]
+    assert payload["probability_answer"]["pair_geometry"] == pair_geometry["probability"]
     assert len(payload["body_answers"]) == 3
     assert payload["body_answers"][0]["deterministic_position"] == payload["target_positions"][0]
     assert payload["deterministic_flow_answer"]["definition"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"

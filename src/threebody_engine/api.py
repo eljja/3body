@@ -2097,6 +2097,10 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         deterministic_ephemeris,
         final_distribution,
     )
+    target_pair_geometry = _target_pair_geometry_summary(
+        answer.get("final_positions", []),
+        final_distribution,
+    )
     return {
         "prediction_schema_version": 1,
         "prediction_type": "three-body-target-position-solution",
@@ -2107,6 +2111,7 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         "target_position_distribution": final_distribution,
         "target_position_table": target_position_table,
         "center_of_mass_frame": center_of_mass_frame,
+        "target_pair_geometry": target_pair_geometry,
         "body_answers": body_answers,
         "deterministic_flow_answer": {
             "definition": "r_i(t) = Pi_{r_i} Phi_t(x(0))",
@@ -2115,6 +2120,7 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
                 "target_positions_relative_to_center",
                 [],
             ),
+            "pair_geometry": target_pair_geometry.get("deterministic", {}),
             "method": deterministic_ephemeris.get("method", "adaptive-DOP853"),
             "invariant_certificate": deterministic_ephemeris.get("invariant_certificate", {}),
         },
@@ -2130,6 +2136,7 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
                 "distribution_mean_relative_to_center",
                 [],
             ),
+            "pair_geometry": target_pair_geometry.get("probability", {}),
             "success_count": final_distribution.get("success_count", 0),
             "failure_count": final_distribution.get("failure_count", 0),
         },
@@ -2154,6 +2161,71 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
             ),
         },
         "mathematical_statement": statement,
+    }
+
+
+def _target_pair_geometry_summary(
+    target_positions: object,
+    final_distribution: Mapping[str, object],
+) -> dict[str, object]:
+    pair_order = [[0, 1], [0, 2], [1, 2]]
+    deterministic_positions = _position_matrix_or_none(target_positions)
+    mean_positions = _position_matrix_or_none(final_distribution.get("mean_positions", []))
+    q05_positions = _position_matrix_or_none(final_distribution.get("q05_positions", []))
+    q95_positions = _position_matrix_or_none(final_distribution.get("q95_positions", []))
+    pair_rows = []
+    deterministic_distances = []
+    mean_distances = []
+    central_intervals = []
+    for left, right in pair_order:
+        deterministic_distance = _matrix_row_distance(deterministic_positions, left, right)
+        mean_distance = _matrix_row_distance(mean_positions, left, right)
+        central_interval = _pair_distance_bounds_from_coordinate_boxes(
+            q05_positions,
+            q95_positions,
+            left,
+            right,
+        )
+        deterministic_distances.append(deterministic_distance)
+        mean_distances.append(mean_distance)
+        central_intervals.append(central_interval)
+        pair_rows.append(
+            {
+                "body_pair": [left, right],
+                "deterministic_distance": deterministic_distance,
+                "deterministic_separation_vector": _matrix_row_difference(
+                    deterministic_positions,
+                    right,
+                    left,
+                ),
+                "probability_mean_distance": mean_distance,
+                "probability_mean_separation_vector": _matrix_row_difference(
+                    mean_positions,
+                    right,
+                    left,
+                ),
+                "central_90_distance_interval_from_coordinate_box": central_interval,
+            }
+        )
+    return {
+        "geometry_schema_version": 1,
+        "pair_order": pair_order,
+        "pair_distances": pair_rows,
+        "deterministic": {
+            "pair_distances": deterministic_distances,
+            "perimeter": _finite_sum(deterministic_distances),
+            "triangle_area": _triangle_area(deterministic_positions),
+        },
+        "probability": {
+            "mean_pair_distances": mean_distances,
+            "central_90_pair_distance_intervals_from_coordinate_boxes": central_intervals,
+            "mean_perimeter": _finite_sum(mean_distances),
+            "mean_triangle_area": _triangle_area(mean_positions),
+            "interval_note": (
+                "Distance intervals are conservative bounds from marginal coordinate q05/q95 boxes, "
+                "not exact pair-distance quantiles."
+            ),
+        },
     }
 
 
@@ -2554,6 +2626,74 @@ def _subtract_vector_from_rows(rows: object, vector: object) -> list[list[float]
     ):
         return []
     return (row_array - vector_array[None, :]).tolist()
+
+
+def _position_matrix_or_none(values: object) -> np.ndarray | None:
+    try:
+        array = np.asarray(values, dtype=float)
+    except (TypeError, ValueError):
+        return None
+    if array.ndim != 2 or array.shape[0] < 3 or array.shape[1] == 0 or np.any(~np.isfinite(array)):
+        return None
+    return array
+
+
+def _matrix_row_distance(matrix: np.ndarray | None, left: int, right: int) -> float:
+    if matrix is None or left >= len(matrix) or right >= len(matrix):
+        return math.nan
+    return float(np.linalg.norm(matrix[right] - matrix[left]))
+
+
+def _matrix_row_difference(matrix: np.ndarray | None, left: int, right: int) -> list[float]:
+    if matrix is None or left >= len(matrix) or right >= len(matrix):
+        return []
+    return (matrix[left] - matrix[right]).tolist()
+
+
+def _pair_distance_bounds_from_coordinate_boxes(
+    lower: np.ndarray | None,
+    upper: np.ndarray | None,
+    left: int,
+    right: int,
+) -> dict[str, float]:
+    if lower is None or upper is None or left >= len(lower) or right >= len(lower) or lower.shape != upper.shape:
+        return {"lower": math.nan, "upper": math.nan}
+    left_low = np.minimum(lower[left], upper[left])
+    left_high = np.maximum(lower[left], upper[left])
+    right_low = np.minimum(lower[right], upper[right])
+    right_high = np.maximum(lower[right], upper[right])
+    min_components = np.maximum.reduce(
+        [
+            left_low - right_high,
+            right_low - left_high,
+            np.zeros_like(left_low),
+        ]
+    )
+    max_components = np.maximum(
+        np.abs(left_low - right_high),
+        np.abs(left_high - right_low),
+    )
+    return {
+        "lower": float(np.linalg.norm(min_components)),
+        "upper": float(np.linalg.norm(max_components)),
+    }
+
+
+def _triangle_area(matrix: np.ndarray | None) -> float:
+    if matrix is None or len(matrix) < 3:
+        return math.nan
+    first = matrix[1] - matrix[0]
+    second = matrix[2] - matrix[0]
+    if first.size == 2:
+        return float(0.5 * abs(first[0] * second[1] - first[1] * second[0]))
+    if first.size == 3:
+        return float(0.5 * np.linalg.norm(np.cross(first, second)))
+    return math.nan
+
+
+def _finite_sum(values: Sequence[float]) -> float:
+    finite_values = [float(value) for value in values if math.isfinite(float(value))]
+    return float(sum(finite_values)) if len(finite_values) == len(values) else math.nan
 
 
 def _position_confidence_regions(

@@ -43,7 +43,7 @@ Output includes final positions, final velocities, solver metadata, and a Noethe
 
 ## One-Call Solution Bundle
 
-Use `threebody_engine.solve_three_body_target_positions(...)` when the caller only needs the direct answer: `target_positions`, `target_position_distribution`, `target_position_table`, `center_of_mass_frame`, one row per body's target-time claim, and the core diagnostics. The table includes a relative 95% radius, `position_claim_strength`, and `recommended_readout` so callers can tell whether to publish a point coordinate, a confidence region, or only a distribution summary. The center-of-mass frame reports the same target positions relative to the mass-weighted center, which is the safer readout when inertial translation is not scientifically meaningful. Use `threebody_engine.solve_three_body_prediction_problem(...)` when the full audit bundle is needed, or:
+Use `threebody_engine.solve_three_body_target_positions(...)` when the caller only needs the direct answer: `target_positions`, `target_position_distribution`, `target_position_table`, `center_of_mass_frame`, `target_pair_geometry`, one row per body's target-time claim, and the core diagnostics. The table includes a relative 95% radius, `position_claim_strength`, and `recommended_readout` so callers can tell whether to publish a point coordinate, a confidence region, or only a distribution summary. The center-of-mass frame reports the same target positions relative to the mass-weighted center, which is the safer readout when inertial translation is not scientifically meaningful. The pair geometry reports pairwise separations, perimeter, area, and conservative distance bounds derived from coordinate quantile boxes. Use `threebody_engine.solve_three_body_prediction_problem(...)` when the full audit bundle is needed, or:
 
 ```powershell
 threebody predict --input initial-state.json --target-solution --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output target-solution.json
@@ -52,7 +52,7 @@ threebody predict --input initial-state.json --solution --count 128 --samples 25
 
 This is the most direct public API for the original project target. It returns:
 
-- `target_positions`, `target_position_distribution`, and `target_position_table` in the compact `solve_three_body_target_positions(...)` answer.
+- `target_positions`, `target_position_distribution`, `target_position_table`, and `target_pair_geometry` in the compact `solve_three_body_target_positions(...)` answer.
 - `prediction_summary`: a compact report-ready conclusion with a versioned schema, promoted claim type, point-position statement, probability statement, reliability/risk statements, key diagnostics, and per-body 95% confidence regions.
 - `mathematical_statement`: the machine-readable mathematical problem statement: Newtonian equations, flow-map readout `r_i(t) = Pi_{r_i} Phi_t(x(0))`, probability push-forward `Law(X_t) = (Phi_t)_# Law(X_0)`, linearized covariance formula, promoted claim contract, and one row per body's target-time position claim.
 - `answer.final_positions`: the three target-time positions from the deterministic flow.
