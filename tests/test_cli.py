@@ -232,6 +232,7 @@ def test_predict_cli_writes_distribution_ephemeris(tmp_path) -> None:
     assert len(payload["position_distribution_ephemeris"]["mean_positions"]) == 9
     assert len(payload["position_distribution_ephemeris"]["mean_positions"][0]) == 3
     assert len(payload["position_distribution_ephemeris"]["flat_covariances"][0]) == 6
+    assert len(payload["position_distribution_ephemeris"]["position_confidence_regions"]) == 9
     assert len(payload["sample_ephemerides"]) == 5
 
 
@@ -268,6 +269,7 @@ def test_predict_cli_writes_solution_bundle(tmp_path) -> None:
     assert payload["answer"]["target_time_inside_forecast_horizon"] is True
     assert len(payload["answer"]["final_positions"]) == 3
     assert len(payload["answer"]["final_position_distribution"]["mean_positions"]) == 3
+    assert len(payload["answer"]["final_position_distribution"]["position_confidence_regions"]) == 3
     assert payload["deterministic_ephemeris"]["prediction_type"] == "deterministic-ephemeris"
     assert payload["distribution_ephemeris"]["prediction_type"] == "empirical-position-distribution-ephemeris"
     assert payload["linearized_gaussian_ephemeris"]["prediction_type"] == "linearized-gaussian-ephemeris"
@@ -304,6 +306,7 @@ def test_predict_cli_writes_linearized_position_distribution(tmp_path) -> None:
     assert payload["uncertainty_model"]["preserve_center_of_mass"] is True
     assert len(payload["mean_positions"]) == 3
     assert len(payload["position_covariance"]) == 6
+    assert len(payload["position_confidence_regions"]) == 3
     assert payload["linearized_diagnostics"]["maximum_position_std"] > 0.0
 
 
@@ -372,6 +375,7 @@ def test_predict_cli_writes_linearized_ephemeris(tmp_path) -> None:
     assert len(payload["rows"]) == 9
     assert len(payload["rows"][0]["mean_positions"]) == 3
     assert len(payload["rows"][0]["position_covariance"]) == 6
+    assert len(payload["rows"][0]["position_confidence_regions"]) == 3
 
 
 def test_predict_cli_writes_interpretation_report(tmp_path) -> None:

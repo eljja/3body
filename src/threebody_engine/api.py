@@ -9,6 +9,7 @@ from typing import Literal
 
 import numpy as np
 from scipy.integrate import solve_ivp
+from scipy.stats import chi2
 
 from threebody.analysis import (
     AnalysisAtlas,
@@ -895,6 +896,11 @@ def predict_three_body_linearized_distribution(
         "final_state_covariance": covariance_t.tolist(),
         "position_covariance": position_covariance.tolist(),
         "body_position_covariances": [covariance.tolist() for covariance in body_covariances],
+        "position_confidence_regions": _position_confidence_regions(
+            final_positions,
+            body_covariances,
+            method="linearized-gaussian",
+        ),
         "state_transition_matrix": transition.tolist(),
         "linearized_diagnostics": {
             "jacobian_step": jacobian_step,
@@ -1431,6 +1437,7 @@ def _position_distribution_summary(positions: list[np.ndarray], dimension: int) 
             "q95_positions": [],
             "flat_covariance": [],
             "body_covariances": [],
+            "position_confidence_regions": [],
             "max_body_radius_from_mean": math.inf,
         }
     stack = np.asarray(positions, dtype=float)
@@ -1454,6 +1461,11 @@ def _position_distribution_summary(positions: list[np.ndarray], dimension: int) 
         "q95_positions": quantiles[2].tolist(),
         "flat_covariance": flat_covariance.tolist(),
         "body_covariances": [covariance.tolist() for covariance in body_covariances],
+        "position_confidence_regions": _position_confidence_regions(
+            mean,
+            body_covariances,
+            method="sample-covariance-gaussian-equivalent",
+        ),
         "max_body_radius_from_mean": float(np.max(body_radii)),
     }
 
@@ -1469,6 +1481,7 @@ def _position_distribution_ephemeris_summary(
             "q05_positions": [],
             "q95_positions": [],
             "flat_covariances": [],
+            "position_confidence_regions": [],
             "max_body_radius_from_mean": [],
         }
     stack = np.asarray(positions_by_sample, dtype=float)
@@ -1477,15 +1490,28 @@ def _position_distribution_ephemeris_summary(
     mean = np.mean(stack, axis=0)
     quantiles = np.quantile(stack, [0.05, 0.5, 0.95], axis=0)
     flat_covariances: list[list[list[float]]] = []
+    confidence_regions: list[list[dict[str, object]]] = []
     max_body_radii: list[float] = []
     for time_index in range(time_count):
         time_positions = stack[:, time_index, :, :]
         flat = time_positions.reshape(ensemble_count, 3 * dimension)
         if ensemble_count > 1:
             covariance = np.cov(flat, rowvar=False)
+            body_covariances = [
+                np.cov(time_positions[:, body_index, :], rowvar=False).reshape(dimension, dimension)
+                for body_index in range(3)
+            ]
         else:
             covariance = np.zeros((3 * dimension, 3 * dimension), dtype=float)
+            body_covariances = [np.zeros((dimension, dimension), dtype=float) for _body in range(3)]
         flat_covariances.append(covariance.tolist())
+        confidence_regions.append(
+            _position_confidence_regions(
+                mean[time_index],
+                body_covariances,
+                method="sample-covariance-gaussian-equivalent",
+            )
+        )
         body_radii = np.linalg.norm(time_positions - mean[time_index][None, :, :], axis=2)
         max_body_radii.append(float(np.max(body_radii)))
     return {
@@ -1494,6 +1520,7 @@ def _position_distribution_ephemeris_summary(
         "q05_positions": quantiles[0].tolist(),
         "q95_positions": quantiles[2].tolist(),
         "flat_covariances": flat_covariances,
+        "position_confidence_regions": confidence_regions,
         "max_body_radius_from_mean": max_body_radii,
     }
 
@@ -1515,10 +1542,66 @@ def _final_position_distribution_from_ephemeris(distribution_ephemeris: Mapping[
         "q05_positions": final_value("q05_positions"),
         "q95_positions": final_value("q95_positions"),
         "flat_covariance": final_value("flat_covariances"),
+        "position_confidence_regions": final_value("position_confidence_regions"),
         "max_body_radius_from_mean": final_value("max_body_radius_from_mean"),
         "success_count": int(distribution_ephemeris.get("success_count", 0)),
         "failure_count": int(distribution_ephemeris.get("failure_count", 0)),
     }
+
+
+def _position_confidence_regions(
+    mean_positions: Sequence[Sequence[float]] | np.ndarray,
+    body_covariances: Sequence[Sequence[Sequence[float]]] | np.ndarray,
+    *,
+    method: str,
+    levels: Sequence[float] = (0.5, 0.9, 0.95, 0.99),
+) -> list[dict[str, object]]:
+    means = np.asarray(mean_positions, dtype=float)
+    covariances = np.asarray(body_covariances, dtype=float)
+    if means.ndim != 2 or covariances.ndim != 3 or covariances.shape[0] != means.shape[0]:
+        return []
+    dimension = int(means.shape[1])
+    regions: list[dict[str, object]] = []
+    for body_index, (center, covariance) in enumerate(zip(means, covariances, strict=True)):
+        covariance = _symmetrize_covariance(covariance)
+        if covariance.shape != (dimension, dimension) or np.any(~np.isfinite(covariance)):
+            region_levels = [
+                {
+                    "probability": float(level),
+                    "mahalanobis_radius": math.inf,
+                    "semi_axes": [math.inf for _axis in range(dimension)],
+                    "axis_directions": np.eye(dimension, dtype=float).tolist(),
+                }
+                for level in levels
+            ]
+        else:
+            eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+            order = np.argsort(eigenvalues)[::-1]
+            eigenvalues = np.maximum(eigenvalues[order], 0.0)
+            eigenvectors = eigenvectors[:, order]
+            region_levels = []
+            for level in levels:
+                probability = float(level)
+                mahalanobis_radius_squared = float(chi2.ppf(probability, dimension))
+                mahalanobis_radius = float(math.sqrt(mahalanobis_radius_squared))
+                semi_axes = np.sqrt(eigenvalues * mahalanobis_radius_squared)
+                region_levels.append(
+                    {
+                        "probability": probability,
+                        "mahalanobis_radius": mahalanobis_radius,
+                        "semi_axes": semi_axes.tolist(),
+                        "axis_directions": eigenvectors.T.tolist(),
+                    }
+                )
+        regions.append(
+            {
+                "body_index": body_index,
+                "method": method,
+                "center": center.tolist(),
+                "levels": region_levels,
+            }
+        )
+    return regions
 
 
 def _linearized_empirical_ephemeris_comparison(
@@ -1828,6 +1911,17 @@ def _linearized_ephemeris_rows(
                 "mean_velocities": velocities.tolist(),
                 "std_positions": std_positions.tolist(),
                 "position_covariance": position_covariance.tolist(),
+                "position_confidence_regions": _position_confidence_regions(
+                    positions,
+                    [
+                        position_covariance[
+                            body_index * system.dimension : (body_index + 1) * system.dimension,
+                            body_index * system.dimension : (body_index + 1) * system.dimension,
+                        ]
+                        for body_index in range(system.body_count)
+                    ],
+                    method="linearized-gaussian",
+                ),
                 "maximum_position_std": float(np.max(std_positions)),
                 "state_covariance_trace": float(np.trace(state_covariance)),
                 "transition_spectral_radius": transition_spectral_radius,

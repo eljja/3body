@@ -126,6 +126,8 @@ def test_engine_api_builds_three_body_position_distribution() -> None:
     assert distribution["uncertainty_model"]["preserve_center_of_mass"] is True
     assert len(distribution["position_distribution"]["mean_positions"]) == 3
     assert len(distribution["position_distribution"]["flat_covariance"]) == 6
+    assert len(distribution["position_distribution"]["position_confidence_regions"]) == 3
+    assert distribution["position_distribution"]["position_confidence_regions"][0]["levels"][2]["probability"] == 0.95
     assert len(distribution["sample_predictions"]) == 7
 
 
@@ -192,6 +194,8 @@ def test_engine_api_builds_three_body_distribution_ephemeris() -> None:
     assert len(distribution["position_distribution_ephemeris"]["mean_positions"][0]) == 3
     assert len(distribution["position_distribution_ephemeris"]["flat_covariances"]) == 9
     assert len(distribution["position_distribution_ephemeris"]["flat_covariances"][0]) == 6
+    assert len(distribution["position_distribution_ephemeris"]["position_confidence_regions"]) == 9
+    assert len(distribution["position_distribution_ephemeris"]["position_confidence_regions"][0]) == 3
     assert len(distribution["sample_ephemerides"]) == 7
     assert len(distribution["sample_ephemerides"][0]["positions"]) == 9
 
@@ -217,6 +221,7 @@ def test_engine_api_solves_three_body_prediction_problem() -> None:
     assert solution["answer"]["target_time_inside_forecast_horizon"] is True
     assert len(solution["answer"]["final_positions"]) == 3
     assert len(solution["answer"]["final_position_distribution"]["mean_positions"]) == 3
+    assert len(solution["answer"]["final_position_distribution"]["position_confidence_regions"]) == 3
     assert solution["deterministic_ephemeris"]["prediction_type"] == "deterministic-ephemeris"
     assert solution["linearized_gaussian_ephemeris"]["prediction_type"] == "linearized-gaussian-ephemeris"
     assert solution["linearized_gaussian_ephemeris"]["uncertainty_model"]["preserve_center_of_mass"] is True
@@ -248,6 +253,8 @@ def test_engine_api_builds_linearized_three_body_position_distribution() -> None
     assert len(distribution["mean_positions"]) == 3
     assert len(distribution["position_covariance"]) == 6
     assert len(distribution["state_transition_matrix"]) == 12
+    assert len(distribution["position_confidence_regions"]) == 3
+    assert distribution["position_confidence_regions"][0]["method"] == "linearized-gaussian"
     assert distribution["linearized_diagnostics"]["minimum_covariance_eigenvalue"] > -1.0e-18
     assert distribution["linearized_diagnostics"]["maximum_position_std"] > 0.0
     covariance0 = np.asarray(distribution["initial_state_covariance"], dtype=float)
@@ -282,6 +289,7 @@ def test_engine_api_builds_linearized_three_body_ephemeris() -> None:
     assert len(ephemeris["rows"]) == 9
     assert len(ephemeris["rows"][0]["mean_positions"]) == 3
     assert len(ephemeris["rows"][0]["position_covariance"]) == 6
+    assert len(ephemeris["rows"][0]["position_confidence_regions"]) == 3
     assert ephemeris["rows"][-1]["maximum_position_std"] > 0.0
     assert ephemeris["linearized_diagnostics"]["maximum_position_std"] >= ephemeris["rows"][-1]["maximum_position_std"]
 

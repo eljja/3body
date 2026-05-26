@@ -52,7 +52,7 @@ threebody predict --input initial-state.json --solution --count 128 --samples 25
 This is the most direct public API for the original project target. It returns:
 
 - `answer.final_positions`: the three target-time positions from the deterministic flow.
-- `answer.final_position_distribution`: mean, quantiles, covariance, and ensemble counts for the target-time position distribution.
+- `answer.final_position_distribution`: mean, quantiles, covariance, confidence regions, and ensemble counts for the target-time position distribution.
 - `answer.recommended_mode`: the promoted interpretation mode from the diagnostic report.
 - `deterministic_ephemeris`: the sampled deterministic trajectory from `0` through `target_time`.
 - `linearized_gaussian_ephemeris`: the sampled first-order Gaussian distribution from `0` through `target_time`.
@@ -116,6 +116,8 @@ Pt = D Phi_t(x0) P0 D Phi_t(x0)^T
 
 Output includes the mean final positions, position standard deviations, the propagated state covariance, the position covariance block, per-body covariance matrices, the state-transition matrix, and diagnostics such as transition condition number and spectral radius.
 
+The `position_confidence_regions` block converts each body's covariance into 50%, 90%, 95%, and 99% Gaussian ellipses or ellipsoids. Each region includes the center, Mahalanobis radius, semi-axis lengths, and axis directions, so the probability statement can be plotted or checked without recomputing the eigensystem.
+
 This mode is the most mathematical local answer: it gives the first-order probability distribution implied by the Newtonian flow. If no explicit `initial_state_covariance` is supplied, `preserve_center_of_mass=True` constructs `P0` on the subspace where mass-weighted center-of-mass position and velocity are unchanged. It is valid while the initial uncertainty is small enough that nonlinear curvature of the flow is not dominant.
 
 ## Linearized Gaussian Ephemeris
@@ -171,6 +173,7 @@ Output includes:
 - 5% and 95% coordinate quantiles
 - covariance of the flattened final position vector
 - per-body position covariance matrices
+- per-body 50/90/95/99% covariance confidence regions
 
 ## Ensemble Distribution Ephemeris
 
@@ -180,7 +183,7 @@ For a probability distribution over the whole forecast interval, use `threebody_
 threebody predict --input initial-state.json --distribution-ephemeris --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution-ephemeris.json
 ```
 
-This integrates the same Gaussian perturbation ensemble as the final-time distribution mode, but keeps every sampled time. The output contains the shared time grid, deterministic base ephemeris, and a `position_distribution_ephemeris` block with time-indexed mean positions, median positions, 5%/95% coordinate quantiles, flattened position covariance matrices, and maximum body radius from the ensemble mean.
+This integrates the same Gaussian perturbation ensemble as the final-time distribution mode, but keeps every sampled time. The output contains the shared time grid, deterministic base ephemeris, and a `position_distribution_ephemeris` block with time-indexed mean positions, median positions, 5%/95% coordinate quantiles, flattened position covariance matrices, covariance confidence regions, and maximum body radius from the ensemble mean.
 
 This mode answers the strongest operational uncertainty question:
 
