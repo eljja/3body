@@ -821,6 +821,29 @@ def solve_three_body_prediction_problem(
     final_sensitivity = linearized_diagnostics.get("final_linearized_sensitivity", {})
     if not isinstance(final_sensitivity, Mapping):
         final_sensitivity = {}
+    input_contract = _prediction_input_contract(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        count=count,
+        initial_state_covariance=initial_state_covariance,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        seed=seed,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        target_times=target_times,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+        jacobian_step=jacobian_step,
+        position_tolerance=position_tolerance,
+        horizon_samples=horizon_samples,
+        linearized_covariance_relative_tolerance=linearized_covariance_relative_tolerance,
+        preserve_center_of_mass=preserve_center_of_mass,
+    )
     answer = {
         "final_positions": final_positions,
         "final_position_distribution": final_distribution,
@@ -850,6 +873,8 @@ def solve_three_body_prediction_problem(
         "prediction_schema_version": 1,
         "prediction_type": "three-body-prediction-solution",
         "target_time": float(target_time),
+        "prediction_input_contract": input_contract,
+        "prediction_input_sha256": _canonical_json_sha256(input_contract),
         "answer": answer,
         "prediction_summary": _prediction_solution_summary(answer, ephemeris_comparison),
         "mathematical_statement": _prediction_mathematical_statement(
@@ -2105,7 +2130,7 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         final_distribution,
         characteristic_scale=_target_position_characteristic_scale(body_answers),
     )
-    return {
+    compact = {
         "prediction_schema_version": 1,
         "prediction_type": "three-body-target-position-solution",
         "target_time": float(solution.get("target_time", math.nan)),
@@ -2168,6 +2193,11 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         },
         "mathematical_statement": statement,
     }
+    compact["target_prediction_certificate"] = _target_prediction_certificate(
+        compact,
+        solution,
+    )
+    return compact
 
 
 def _target_distribution_quality_summary(
@@ -2230,6 +2260,124 @@ def _sampling_error_strength(relative_standard_error: float) -> str:
     if relative_standard_error <= 1.0e-2:
         return "usable"
     return "sampling-noisy"
+
+
+def _prediction_input_contract(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    count: int,
+    initial_state_covariance: Sequence[Sequence[float]] | None,
+    position_scale: float,
+    velocity_scale: float,
+    seed: int,
+    gravitational_constant: float,
+    softening: float,
+    samples: int,
+    target_times: Sequence[float] | None,
+    rtol: float,
+    atol: float,
+    max_step: float,
+    jacobian_step: float,
+    position_tolerance: float,
+    horizon_samples: int,
+    linearized_covariance_relative_tolerance: float,
+    preserve_center_of_mass: bool,
+) -> dict[str, object]:
+    return {
+        "contract_schema_version": 1,
+        "problem_type": "general-newtonian-three-body-initial-value-problem",
+        "inputs": {
+            "masses": _json_number_array(masses),
+            "positions": _json_nested_number_array(positions),
+            "velocities": _json_nested_number_array(velocities),
+            "target_time": float(target_time),
+            "target_times": None if target_times is None else _json_number_array(target_times),
+            "initial_state_covariance": (
+                None
+                if initial_state_covariance is None
+                else _json_nested_number_array(initial_state_covariance)
+            ),
+        },
+        "solver_parameters": {
+            "gravitational_constant": float(gravitational_constant),
+            "softening": float(softening),
+            "samples": int(samples),
+            "rtol": float(rtol),
+            "atol": float(atol),
+            "max_step": float(max_step),
+            "jacobian_step": float(jacobian_step),
+        },
+        "uncertainty_parameters": {
+            "count": int(count),
+            "position_scale": float(position_scale),
+            "velocity_scale": float(velocity_scale),
+            "seed": int(seed),
+            "preserve_center_of_mass": bool(preserve_center_of_mass),
+        },
+        "interpretation_parameters": {
+            "position_tolerance": float(position_tolerance),
+            "horizon_samples": int(horizon_samples),
+            "linearized_covariance_relative_tolerance": float(
+                linearized_covariance_relative_tolerance
+            ),
+        },
+    }
+
+
+def _target_prediction_certificate(
+    compact_solution: Mapping[str, object],
+    full_solution: Mapping[str, object],
+) -> dict[str, object]:
+    input_contract = full_solution.get("prediction_input_contract", {})
+    if not isinstance(input_contract, Mapping):
+        input_contract = {}
+    input_sha256 = full_solution.get("prediction_input_sha256")
+    if not isinstance(input_sha256, str):
+        input_sha256 = _canonical_json_sha256(input_contract)
+    result_payload = _target_prediction_result_payload(compact_solution)
+    return {
+        "certificate_schema_version": 1,
+        "certificate_type": "three-body-target-prediction-reproducibility",
+        "input_contract_sha256": input_sha256,
+        "input_contract": dict(input_contract),
+        "result_payload_sha256": _canonical_json_sha256(result_payload),
+        "result_payload_keys": sorted(result_payload),
+        "prediction_schema_version": compact_solution.get("prediction_schema_version"),
+        "prediction_type": compact_solution.get("prediction_type"),
+        "claim": compact_solution.get("claim"),
+        "recommended_mode": compact_solution.get("recommended_mode"),
+        "reproducibility_statement": (
+            "The target answer is tied to this input contract and solver/uncertainty parameter set; "
+            "recompute with the same contract to audit the reported target positions and distribution."
+        ),
+    }
+
+
+def _target_prediction_result_payload(compact_solution: Mapping[str, object]) -> dict[str, object]:
+    excluded = {"target_prediction_certificate", "solution_bundle"}
+    return {str(key): value for key, value in compact_solution.items() if key not in excluded}
+
+
+def _canonical_json_sha256(payload: object) -> str:
+    canonical = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=True,
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def _json_number_array(values: Sequence[float]) -> list[float]:
+    return [float(value) for value in values]
+
+
+def _json_nested_number_array(values: Sequence[Sequence[float]]) -> list[list[float]]:
+    return [[float(value) for value in row] for row in values]
 
 
 def _target_pair_geometry_summary(

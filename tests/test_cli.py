@@ -296,6 +296,11 @@ def test_predict_cli_writes_solution_bundle(tmp_path) -> None:
 
     assert exit_code == 0
     assert payload["prediction_type"] == "three-body-prediction-solution"
+    assert payload["prediction_input_contract"]["contract_schema_version"] == 1
+    assert payload["prediction_input_contract"]["uncertainty_parameters"]["count"] == 5
+    assert payload["prediction_input_contract"]["solver_parameters"]["samples"] == 9
+    assert isinstance(payload["prediction_input_sha256"], str)
+    assert len(payload["prediction_input_sha256"]) == 64
     assert payload["prediction_summary"]["summary_schema_version"] == 1
     assert payload["prediction_summary"]["claim"] in {
         "target-position-and-distribution",
@@ -434,6 +439,17 @@ def test_predict_cli_writes_compact_target_solution(tmp_path) -> None:
         "sampling-noisy",
     }
     assert payload["probability_answer"]["distribution_quality"] == distribution_quality
+    certificate = payload["target_prediction_certificate"]
+    assert certificate["certificate_schema_version"] == 1
+    assert certificate["certificate_type"] == "three-body-target-prediction-reproducibility"
+    assert certificate["input_contract"]["uncertainty_parameters"]["count"] == 5
+    assert certificate["input_contract"]["solver_parameters"]["samples"] == 9
+    assert isinstance(certificate["input_contract_sha256"], str)
+    assert len(certificate["input_contract_sha256"]) == 64
+    assert isinstance(certificate["result_payload_sha256"], str)
+    assert len(certificate["result_payload_sha256"]) == 64
+    assert "target_prediction_certificate" not in certificate["result_payload_keys"]
+    assert "target_positions" in certificate["result_payload_keys"]
     assert len(payload["body_answers"]) == 3
     assert payload["body_answers"][0]["deterministic_position"] == payload["target_positions"][0]
     assert payload["deterministic_flow_answer"]["definition"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
