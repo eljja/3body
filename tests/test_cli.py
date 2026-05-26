@@ -374,10 +374,18 @@ def test_predict_cli_writes_compact_target_solution(tmp_path) -> None:
     assert payload["recommended_mode"] in {"linearized-gaussian", "empirical-ensemble"}
     assert len(payload["target_positions"]) == 3
     assert len(payload["target_position_distribution"]["mean_positions"]) == 3
+    assert len(payload["target_position_table"]) == 3
+    assert payload["target_position_table"][0]["body_index"] == 0
+    assert payload["target_position_table"][0]["deterministic_position"] == payload["target_positions"][0]
+    assert len(payload["target_position_table"][0]["central_90_interval"]["lower"]) == 2
+    assert len(payload["target_position_table"][0]["central_90_interval"]["upper"]) == 2
+    assert payload["target_position_table"][0]["confidence_region_95"]["max_semi_axis"] >= 0.0
+    assert payload["target_position_table"][0]["deterministic_to_mean_distance"] >= 0.0
     assert len(payload["body_answers"]) == 3
     assert payload["body_answers"][0]["deterministic_position"] == payload["target_positions"][0]
     assert payload["deterministic_flow_answer"]["definition"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
     assert payload["probability_answer"]["definition"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
+    assert payload["probability_answer"]["target_position_table"] == payload["target_position_table"]
     assert len(payload["probability_answer"]["confidence_regions_95"]) == 3
     assert payload["diagnostics"]["minimum_pair_distance"] > 0.0
     assert payload["mathematical_statement"]["statement_schema_version"] == 1

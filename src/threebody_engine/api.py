@@ -2088,6 +2088,11 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
     final_distribution = answer.get("final_position_distribution", {})
     if not isinstance(final_distribution, Mapping):
         final_distribution = {}
+    body_answers = statement.get("body_position_claims", [])
+    target_position_table = _target_position_answer_table(
+        body_answers,
+        claim=str(summary.get("claim", "unresolved-target-position")),
+    )
     return {
         "prediction_schema_version": 1,
         "prediction_type": "three-body-target-position-solution",
@@ -2096,7 +2101,8 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         "recommended_mode": str(answer.get("recommended_mode", "unresolved")),
         "target_positions": answer.get("final_positions", []),
         "target_position_distribution": final_distribution,
-        "body_answers": statement.get("body_position_claims", []),
+        "target_position_table": target_position_table,
+        "body_answers": body_answers,
         "deterministic_flow_answer": {
             "definition": "r_i(t) = Pi_{r_i} Phi_t(x(0))",
             "positions": answer.get("final_positions", []),
@@ -2110,6 +2116,7 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
             "q05_positions": final_distribution.get("q05_positions", []),
             "q95_positions": final_distribution.get("q95_positions", []),
             "confidence_regions_95": summary.get("body_95_confidence_regions", []),
+            "target_position_table": target_position_table,
             "success_count": final_distribution.get("success_count", 0),
             "failure_count": final_distribution.get("failure_count", 0),
         },
@@ -2135,6 +2142,47 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         },
         "mathematical_statement": statement,
     }
+
+
+def _target_position_answer_table(
+    body_answers: object,
+    *,
+    claim: str,
+) -> list[dict[str, object]]:
+    if not isinstance(body_answers, Sequence) or isinstance(body_answers, (str, bytes, bytearray)):
+        return []
+    rows: list[dict[str, object]] = []
+    for answer in body_answers:
+        if not isinstance(answer, Mapping):
+            continue
+        confidence_region = answer.get("confidence_region_95", {})
+        if not isinstance(confidence_region, Mapping):
+            confidence_region = {}
+        semi_axes = confidence_region.get("semi_axes", [])
+        rows.append(
+            {
+                "body_index": int(answer.get("body_index", len(rows))),
+                "claim": claim,
+                "deterministic_position": answer.get("deterministic_position", []),
+                "probability_mean": answer.get("distribution_mean", []),
+                "probability_median": answer.get("distribution_median", []),
+                "central_90_interval": {
+                    "lower": answer.get("distribution_q05", []),
+                    "upper": answer.get("distribution_q95", []),
+                },
+                "confidence_region_95": {
+                    "center": confidence_region.get("center", []),
+                    "semi_axes": semi_axes,
+                    "axis_directions": confidence_region.get("axis_directions", []),
+                    "max_semi_axis": _max_numeric_value(semi_axes),
+                },
+                "deterministic_to_mean_distance": _euclidean_distance(
+                    answer.get("deterministic_position", []),
+                    answer.get("distribution_mean", []),
+                ),
+            }
+        )
+    return rows
 
 
 def _prediction_mathematical_statement(
@@ -2278,6 +2326,39 @@ def _confidence_region_for_body(
         if int(region.get("body_index", -1)) == body_index:
             return dict(region)
     return {}
+
+
+def _max_numeric_value(values: object) -> float:
+    if not isinstance(values, Sequence) or isinstance(values, (str, bytes, bytearray)):
+        return math.nan
+    numeric_values = []
+    for value in values:
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(numeric):
+            numeric_values.append(numeric)
+    return max(numeric_values) if numeric_values else math.nan
+
+
+def _euclidean_distance(left: object, right: object) -> float:
+    if (
+        not isinstance(left, Sequence)
+        or isinstance(left, (str, bytes, bytearray))
+        or not isinstance(right, Sequence)
+        or isinstance(right, (str, bytes, bytearray))
+        or len(left) != len(right)
+    ):
+        return math.nan
+    try:
+        left_array = np.asarray(left, dtype=float)
+        right_array = np.asarray(right, dtype=float)
+    except (TypeError, ValueError):
+        return math.nan
+    if left_array.shape != right_array.shape or np.any(~np.isfinite(left_array)) or np.any(~np.isfinite(right_array)):
+        return math.nan
+    return float(np.linalg.norm(left_array - right_array))
 
 
 def _position_confidence_regions(

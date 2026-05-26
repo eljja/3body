@@ -355,10 +355,18 @@ def test_engine_api_returns_compact_target_position_solution() -> None:
     }
     assert len(solution["target_positions"]) == 3
     assert len(solution["target_position_distribution"]["mean_positions"]) == 3
+    assert len(solution["target_position_table"]) == 3
+    assert solution["target_position_table"][0]["body_index"] == 0
+    assert solution["target_position_table"][0]["deterministic_position"] == solution["target_positions"][0]
+    assert len(solution["target_position_table"][0]["central_90_interval"]["lower"]) == 2
+    assert len(solution["target_position_table"][0]["central_90_interval"]["upper"]) == 2
+    assert solution["target_position_table"][0]["confidence_region_95"]["max_semi_axis"] >= 0.0
+    assert solution["target_position_table"][0]["deterministic_to_mean_distance"] >= 0.0
     assert len(solution["body_answers"]) == 3
     assert solution["body_answers"][0]["deterministic_position"] == solution["target_positions"][0]
     assert solution["deterministic_flow_answer"]["definition"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
     assert solution["probability_answer"]["definition"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
+    assert solution["probability_answer"]["target_position_table"] == solution["target_position_table"]
     assert len(solution["probability_answer"]["confidence_regions_95"]) == 3
     assert solution["diagnostics"]["minimum_pair_distance"] > 0.0
     assert solution["mathematical_statement"]["statement_schema_version"] == 1
