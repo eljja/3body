@@ -164,6 +164,34 @@ def test_predict_cli_writes_ephemeris(tmp_path) -> None:
     assert payload["invariant_certificate"]["maximum_relative_energy_drift"] < 1.0e-8
 
 
+def test_predict_cli_writes_ephemeris_at_requested_times(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "ephemeris.json"
+    _write_prediction_input(input_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    payload["target_times"] = [0.0, 0.01, 0.035, 0.05]
+    input_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--ephemeris",
+            "--samples",
+            "9",
+            "--output",
+            str(output_path),
+        ]
+    )
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert result["prediction_type"] == "deterministic-ephemeris"
+    assert result["times"] == payload["target_times"]
+    assert len(result["positions"]) == len(payload["target_times"])
+
+
 def test_predict_cli_writes_position_distribution(tmp_path) -> None:
     input_path = tmp_path / "initial-state.json"
     output_path = tmp_path / "distribution.json"

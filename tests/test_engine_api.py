@@ -104,6 +104,51 @@ def test_engine_api_builds_three_body_ephemeris() -> None:
     assert ephemeris["invariant_certificate"]["maximum_relative_energy_drift"] < 1.0e-8
 
 
+def test_engine_api_builds_ephemeris_at_requested_times() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+    target_times = [0.0, 0.01, 0.035, 0.05]
+
+    ephemeris = predict_three_body_ephemeris(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        samples=9,
+        target_times=target_times,
+    )
+    linearized = predict_three_body_linearized_ephemeris(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        samples=9,
+        target_times=target_times,
+        preserve_center_of_mass=True,
+    )
+    distribution = predict_three_body_distribution_ephemeris(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        count=5,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        seed=4,
+        samples=9,
+        target_times=target_times,
+    )
+
+    assert ephemeris["times"] == target_times
+    assert len(ephemeris["positions"]) == len(target_times)
+    assert linearized["times"] == target_times
+    assert len(linearized["rows"]) == len(target_times)
+    assert distribution["times"] == target_times
+    assert len(distribution["position_distribution_ephemeris"]["mean_positions"]) == len(target_times)
+
+
 def test_engine_api_builds_three_body_position_distribution() -> None:
     scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
     positions, velocities = scenario.system.split_state(scenario.initial_state)

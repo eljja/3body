@@ -378,6 +378,7 @@ def predict_three_body_ephemeris(
     gravitational_constant: float = 1.0,
     softening: float = 0.0,
     samples: int = 256,
+    target_times: Sequence[float] | None = None,
     rtol: float = 1.0e-10,
     atol: float = 1.0e-12,
     max_step: float = math.inf,
@@ -398,6 +399,7 @@ def predict_three_body_ephemeris(
         initial_state,
         target_time,
         samples=samples,
+        target_times=target_times,
         rtol=rtol,
         atol=atol,
         max_step=max_step,
@@ -565,6 +567,7 @@ def predict_three_body_distribution_ephemeris(
     gravitational_constant: float = 1.0,
     softening: float = 0.0,
     samples: int = 256,
+    target_times: Sequence[float] | None = None,
     rtol: float = 1.0e-10,
     atol: float = 1.0e-12,
     max_step: float = math.inf,
@@ -612,6 +615,7 @@ def predict_three_body_distribution_ephemeris(
             state,
             target_time,
             samples=sample_count,
+            target_times=target_times,
             integrator=integrator,
         )
         if not trajectory.success or len(trajectory.y) == 0:
@@ -690,6 +694,7 @@ def solve_three_body_prediction_problem(
     gravitational_constant: float = 1.0,
     softening: float = 0.0,
     samples: int = 256,
+    target_times: Sequence[float] | None = None,
     rtol: float = 1.0e-10,
     atol: float = 1.0e-12,
     max_step: float = math.inf,
@@ -726,6 +731,7 @@ def solve_three_body_prediction_problem(
         gravitational_constant=gravitational_constant,
         softening=softening,
         samples=samples,
+        target_times=target_times,
         rtol=rtol,
         atol=atol,
         max_step=max_step,
@@ -742,6 +748,7 @@ def solve_three_body_prediction_problem(
         gravitational_constant=gravitational_constant,
         softening=softening,
         samples=samples,
+        target_times=target_times,
         jacobian_step=jacobian_step,
         rtol=rtol,
         atol=atol,
@@ -1013,6 +1020,7 @@ def predict_three_body_linearized_ephemeris(
     gravitational_constant: float = 1.0,
     softening: float = 0.0,
     samples: int = 256,
+    target_times: Sequence[float] | None = None,
     jacobian_step: float = 1.0e-6,
     rtol: float = 1.0e-10,
     atol: float = 1.0e-12,
@@ -1045,6 +1053,7 @@ def predict_three_body_linearized_ephemeris(
         initial_state,
         target_time,
         samples=samples,
+        target_times=target_times,
         jacobian_step=jacobian_step,
         rtol=rtol,
         atol=atol,
@@ -1190,6 +1199,7 @@ def predict_three_body_interpretation_report(
     gravitational_constant: float = 1.0,
     softening: float = 0.0,
     samples: int = 256,
+    target_times: Sequence[float] | None = None,
     rtol: float = 1.0e-10,
     atol: float = 1.0e-12,
     max_step: float = math.inf,
@@ -1362,10 +1372,37 @@ def _validated_sample_count(samples: int) -> int:
     return samples
 
 
-def _prediction_times(target_time: float, samples: int) -> np.ndarray:
+def _prediction_times(
+    target_time: float,
+    samples: int,
+    target_times: Sequence[float] | None = None,
+) -> np.ndarray:
+    if target_times is not None:
+        return _validated_target_times(target_time, target_times)
     if target_time == 0.0:
         return np.array([0.0], dtype=float)
     return np.linspace(0.0, target_time, samples)
+
+
+def _validated_target_times(target_time: float, target_times: Sequence[float]) -> np.ndarray:
+    times = np.asarray(target_times, dtype=float)
+    if times.ndim != 1 or times.size == 0:
+        raise ValueError("target_times must be a non-empty one-dimensional sequence.")
+    if np.any(~np.isfinite(times)):
+        raise ValueError("target_times must contain only finite values.")
+    if target_time == 0.0:
+        if np.any(times != 0.0):
+            raise ValueError("target_times must contain only 0 when target_time is 0.")
+        return np.array([0.0], dtype=float)
+    direction = 1.0 if target_time > 0.0 else -1.0
+    directed_times = direction * times
+    if np.any(np.diff(directed_times) <= 0.0):
+        raise ValueError("target_times must be strictly monotone in the integration direction.")
+    if np.any(directed_times < 0.0) or np.any(directed_times > direction * target_time):
+        raise ValueError("target_times must lie between 0 and target_time.")
+    if not math.isclose(float(times[-1]), target_time, rel_tol=0.0, abs_tol=1.0e-15):
+        raise ValueError("target_times must end at target_time.")
+    return times
 
 
 def _prediction_trajectory(
@@ -1374,12 +1411,13 @@ def _prediction_trajectory(
     target_time: float,
     *,
     samples: int,
+    target_times: Sequence[float] | None = None,
     rtol: float,
     atol: float,
     max_step: float,
 ) -> TrajectoryResult:
     sample_count = _validated_sample_count(samples)
-    t_eval = _prediction_times(target_time, sample_count)
+    t_eval = _prediction_times(target_time, sample_count, target_times=target_times)
     if target_time == 0.0:
         return TrajectoryResult(
             t=np.array([0.0], dtype=float),
@@ -1402,9 +1440,10 @@ def _prediction_trajectory_with_integrator(
     target_time: float,
     *,
     samples: int,
+    target_times: Sequence[float] | None = None,
     integrator: AdaptiveIntegrator,
 ) -> TrajectoryResult:
-    t_eval = _prediction_times(target_time, samples)
+    t_eval = _prediction_times(target_time, samples, target_times=target_times)
     if target_time == 0.0:
         return TrajectoryResult(
             t=np.array([0.0], dtype=float),
@@ -1978,13 +2017,14 @@ def _linearized_flow_trace(
     target_time: float,
     *,
     samples: int,
+    target_times: Sequence[float] | None = None,
     jacobian_step: float,
     rtol: float,
     atol: float,
 ) -> dict[str, object]:
     state_dimension = initial_state.size
     identity = np.eye(state_dimension, dtype=float)
-    t_eval = _prediction_times(target_time, samples)
+    t_eval = _prediction_times(target_time, samples, target_times=target_times)
     if target_time == 0.0:
         return {
             "success": True,

@@ -76,6 +76,8 @@ This returns the sampled orbit table from `0` through `target_time`: times, posi
 
 The ephemeris mode is the most direct answer to "where are the bodies over the forecast interval?" The final row is the same target-time position claim produced by the deterministic forecast, but the intermediate rows make the claim inspectable and reusable for visualization or external analysis.
 
+If the input JSON includes `target_times`, ephemeris modes return exactly those requested times instead of an evenly spaced grid. The list must be strictly monotone from the integration start toward `target_time`, stay between `0` and `target_time`, and end at `target_time`.
+
 ## Interpretation Report
 
 Use `threebody_engine.predict_three_body_interpretation_report(...)` or:
@@ -146,6 +148,8 @@ P(t_k) = D Phi_{t_k}(x0) P0 D Phi_{t_k}(x0)^T
 
 Use this when the initial uncertainty is small and a local Gaussian approximation is the appropriate mathematical object. Compare it with the empirical distribution ephemeris when nonlinear curvature may matter.
 
+Like the deterministic ephemeris, this mode honors `target_times` in the input JSON, so an observation schedule can request nonuniform probability distributions at exact times.
+
 ## Forecast Horizon
 
 Use `threebody_engine.predict_three_body_forecast_horizon(...)` or:
@@ -194,6 +198,8 @@ threebody predict --input initial-state.json --distribution-ephemeris --count 12
 ```
 
 This integrates the same Gaussian perturbation ensemble as the final-time distribution mode, but keeps every sampled time. The output contains the shared time grid, deterministic base ephemeris, and a `position_distribution_ephemeris` block with time-indexed mean positions, median positions, 5%/95% coordinate quantiles, flattened position covariance matrices, covariance confidence regions, and maximum body radius from the ensemble mean.
+
+When `target_times` is supplied, every ensemble member is evaluated on that same nonuniform requested time grid.
 
 This mode answers the strongest operational uncertainty question:
 

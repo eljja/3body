@@ -561,7 +561,15 @@ def run_predict_command(args: argparse.Namespace) -> int:
             "Choose only one of --distribution, --distribution-ephemeris, --linearized-distribution, "
             "--linearized-ephemeris, --score-positions, --report, --horizon, --ephemeris, or --solution."
         )
-    target_time = args.target_time if args.target_time is not None else _required_prediction_field(payload, "target_time")
+    target_times = payload.get("target_times")
+    if args.target_time is not None:
+        target_time = args.target_time
+    elif "target_time" in payload:
+        target_time = payload["target_time"]
+    elif target_times:
+        target_time = target_times[-1]
+    else:
+        target_time = _required_prediction_field(payload, "target_time")
     common_kwargs = {
         "gravitational_constant": args.gravitational_constant,
         "softening": args.softening,
@@ -586,6 +594,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             velocity_scale=args.velocity_scale,
             seed=args.seed,
             samples=args.samples,
+            target_times=target_times,
             max_step=args.max_step,
             jacobian_step=args.jacobian_step,
             position_tolerance=args.position_tolerance,
@@ -606,6 +615,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             velocity_scale=args.velocity_scale,
             seed=args.seed,
             samples=args.samples,
+            target_times=target_times,
             max_step=args.max_step,
             jacobian_step=args.jacobian_step,
             position_tolerance=args.position_tolerance,
@@ -637,6 +647,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             _required_prediction_field(payload, "velocities"),
             target_time,
             samples=args.samples,
+            target_times=target_times,
             max_step=args.max_step,
             include_invariant_series=args.include_invariant_series,
             **common_kwargs,
@@ -666,6 +677,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             position_scale=args.position_scale,
             velocity_scale=args.velocity_scale,
             samples=args.samples,
+            target_times=target_times,
             jacobian_step=args.jacobian_step,
             preserve_center_of_mass=standalone_preserve_center_of_mass,
             **common_kwargs,
@@ -699,6 +711,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             seed=args.seed,
             include_sample_ephemerides=args.include_sample_ephemerides,
             samples=args.samples,
+            target_times=target_times,
             max_step=args.max_step,
             **empirical_uncertainty_kwargs,
             **common_kwargs,
