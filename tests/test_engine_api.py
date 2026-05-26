@@ -285,6 +285,8 @@ def test_engine_api_solves_three_body_prediction_problem() -> None:
     assert solution["distribution_ephemeris"]["prediction_type"] == "empirical-position-distribution-ephemeris"
     assert solution["ephemeris_distribution_comparison"]["row_count"] == 9
     assert solution["ephemeris_distribution_comparison"]["final_covariance_relative_gap"] >= 0.0
+    assert solution["answer"]["uncertainty_amplification_factor"] >= 1.0
+    assert np.isfinite(solution["answer"]["finite_time_lyapunov_exponent"])
     assert solution["answer"]["minimum_pair_distance"] > 0.0
     assert solution["answer"]["close_approach_warning_level"] in {
         "nominal",
@@ -322,6 +324,8 @@ def test_engine_api_builds_linearized_three_body_position_distribution() -> None
     assert distribution["position_confidence_regions"][0]["method"] == "linearized-gaussian"
     assert distribution["linearized_diagnostics"]["minimum_covariance_eigenvalue"] > -1.0e-18
     assert distribution["linearized_diagnostics"]["maximum_position_std"] > 0.0
+    assert distribution["linearized_diagnostics"]["uncertainty_amplification_factor"] >= 1.0
+    assert np.isfinite(distribution["linearized_diagnostics"]["finite_time_lyapunov_exponent"])
     covariance0 = np.asarray(distribution["initial_state_covariance"], dtype=float)
     weights = np.asarray(scenario.system.masses, dtype=float)
     weights = weights / np.sum(weights)
@@ -384,6 +388,10 @@ def test_engine_api_builds_linearized_three_body_ephemeris() -> None:
     assert len(ephemeris["rows"][0]["mean_positions"]) == 3
     assert len(ephemeris["rows"][0]["position_covariance"]) == 6
     assert len(ephemeris["rows"][0]["position_confidence_regions"]) == 3
+    assert ephemeris["rows"][-1]["linearized_sensitivity"]["uncertainty_amplification_factor"] >= 1.0
+    assert np.isfinite(
+        ephemeris["linearized_diagnostics"]["final_linearized_sensitivity"]["finite_time_lyapunov_exponent"]
+    )
     assert ephemeris["rows"][-1]["maximum_position_std"] > 0.0
     assert ephemeris["linearized_diagnostics"]["maximum_position_std"] >= ephemeris["rows"][-1]["maximum_position_std"]
 
@@ -441,6 +449,7 @@ def test_engine_api_estimates_three_body_forecast_horizon() -> None:
     assert horizon["reliable_until"] == horizon["rows"][-1]["time"]
     assert horizon["final_uncertainty_to_tolerance_ratio"] < 1.0
     assert len(horizon["rows"]) == 6
+    assert horizon["rows"][-1]["linearized_sensitivity"]["uncertainty_amplification_factor"] >= 1.0
 
 
 def test_engine_api_exposes_public_static_claim_contract() -> None:

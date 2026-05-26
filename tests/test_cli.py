@@ -306,6 +306,7 @@ def test_predict_cli_writes_solution_bundle(tmp_path) -> None:
     assert payload["linearized_gaussian_ephemeris"]["prediction_type"] == "linearized-gaussian-ephemeris"
     assert payload["ephemeris_distribution_comparison"]["row_count"] == 9
     assert payload["ephemeris_distribution_comparison"]["final_covariance_relative_gap"] >= 0.0
+    assert payload["answer"]["uncertainty_amplification_factor"] >= 1.0
     assert payload["answer"]["minimum_pair_distance"] > 0.0
     assert payload["interpretation_report"]["prediction_type"] == "three-body-interpretation-report"
 
@@ -340,6 +341,7 @@ def test_predict_cli_writes_linearized_position_distribution(tmp_path) -> None:
     assert len(payload["position_covariance"]) == 6
     assert len(payload["position_confidence_regions"]) == 3
     assert payload["linearized_diagnostics"]["maximum_position_std"] > 0.0
+    assert payload["linearized_diagnostics"]["uncertainty_amplification_factor"] >= 1.0
 
 
 def test_predict_cli_uses_explicit_initial_covariance_for_distribution(tmp_path) -> None:
@@ -439,6 +441,7 @@ def test_predict_cli_writes_linearized_ephemeris(tmp_path) -> None:
     assert len(payload["rows"][0]["mean_positions"]) == 3
     assert len(payload["rows"][0]["position_covariance"]) == 6
     assert len(payload["rows"][0]["position_confidence_regions"]) == 3
+    assert payload["rows"][-1]["linearized_sensitivity"]["uncertainty_amplification_factor"] >= 1.0
 
 
 def test_predict_cli_writes_interpretation_report(tmp_path) -> None:

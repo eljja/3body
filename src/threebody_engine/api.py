@@ -815,6 +815,12 @@ def solve_three_body_prediction_problem(
         if deterministic_ephemeris.get("positions")
         else []
     )
+    linearized_diagnostics = linearized_ephemeris.get("linearized_diagnostics", {})
+    if not isinstance(linearized_diagnostics, Mapping):
+        linearized_diagnostics = {}
+    final_sensitivity = linearized_diagnostics.get("final_linearized_sensitivity", {})
+    if not isinstance(final_sensitivity, Mapping):
+        final_sensitivity = {}
     return {
         "prediction_schema_version": 1,
         "prediction_type": "three-body-prediction-solution",
@@ -828,6 +834,12 @@ def solve_three_body_prediction_problem(
             "empirical_distribution_resolved": verdict.get("empirical_distribution_resolved") is True,
             "linearized_ephemeris_consistent_until": ephemeris_comparison["linearized_consistent_until"],
             "first_linearized_ephemeris_break_time": ephemeris_comparison["first_break_time"],
+            "finite_time_lyapunov_exponent": float(
+                final_sensitivity.get("finite_time_lyapunov_exponent", math.inf)
+            ),
+            "uncertainty_amplification_factor": float(
+                final_sensitivity.get("uncertainty_amplification_factor", math.inf)
+            ),
             "minimum_pair_distance": deterministic_ephemeris["close_approach_diagnostics"][
                 "minimum_pair_distance"
             ],
@@ -912,6 +924,7 @@ def predict_three_body_linearized_distribution(
         system.dimension,
     )
     covariance_eigenvalues = np.linalg.eigvalsh(covariance_t)
+    sensitivity = _linearized_sensitivity_diagnostics(transition, target_time)
     return {
         "prediction_schema_version": 1,
         "prediction_type": "linearized-gaussian-position-distribution",
@@ -945,8 +958,7 @@ def predict_three_body_linearized_distribution(
         "state_transition_matrix": transition.tolist(),
         "linearized_diagnostics": {
             "jacobian_step": jacobian_step,
-            "transition_condition_number": float(np.linalg.cond(transition)),
-            "transition_spectral_radius": float(max(abs(np.linalg.eigvals(transition)))),
+            **sensitivity,
             "minimum_covariance_eigenvalue": float(np.min(covariance_eigenvalues)),
             "maximum_position_std": float(np.max(std_positions)),
         },
@@ -1094,6 +1106,7 @@ def predict_three_body_linearized_ephemeris(
     )
     rows = _linearized_ephemeris_rows(system, flow, covariance0)
     max_position_std = max((float(row["maximum_position_std"]) for row in rows), default=math.inf)
+    final_sensitivity = rows[-1].get("linearized_sensitivity", {}) if rows else {}
     return {
         "prediction_schema_version": 1,
         "prediction_type": "linearized-gaussian-ephemeris",
@@ -1119,6 +1132,7 @@ def predict_three_body_linearized_ephemeris(
             "jacobian_step": jacobian_step,
             "sample_count": len(rows),
             "maximum_position_std": max_position_std,
+            "final_linearized_sensitivity": final_sensitivity,
         },
         "interpretation": (
             "Time-resolved first-order Gaussian push-forward: each row contains the nominal positions "
@@ -2235,8 +2249,7 @@ def _linearized_ephemeris_rows(
             position_covariance = np.full((position_width, position_width), math.inf, dtype=float)
             state_covariance = np.full_like(covariance0, math.inf, dtype=float)
             std_positions = np.full((system.body_count, system.dimension), math.inf, dtype=float)
-            transition_spectral_radius = math.inf
-            transition_condition_number = math.inf
+            sensitivity = _invalid_linearized_sensitivity_diagnostics()
         else:
             state_covariance = _symmetrize_covariance(transition @ covariance0 @ transition.T)
             position_covariance = state_covariance[:position_width, :position_width]
@@ -2244,8 +2257,7 @@ def _linearized_ephemeris_rows(
                 system.body_count,
                 system.dimension,
             )
-            transition_spectral_radius = float(max(abs(np.linalg.eigvals(transition))))
-            transition_condition_number = float(np.linalg.cond(transition))
+            sensitivity = _linearized_sensitivity_diagnostics(transition, float(time))
         rows.append(
             {
                 "time": float(time),
@@ -2266,8 +2278,9 @@ def _linearized_ephemeris_rows(
                 ),
                 "maximum_position_std": float(np.max(std_positions)),
                 "state_covariance_trace": float(np.trace(state_covariance)),
-                "transition_spectral_radius": transition_spectral_radius,
-                "transition_condition_number": transition_condition_number,
+                "transition_spectral_radius": sensitivity["transition_spectral_radius"],
+                "transition_condition_number": sensitivity["transition_condition_number"],
+                "linearized_sensitivity": sensitivity,
             }
         )
     return rows
@@ -2276,6 +2289,42 @@ def _linearized_ephemeris_rows(
 def _symmetrize_covariance(covariance: np.ndarray) -> np.ndarray:
     covariance = np.asarray(covariance, dtype=float)
     return 0.5 * (covariance + covariance.T)
+
+
+def _linearized_sensitivity_diagnostics(transition: np.ndarray, elapsed_time: float) -> dict[str, float]:
+    transition = np.asarray(transition, dtype=float)
+    if transition.ndim != 2 or transition.shape[0] != transition.shape[1] or np.any(~np.isfinite(transition)):
+        return _invalid_linearized_sensitivity_diagnostics()
+    singular_values = np.linalg.svd(transition, compute_uv=False)
+    maximum_singular_value = float(np.max(singular_values)) if singular_values.size else math.inf
+    minimum_singular_value = float(np.min(singular_values)) if singular_values.size else math.inf
+    condition_number = math.inf if minimum_singular_value == 0.0 else maximum_singular_value / minimum_singular_value
+    spectral_radius = float(max(abs(np.linalg.eigvals(transition)))) if transition.size else math.inf
+    if elapsed_time == 0.0:
+        finite_time_lyapunov_exponent = 0.0 if maximum_singular_value > 0.0 else -math.inf
+    elif maximum_singular_value > 0.0 and math.isfinite(maximum_singular_value):
+        finite_time_lyapunov_exponent = float(math.log(maximum_singular_value) / abs(elapsed_time))
+    else:
+        finite_time_lyapunov_exponent = math.inf
+    return {
+        "transition_spectral_radius": spectral_radius,
+        "transition_condition_number": float(condition_number),
+        "maximum_singular_value": maximum_singular_value,
+        "minimum_singular_value": minimum_singular_value,
+        "uncertainty_amplification_factor": maximum_singular_value,
+        "finite_time_lyapunov_exponent": finite_time_lyapunov_exponent,
+    }
+
+
+def _invalid_linearized_sensitivity_diagnostics() -> dict[str, float]:
+    return {
+        "transition_spectral_radius": math.inf,
+        "transition_condition_number": math.inf,
+        "maximum_singular_value": math.inf,
+        "minimum_singular_value": math.inf,
+        "uncertainty_amplification_factor": math.inf,
+        "finite_time_lyapunov_exponent": math.inf,
+    }
 
 
 def _forecast_horizon_rows(
@@ -2291,14 +2340,16 @@ def _forecast_horizon_rows(
     rows: list[dict[str, object]] = []
     for time, transition in zip(times, transitions, strict=False):
         if transition.shape[0] != covariance0.shape[0] or np.any(~np.isfinite(transition)):
+            sensitivity = _invalid_linearized_sensitivity_diagnostics()
             rows.append(
                 {
                     "time": float(time),
                     "max_position_std": math.inf,
                     "rms_position_std": math.inf,
                     "uncertainty_to_tolerance_ratio": math.inf,
-                    "transition_spectral_radius": math.inf,
-                    "transition_condition_number": math.inf,
+                    "transition_spectral_radius": sensitivity["transition_spectral_radius"],
+                    "transition_condition_number": sensitivity["transition_condition_number"],
+                    "linearized_sensitivity": sensitivity,
                     "resolved": False,
                 }
             )
@@ -2310,14 +2361,16 @@ def _forecast_horizon_rows(
         max_position_std = float(np.max(position_std))
         rms_position_std = float(np.sqrt(np.mean(position_variance)))
         ratio = max_position_std / position_tolerance
+        sensitivity = _linearized_sensitivity_diagnostics(transition, float(time))
         rows.append(
             {
                 "time": float(time),
                 "max_position_std": max_position_std,
                 "rms_position_std": rms_position_std,
                 "uncertainty_to_tolerance_ratio": float(ratio),
-                "transition_spectral_radius": float(max(abs(np.linalg.eigvals(transition)))),
-                "transition_condition_number": float(np.linalg.cond(transition)),
+                "transition_spectral_radius": sensitivity["transition_spectral_radius"],
+                "transition_condition_number": sensitivity["transition_condition_number"],
+                "linearized_sensitivity": sensitivity,
                 "resolved": bool(ratio <= 1.0),
             }
         )

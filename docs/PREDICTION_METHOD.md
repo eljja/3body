@@ -122,6 +122,8 @@ Output includes the mean final positions, position standard deviations, the prop
 
 The `position_confidence_regions` block converts each body's covariance into 50%, 90%, 95%, and 99% Gaussian ellipses or ellipsoids. Each region includes the center, Mahalanobis radius, semi-axis lengths, and axis directions, so the probability statement can be plotted or checked without recomputing the eigensystem.
 
+The `linearized_diagnostics` block also reports singular-value sensitivity: maximum/minimum singular values of `D Phi_t`, the uncertainty amplification factor, and the finite-time Lyapunov exponent `log(sigma_max) / |t|`. These are local predictability diagnostics, not global chaos proofs.
+
 This mode is the most mathematical local answer: it gives the first-order probability distribution implied by the Newtonian flow. If no explicit `initial_state_covariance` is supplied, `preserve_center_of_mass=True` constructs `P0` on the subspace where mass-weighted center-of-mass position and velocity are unchanged. It is valid while the initial uncertainty is small enough that nonlinear curvature of the flow is not dominant.
 
 ## Position Hypothesis Score
@@ -151,6 +153,8 @@ P(t_k) = D Phi_{t_k}(x0) P0 D Phi_{t_k}(x0)^T
 Use this when the initial uncertainty is small and a local Gaussian approximation is the appropriate mathematical object. Compare it with the empirical distribution ephemeris when nonlinear curvature may matter.
 
 Like the deterministic ephemeris, this mode honors `target_times` in the input JSON, so an observation schedule can request nonuniform probability distributions at exact times.
+
+Each row includes `linearized_sensitivity`, so sensitivity growth can be inspected over time instead of only at the final target time.
 
 ## Forecast Horizon
 
