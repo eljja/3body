@@ -375,6 +375,21 @@ def test_engine_api_returns_compact_target_position_solution() -> None:
     }
     assert solution["target_position_table"][0]["deterministic_to_mean_distance"] >= 0.0
     assert solution["target_position_table"][0]["deterministic_to_mean_distance_relative"] >= 0.0
+    center_frame = solution["center_of_mass_frame"]
+    assert center_frame["frame"] == "mass-weighted-center-of-mass"
+    assert center_frame["total_mass"] == sum(scenario.system.masses)
+    assert len(center_frame["target_center_position"]) == 2
+    assert len(center_frame["target_positions_relative_to_center"]) == 3
+    assert len(center_frame["distribution_mean_relative_to_center"]) == 3
+    assert center_frame["target_center_speed"] >= 0.0
+    assert (
+        solution["deterministic_flow_answer"]["positions_relative_to_center_of_mass"]
+        == center_frame["target_positions_relative_to_center"]
+    )
+    assert (
+        solution["probability_answer"]["mean_positions_relative_to_center_of_mass"]
+        == center_frame["distribution_mean_relative_to_center"]
+    )
     assert len(solution["body_answers"]) == 3
     assert solution["body_answers"][0]["deterministic_position"] == solution["target_positions"][0]
     assert solution["deterministic_flow_answer"]["definition"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"

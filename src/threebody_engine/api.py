@@ -2093,6 +2093,10 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         body_answers,
         claim=str(summary.get("claim", "unresolved-target-position")),
     )
+    center_of_mass_frame = _center_of_mass_frame_summary(
+        deterministic_ephemeris,
+        final_distribution,
+    )
     return {
         "prediction_schema_version": 1,
         "prediction_type": "three-body-target-position-solution",
@@ -2102,10 +2106,15 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         "target_positions": answer.get("final_positions", []),
         "target_position_distribution": final_distribution,
         "target_position_table": target_position_table,
+        "center_of_mass_frame": center_of_mass_frame,
         "body_answers": body_answers,
         "deterministic_flow_answer": {
             "definition": "r_i(t) = Pi_{r_i} Phi_t(x(0))",
             "positions": answer.get("final_positions", []),
+            "positions_relative_to_center_of_mass": center_of_mass_frame.get(
+                "target_positions_relative_to_center",
+                [],
+            ),
             "method": deterministic_ephemeris.get("method", "adaptive-DOP853"),
             "invariant_certificate": deterministic_ephemeris.get("invariant_certificate", {}),
         },
@@ -2117,6 +2126,10 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
             "q95_positions": final_distribution.get("q95_positions", []),
             "confidence_regions_95": summary.get("body_95_confidence_regions", []),
             "target_position_table": target_position_table,
+            "mean_positions_relative_to_center_of_mass": center_of_mass_frame.get(
+                "distribution_mean_relative_to_center",
+                [],
+            ),
             "success_count": final_distribution.get("success_count", 0),
             "failure_count": final_distribution.get("failure_count", 0),
         },
@@ -2141,6 +2154,40 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
             ),
         },
         "mathematical_statement": statement,
+    }
+
+
+def _center_of_mass_frame_summary(
+    deterministic_ephemeris: Mapping[str, object],
+    final_distribution: Mapping[str, object],
+) -> dict[str, object]:
+    masses = deterministic_ephemeris.get("masses", [])
+    positions = deterministic_ephemeris.get("positions", [])
+    velocities = deterministic_ephemeris.get("velocities", [])
+    initial_positions = _indexed_sequence_value(positions, 0)
+    target_positions = _indexed_sequence_value(positions, len(positions) - 1) if isinstance(positions, Sequence) else []
+    initial_velocities = _indexed_sequence_value(velocities, 0)
+    target_velocities = _indexed_sequence_value(velocities, len(velocities) - 1) if isinstance(velocities, Sequence) else []
+    initial_center = _mass_weighted_center(masses, initial_positions)
+    target_center = _mass_weighted_center(masses, target_positions)
+    initial_center_velocity = _mass_weighted_center(masses, initial_velocities)
+    target_center_velocity = _mass_weighted_center(masses, target_velocities)
+    mean_positions = final_distribution.get("mean_positions", [])
+    return {
+        "frame": "mass-weighted-center-of-mass",
+        "total_mass": _total_mass(masses),
+        "initial_center_position": initial_center,
+        "target_center_position": target_center,
+        "center_displacement": _vector_difference(target_center, initial_center),
+        "initial_center_velocity": initial_center_velocity,
+        "target_center_velocity": target_center_velocity,
+        "target_center_speed": _vector_norm(target_center_velocity),
+        "target_positions_relative_to_center": _subtract_vector_from_rows(target_positions, target_center),
+        "distribution_mean_relative_to_center": _subtract_vector_from_rows(mean_positions, target_center),
+        "interpretation": (
+            "Use target_positions_relative_to_center when comparing intrinsic three-body geometry "
+            "independently of inertial-frame translation."
+        ),
     }
 
 
@@ -2431,6 +2478,82 @@ def _safe_ratio(numerator: float, denominator: float) -> float:
     if not math.isfinite(numerator) or not math.isfinite(denominator) or denominator <= 0.0:
         return math.nan
     return float(numerator / denominator)
+
+
+def _total_mass(masses: object) -> float:
+    if not isinstance(masses, Sequence) or isinstance(masses, (str, bytes, bytearray)):
+        return math.nan
+    try:
+        mass_array = np.asarray(masses, dtype=float)
+    except (TypeError, ValueError):
+        return math.nan
+    if mass_array.ndim != 1 or mass_array.size == 0 or np.any(~np.isfinite(mass_array)):
+        return math.nan
+    total = float(np.sum(mass_array))
+    return total if total > 0.0 else math.nan
+
+
+def _mass_weighted_center(masses: object, vectors: object) -> list[float]:
+    total = _total_mass(masses)
+    if not math.isfinite(total):
+        return []
+    try:
+        mass_array = np.asarray(masses, dtype=float)
+        vector_array = np.asarray(vectors, dtype=float)
+    except (TypeError, ValueError):
+        return []
+    if (
+        mass_array.ndim != 1
+        or vector_array.ndim != 2
+        or vector_array.shape[0] != mass_array.size
+        or np.any(~np.isfinite(vector_array))
+    ):
+        return []
+    return np.average(vector_array, axis=0, weights=mass_array).tolist()
+
+
+def _vector_difference(left: object, right: object) -> list[float]:
+    try:
+        left_array = np.asarray(left, dtype=float)
+        right_array = np.asarray(right, dtype=float)
+    except (TypeError, ValueError):
+        return []
+    if (
+        left_array.ndim != 1
+        or right_array.ndim != 1
+        or left_array.shape != right_array.shape
+        or np.any(~np.isfinite(left_array))
+        or np.any(~np.isfinite(right_array))
+    ):
+        return []
+    return (left_array - right_array).tolist()
+
+
+def _vector_norm(vector: object) -> float:
+    try:
+        array = np.asarray(vector, dtype=float)
+    except (TypeError, ValueError):
+        return math.nan
+    if array.ndim != 1 or np.any(~np.isfinite(array)):
+        return math.nan
+    return float(np.linalg.norm(array))
+
+
+def _subtract_vector_from_rows(rows: object, vector: object) -> list[list[float]]:
+    try:
+        row_array = np.asarray(rows, dtype=float)
+        vector_array = np.asarray(vector, dtype=float)
+    except (TypeError, ValueError):
+        return []
+    if (
+        row_array.ndim != 2
+        or vector_array.ndim != 1
+        or row_array.shape[1] != vector_array.size
+        or np.any(~np.isfinite(row_array))
+        or np.any(~np.isfinite(vector_array))
+    ):
+        return []
+    return (row_array - vector_array[None, :]).tolist()
 
 
 def _position_confidence_regions(

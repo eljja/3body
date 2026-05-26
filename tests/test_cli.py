@@ -394,6 +394,21 @@ def test_predict_cli_writes_compact_target_solution(tmp_path) -> None:
     }
     assert payload["target_position_table"][0]["deterministic_to_mean_distance"] >= 0.0
     assert payload["target_position_table"][0]["deterministic_to_mean_distance_relative"] >= 0.0
+    center_frame = payload["center_of_mass_frame"]
+    assert center_frame["frame"] == "mass-weighted-center-of-mass"
+    assert center_frame["total_mass"] == 3.0
+    assert len(center_frame["target_center_position"]) == 2
+    assert len(center_frame["target_positions_relative_to_center"]) == 3
+    assert len(center_frame["distribution_mean_relative_to_center"]) == 3
+    assert center_frame["target_center_speed"] >= 0.0
+    assert (
+        payload["deterministic_flow_answer"]["positions_relative_to_center_of_mass"]
+        == center_frame["target_positions_relative_to_center"]
+    )
+    assert (
+        payload["probability_answer"]["mean_positions_relative_to_center_of_mass"]
+        == center_frame["distribution_mean_relative_to_center"]
+    )
     assert len(payload["body_answers"]) == 3
     assert payload["body_answers"][0]["deterministic_position"] == payload["target_positions"][0]
     assert payload["deterministic_flow_answer"]["definition"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
