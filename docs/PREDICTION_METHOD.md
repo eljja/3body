@@ -78,6 +78,8 @@ The ephemeris mode is the most direct answer to "where are the bodies over the f
 
 If the input JSON includes `target_times`, ephemeris modes return exactly those requested times instead of an evenly spaced grid. The list must be strictly monotone from the integration start toward `target_time`, stay between `0` and `target_time`, and end at `target_time`.
 
+Deterministic ephemeris and point forecast outputs also include `close_approach_diagnostics`: the minimum sampled pair distance, the body pair and time where it occurs, scale ratios, and a `regularization_recommended` flag. This is not a finite-radius collision claim; it is a warning that the forecast passed through a close-encounter regime where regularized coordinates or stricter step control may be required.
+
 ## Interpretation Report
 
 Use `threebody_engine.predict_three_body_interpretation_report(...)` or:
@@ -200,6 +202,8 @@ threebody predict --input initial-state.json --distribution-ephemeris --count 12
 This integrates the same Gaussian perturbation ensemble as the final-time distribution mode, but keeps every sampled time. The output contains the shared time grid, deterministic base ephemeris, and a `position_distribution_ephemeris` block with time-indexed mean positions, median positions, 5%/95% coordinate quantiles, flattened position covariance matrices, covariance confidence regions, and maximum body radius from the ensemble mean.
 
 When `target_times` is supplied, every ensemble member is evaluated on that same nonuniform requested time grid.
+
+The distribution ephemeris additionally reports `ensemble_close_approach_diagnostics`, aggregating close-approach risk across successful ensemble members.
 
 This mode answers the strongest operational uncertainty question:
 

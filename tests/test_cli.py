@@ -131,6 +131,7 @@ def test_predict_cli_writes_deterministic_three_body_forecast(tmp_path) -> None:
     assert payload["dimension"] == 2
     assert len(payload["positions"]) == 3
     assert payload["invariant_certificate"]["maximum_relative_energy_drift"] < 1.0e-8
+    assert payload["close_approach_diagnostics"]["minimum_pair_distance"] > 0.0
 
 
 def test_predict_cli_writes_ephemeris(tmp_path) -> None:
@@ -162,6 +163,7 @@ def test_predict_cli_writes_ephemeris(tmp_path) -> None:
     assert len(payload["positions"][0]) == 3
     assert len(payload["invariant_series"]["energy"]) == 9
     assert payload["invariant_certificate"]["maximum_relative_energy_drift"] < 1.0e-8
+    assert payload["close_approach_diagnostics"]["minimum_pair_distance"] > 0.0
 
 
 def test_predict_cli_writes_ephemeris_at_requested_times(tmp_path) -> None:
@@ -261,6 +263,7 @@ def test_predict_cli_writes_distribution_ephemeris(tmp_path) -> None:
     assert len(payload["position_distribution_ephemeris"]["mean_positions"][0]) == 3
     assert len(payload["position_distribution_ephemeris"]["flat_covariances"][0]) == 6
     assert len(payload["position_distribution_ephemeris"]["position_confidence_regions"]) == 9
+    assert payload["ensemble_close_approach_diagnostics"]["sample_count"] == 5
     assert len(payload["sample_ephemerides"]) == 5
 
 
@@ -303,6 +306,7 @@ def test_predict_cli_writes_solution_bundle(tmp_path) -> None:
     assert payload["linearized_gaussian_ephemeris"]["prediction_type"] == "linearized-gaussian-ephemeris"
     assert payload["ephemeris_distribution_comparison"]["row_count"] == 9
     assert payload["ephemeris_distribution_comparison"]["final_covariance_relative_gap"] >= 0.0
+    assert payload["answer"]["minimum_pair_distance"] > 0.0
     assert payload["interpretation_report"]["prediction_type"] == "three-body-interpretation-report"
 
 

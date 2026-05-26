@@ -69,6 +69,13 @@ def test_engine_api_predicts_three_body_positions_from_initial_state() -> None:
     assert len(prediction["positions"]) == 3
     assert len(prediction["positions"][0]) == 2
     assert prediction["invariant_certificate"]["maximum_relative_energy_drift"] < 1.0e-8
+    assert prediction["close_approach_diagnostics"]["minimum_pair_distance"] > 0.0
+    assert prediction["close_approach_diagnostics"]["warning_level"] in {
+        "nominal",
+        "close-approach",
+        "softening-scale",
+        "collision-scale",
+    }
 
 
 def test_engine_api_builds_three_body_ephemeris() -> None:
@@ -102,6 +109,8 @@ def test_engine_api_builds_three_body_ephemeris() -> None:
     assert ephemeris["velocities"][-1] == point_prediction["velocities"]
     assert len(ephemeris["invariant_series"]["energy"]) == 9
     assert ephemeris["invariant_certificate"]["maximum_relative_energy_drift"] < 1.0e-8
+    assert ephemeris["close_approach_diagnostics"]["minimum_pair_distance"] > 0.0
+    assert len(ephemeris["close_approach_diagnostics"]["minimum_pair"]) == 2
 
 
 def test_engine_api_builds_ephemeris_at_requested_times() -> None:
@@ -242,6 +251,8 @@ def test_engine_api_builds_three_body_distribution_ephemeris() -> None:
     assert len(distribution["position_distribution_ephemeris"]["flat_covariances"][0]) == 6
     assert len(distribution["position_distribution_ephemeris"]["position_confidence_regions"]) == 9
     assert len(distribution["position_distribution_ephemeris"]["position_confidence_regions"][0]) == 3
+    assert distribution["ensemble_close_approach_diagnostics"]["sample_count"] == 7
+    assert distribution["ensemble_close_approach_diagnostics"]["minimum_pair_distance"] > 0.0
     assert len(distribution["sample_ephemerides"]) == 7
     assert len(distribution["sample_ephemerides"][0]["positions"]) == 9
 
@@ -274,6 +285,14 @@ def test_engine_api_solves_three_body_prediction_problem() -> None:
     assert solution["distribution_ephemeris"]["prediction_type"] == "empirical-position-distribution-ephemeris"
     assert solution["ephemeris_distribution_comparison"]["row_count"] == 9
     assert solution["ephemeris_distribution_comparison"]["final_covariance_relative_gap"] >= 0.0
+    assert solution["answer"]["minimum_pair_distance"] > 0.0
+    assert solution["answer"]["close_approach_warning_level"] in {
+        "nominal",
+        "close-approach",
+        "softening-scale",
+        "collision-scale",
+    }
+    assert solution["answer"]["regularization_recommended"] in {True, False}
     assert "linearized_ephemeris_consistent_until" in solution["answer"]
     assert "first_linearized_ephemeris_break_time" in solution["answer"]
     assert solution["interpretation_report"]["prediction_type"] == "three-body-interpretation-report"

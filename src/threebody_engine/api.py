@@ -349,6 +349,12 @@ def predict_three_body_positions(
     final_state = trajectory.y[-1] if len(trajectory.y) else np.full(system.state_dim, np.nan)
     final_positions, final_velocities = system.split_state(final_state)
     invariant_certificate = noether_invariant_drift_certificate(system, trajectory).as_dict()
+    positions_series, _velocities_series = _trajectory_position_velocity_series(system, trajectory)
+    close_approach_diagnostics = _close_approach_diagnostics(
+        positions_series,
+        trajectory.t,
+        softening=system.softening,
+    )
     return {
         "prediction_schema_version": 1,
         "prediction_type": "deterministic-position",
@@ -366,6 +372,7 @@ def predict_three_body_positions(
         "sample_count": int(len(trajectory.t)),
         "solver": dict(trajectory.metadata),
         "invariant_certificate": invariant_certificate,
+        "close_approach_diagnostics": close_approach_diagnostics,
     }
 
 
@@ -407,6 +414,11 @@ def predict_three_body_ephemeris(
     positions_series, velocities_series = _trajectory_position_velocity_series(system, trajectory)
     final_state = trajectory.y[-1] if len(trajectory.y) else np.full(system.state_dim, np.nan)
     invariant_certificate = noether_invariant_drift_certificate(system, trajectory).as_dict()
+    close_approach_diagnostics = _close_approach_diagnostics(
+        positions_series,
+        trajectory.t,
+        softening=system.softening,
+    )
     result: dict[str, object] = {
         "prediction_schema_version": 1,
         "prediction_type": "deterministic-ephemeris",
@@ -425,6 +437,7 @@ def predict_three_body_ephemeris(
         "sample_count": int(len(trajectory.t)),
         "solver": dict(trajectory.metadata),
         "invariant_certificate": invariant_certificate,
+        "close_approach_diagnostics": close_approach_diagnostics,
     }
     if include_invariant_series:
         result["invariant_series"] = _trajectory_invariant_series(system, trajectory)
@@ -608,6 +621,7 @@ def predict_three_body_distribution_ephemeris(
     successful_positions: list[np.ndarray] = []
     successful_times: np.ndarray | None = None
     sample_rows: list[dict[str, object]] = []
+    sample_close_approach_diagnostics: list[dict[str, object]] = []
     failures: list[dict[str, object]] = []
     for index, state in enumerate(initial_states):
         trajectory = _prediction_trajectory_with_integrator(
@@ -623,6 +637,13 @@ def predict_three_body_distribution_ephemeris(
             continue
         positions_series, velocities_series = _trajectory_position_velocity_series(system, trajectory)
         successful_positions.append(positions_series)
+        sample_close_approach_diagnostics.append(
+            _close_approach_diagnostics(
+                positions_series,
+                trajectory.t,
+                softening=system.softening,
+            )
+        )
         if successful_times is None:
             successful_times = trajectory.t
         if include_sample_ephemerides:
@@ -642,6 +663,7 @@ def predict_three_body_distribution_ephemeris(
         gravitational_constant=gravitational_constant,
         softening=softening,
         samples=samples,
+        target_times=target_times,
         rtol=rtol,
         atol=atol,
         max_step=max_step,
@@ -670,6 +692,9 @@ def predict_three_body_distribution_ephemeris(
         "failures": failures,
         "times": [] if successful_times is None else successful_times.tolist(),
         "base_ephemeris": base_ephemeris,
+        "ensemble_close_approach_diagnostics": _ensemble_close_approach_diagnostics(
+            sample_close_approach_diagnostics
+        ),
         "position_distribution_ephemeris": _position_distribution_ephemeris_summary(
             successful_positions,
             system.dimension,
@@ -803,6 +828,15 @@ def solve_three_body_prediction_problem(
             "empirical_distribution_resolved": verdict.get("empirical_distribution_resolved") is True,
             "linearized_ephemeris_consistent_until": ephemeris_comparison["linearized_consistent_until"],
             "first_linearized_ephemeris_break_time": ephemeris_comparison["first_break_time"],
+            "minimum_pair_distance": deterministic_ephemeris["close_approach_diagnostics"][
+                "minimum_pair_distance"
+            ],
+            "close_approach_warning_level": deterministic_ephemeris["close_approach_diagnostics"][
+                "warning_level"
+            ],
+            "regularization_recommended": deterministic_ephemeris["close_approach_diagnostics"][
+                "regularization_recommended"
+            ],
         },
         "deterministic_ephemeris": deterministic_ephemeris,
         "linearized_gaussian_ephemeris": linearized_ephemeris,
@@ -1469,6 +1503,123 @@ def _trajectory_position_velocity_series(
         positions.append(state_positions)
         velocities.append(state_velocities)
     return np.asarray(positions, dtype=float), np.asarray(velocities, dtype=float)
+
+
+def _close_approach_diagnostics(
+    positions_series: Sequence[Sequence[Sequence[float]]] | np.ndarray,
+    times: Sequence[float] | np.ndarray,
+    *,
+    softening: float,
+) -> dict[str, object]:
+    positions = np.asarray(positions_series, dtype=float)
+    time_array = np.asarray(times, dtype=float)
+    body_pairs = [(0, 1), (0, 2), (1, 2)]
+    if positions.ndim != 3 or positions.shape[0] == 0 or positions.shape[1] != 3:
+        return {
+            "body_pairs": [[first, second] for first, second in body_pairs],
+            "minimum_pair_distance": math.inf,
+            "minimum_pair": [],
+            "minimum_time": math.nan,
+            "minimum_time_index": -1,
+            "characteristic_pair_distance": math.inf,
+            "minimum_to_characteristic_ratio": math.inf,
+            "softening": float(softening),
+            "minimum_to_softening_ratio": math.inf,
+            "warning_level": "unavailable",
+            "regularization_recommended": False,
+            "interpretation": "No sampled positions were available for close-approach diagnostics.",
+        }
+    pair_distances = np.stack(
+        [
+            np.linalg.norm(positions[:, first, :] - positions[:, second, :], axis=1)
+            for first, second in body_pairs
+        ],
+        axis=1,
+    )
+    finite_mask = np.isfinite(pair_distances)
+    if not np.any(finite_mask):
+        minimum_distance = math.inf
+        time_index = -1
+        pair_index = -1
+        characteristic_distance = math.inf
+    else:
+        masked = np.where(finite_mask, pair_distances, math.inf)
+        flat_index = int(np.argmin(masked))
+        time_index, pair_index = np.unravel_index(flat_index, masked.shape)
+        minimum_distance = float(masked[time_index, pair_index])
+        characteristic_distance = float(np.median(pair_distances[finite_mask]))
+    if not math.isfinite(characteristic_distance) or characteristic_distance <= 0.0:
+        characteristic_ratio = math.inf
+    else:
+        characteristic_ratio = minimum_distance / characteristic_distance
+    softening = float(softening)
+    softening_ratio = math.inf if softening <= 0.0 else minimum_distance / softening
+    if not math.isfinite(minimum_distance):
+        warning_level = "unavailable"
+    elif minimum_distance <= 0.0:
+        warning_level = "collision-scale"
+    elif softening > 0.0 and minimum_distance <= 2.0 * softening:
+        warning_level = "softening-scale"
+    elif characteristic_ratio <= 1.0e-6:
+        warning_level = "collision-scale"
+    elif characteristic_ratio <= 1.0e-3:
+        warning_level = "close-approach"
+    else:
+        warning_level = "nominal"
+    return {
+        "body_pairs": [[first, second] for first, second in body_pairs],
+        "minimum_pair_distance": minimum_distance,
+        "minimum_pair": [] if pair_index < 0 else list(body_pairs[pair_index]),
+        "minimum_time": math.nan if time_index < 0 or time_index >= len(time_array) else float(time_array[time_index]),
+        "minimum_time_index": int(time_index),
+        "characteristic_pair_distance": characteristic_distance,
+        "minimum_to_characteristic_ratio": float(characteristic_ratio),
+        "softening": softening,
+        "minimum_to_softening_ratio": float(softening_ratio),
+        "warning_level": warning_level,
+        "regularization_recommended": warning_level in {"collision-scale", "softening-scale", "close-approach"},
+        "interpretation": (
+            "Close-approach diagnostic over sampled positions. Small minimum_to_characteristic_ratio or "
+            "minimum distances near the softening scale indicate that a regularized collision chart or a "
+            "smaller integration step should be considered before promoting a long-horizon forecast."
+        ),
+    }
+
+
+def _ensemble_close_approach_diagnostics(sample_diagnostics: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    if not sample_diagnostics:
+        return {
+            "sample_count": 0,
+            "minimum_pair_distance": math.inf,
+            "minimum_sample_index": -1,
+            "warning_level_counts": {},
+            "regularization_recommended_count": 0,
+            "regularization_recommended_fraction": 0.0,
+        }
+    distances = np.asarray(
+        [float(row.get("minimum_pair_distance", math.inf)) for row in sample_diagnostics],
+        dtype=float,
+    )
+    minimum_sample_index = int(np.argmin(distances)) if distances.size else -1
+    warning_counts: dict[str, int] = {}
+    regularization_count = 0
+    for row in sample_diagnostics:
+        warning_level = str(row.get("warning_level", "unavailable"))
+        warning_counts[warning_level] = warning_counts.get(warning_level, 0) + 1
+        if row.get("regularization_recommended") is True:
+            regularization_count += 1
+    sample_count = len(sample_diagnostics)
+    return {
+        "sample_count": sample_count,
+        "minimum_pair_distance": float(distances[minimum_sample_index]) if minimum_sample_index >= 0 else math.inf,
+        "minimum_sample_index": minimum_sample_index,
+        "minimum_sample_diagnostics": (
+            dict(sample_diagnostics[minimum_sample_index]) if minimum_sample_index >= 0 else {}
+        ),
+        "warning_level_counts": warning_counts,
+        "regularization_recommended_count": regularization_count,
+        "regularization_recommended_fraction": float(regularization_count / sample_count),
+    }
 
 
 def _trajectory_invariant_series(
