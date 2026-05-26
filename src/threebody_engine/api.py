@@ -2101,6 +2101,10 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         answer.get("final_positions", []),
         final_distribution,
     )
+    target_distribution_quality = _target_distribution_quality_summary(
+        final_distribution,
+        characteristic_scale=_target_position_characteristic_scale(body_answers),
+    )
     return {
         "prediction_schema_version": 1,
         "prediction_type": "three-body-target-position-solution",
@@ -2112,6 +2116,7 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         "target_position_table": target_position_table,
         "center_of_mass_frame": center_of_mass_frame,
         "target_pair_geometry": target_pair_geometry,
+        "target_distribution_quality": target_distribution_quality,
         "body_answers": body_answers,
         "deterministic_flow_answer": {
             "definition": "r_i(t) = Pi_{r_i} Phi_t(x(0))",
@@ -2137,6 +2142,7 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
                 [],
             ),
             "pair_geometry": target_pair_geometry.get("probability", {}),
+            "distribution_quality": target_distribution_quality,
             "success_count": final_distribution.get("success_count", 0),
             "failure_count": final_distribution.get("failure_count", 0),
         },
@@ -2162,6 +2168,68 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         },
         "mathematical_statement": statement,
     }
+
+
+def _target_distribution_quality_summary(
+    final_distribution: Mapping[str, object],
+    *,
+    characteristic_scale: float,
+) -> dict[str, object]:
+    success_count = int(final_distribution.get("success_count", 0))
+    failure_count = int(final_distribution.get("failure_count", 0))
+    flat_covariance = final_distribution.get("flat_covariance", [])
+    mean_positions = _position_matrix_or_none(final_distribution.get("mean_positions", []))
+    body_rows: list[dict[str, object]] = []
+    max_standard_errors: list[float] = []
+    if success_count > 0 and mean_positions is not None:
+        try:
+            covariance = np.asarray(flat_covariance, dtype=float)
+        except (TypeError, ValueError):
+            covariance = np.asarray([])
+        dimension = mean_positions.shape[1]
+        expected_width = mean_positions.shape[0] * dimension
+        if covariance.shape == (expected_width, expected_width) and np.all(np.isfinite(covariance)):
+            variances = np.maximum(np.diag(covariance), 0.0).reshape(mean_positions.shape[0], dimension)
+            standard_errors = np.sqrt(variances / float(success_count))
+            for body_index, row in enumerate(standard_errors):
+                max_standard_error = float(np.max(row))
+                max_standard_errors.append(max_standard_error)
+                body_rows.append(
+                    {
+                        "body_index": body_index,
+                        "mean_standard_error": row.tolist(),
+                        "max_mean_standard_error": max_standard_error,
+                        "relative_max_mean_standard_error": _safe_ratio(
+                            max_standard_error,
+                            characteristic_scale,
+                        ),
+                    }
+                )
+    max_mean_standard_error = max(max_standard_errors) if max_standard_errors else math.nan
+    relative_max = _safe_ratio(max_mean_standard_error, characteristic_scale)
+    return {
+        "quality_schema_version": 1,
+        "sample_count": success_count,
+        "failure_count": failure_count,
+        "body_mean_standard_errors": body_rows,
+        "max_mean_standard_error": max_mean_standard_error,
+        "relative_max_mean_standard_error": relative_max,
+        "sampling_error_strength": _sampling_error_strength(relative_max),
+        "interpretation": (
+            "Mean standard errors estimate Monte Carlo sampling uncertainty of the empirical "
+            "target-position mean, not the physical spread of the predicted positions."
+        ),
+    }
+
+
+def _sampling_error_strength(relative_standard_error: float) -> str:
+    if not math.isfinite(relative_standard_error):
+        return "unavailable"
+    if relative_standard_error <= 1.0e-4:
+        return "well-sampled"
+    if relative_standard_error <= 1.0e-2:
+        return "usable"
+    return "sampling-noisy"
 
 
 def _target_pair_geometry_summary(

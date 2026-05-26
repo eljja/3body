@@ -403,6 +403,18 @@ def test_engine_api_returns_compact_target_position_solution() -> None:
     assert pair_geometry["probability"]["mean_perimeter"] > 0.0
     assert solution["deterministic_flow_answer"]["pair_geometry"] == pair_geometry["deterministic"]
     assert solution["probability_answer"]["pair_geometry"] == pair_geometry["probability"]
+    distribution_quality = solution["target_distribution_quality"]
+    assert distribution_quality["quality_schema_version"] == 1
+    assert distribution_quality["sample_count"] == 5
+    assert len(distribution_quality["body_mean_standard_errors"]) == 3
+    assert distribution_quality["body_mean_standard_errors"][0]["max_mean_standard_error"] >= 0.0
+    assert distribution_quality["relative_max_mean_standard_error"] >= 0.0
+    assert distribution_quality["sampling_error_strength"] in {
+        "well-sampled",
+        "usable",
+        "sampling-noisy",
+    }
+    assert solution["probability_answer"]["distribution_quality"] == distribution_quality
     assert len(solution["body_answers"]) == 3
     assert solution["body_answers"][0]["deterministic_position"] == solution["target_positions"][0]
     assert solution["deterministic_flow_answer"]["definition"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
