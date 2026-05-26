@@ -46,6 +46,7 @@ Output includes final positions, final velocities, solver metadata, and a Noethe
 Use `threebody_engine.solve_three_body_target_positions(...)` when the caller only needs the direct answer: `target_positions`, `target_position_distribution`, one row per body's target-time claim, and the core diagnostics. Use `threebody_engine.solve_three_body_prediction_problem(...)` when the full audit bundle is needed, or:
 
 ```powershell
+threebody predict --input initial-state.json --target-solution --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output target-solution.json
 threebody predict --input initial-state.json --solution --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output solution.json
 ```
 

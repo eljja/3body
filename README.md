@@ -205,6 +205,7 @@ position_score = score_three_body_position_hypothesis(
 The same layer is available from the CLI:
 
 ```powershell
+threebody predict --input initial-state.json --target-solution --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output target-solution.json
 threebody predict --input initial-state.json --solution --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output solution.json
 threebody predict --input initial-state.json --target-time 0.5 --output prediction.json
 threebody predict --input initial-state.json --ephemeris --samples 256 --output ephemeris.json

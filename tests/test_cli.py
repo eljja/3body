@@ -336,6 +336,54 @@ def test_predict_cli_writes_solution_bundle(tmp_path) -> None:
     assert payload["interpretation_report"]["prediction_type"] == "three-body-interpretation-report"
 
 
+def test_predict_cli_writes_compact_target_solution(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "target-solution.json"
+    _write_prediction_input(input_path)
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--target-solution",
+            "--count",
+            "5",
+            "--position-scale",
+            "1e-7",
+            "--velocity-scale",
+            "1e-7",
+            "--samples",
+            "9",
+            "--horizon-samples",
+            "6",
+            "--output",
+            str(output_path),
+        ]
+    )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["prediction_type"] == "three-body-target-position-solution"
+    assert payload["claim"] in {
+        "target-position-and-distribution",
+        "distributional-target-position",
+        "deterministic-target-position",
+        "unresolved-target-position",
+    }
+    assert payload["recommended_mode"] in {"linearized-gaussian", "empirical-ensemble"}
+    assert len(payload["target_positions"]) == 3
+    assert len(payload["target_position_distribution"]["mean_positions"]) == 3
+    assert len(payload["body_answers"]) == 3
+    assert payload["body_answers"][0]["deterministic_position"] == payload["target_positions"][0]
+    assert payload["deterministic_flow_answer"]["definition"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
+    assert payload["probability_answer"]["definition"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
+    assert len(payload["probability_answer"]["confidence_regions_95"]) == 3
+    assert payload["diagnostics"]["minimum_pair_distance"] > 0.0
+    assert payload["mathematical_statement"]["statement_schema_version"] == 1
+    assert "solution_bundle" not in payload
+
+
 def test_predict_cli_writes_linearized_position_distribution(tmp_path) -> None:
     input_path = tmp_path / "initial-state.json"
     output_path = tmp_path / "linearized-distribution.json"
