@@ -51,6 +51,7 @@ threebody predict --input initial-state.json --solution --count 128 --samples 25
 
 This is the most direct public API for the original project target. It returns:
 
+- `prediction_summary`: a compact report-ready conclusion with a versioned schema, promoted claim type, point-position statement, probability statement, reliability/risk statements, key diagnostics, and per-body 95% confidence regions.
 - `answer.final_positions`: the three target-time positions from the deterministic flow.
 - `answer.final_position_distribution`: mean, quantiles, covariance, confidence regions, and ensemble counts for the target-time position distribution.
 - `answer.recommended_mode`: the promoted interpretation mode from the diagnostic report.
@@ -220,6 +221,8 @@ At each sampled time between now and t, what is the probability distribution of 
 The deterministic API answers "where are the bodies at time `t` if the initial state is exactly known?"
 
 The solution bundle answers "what are the target-time positions, how do they evolve, what is the probability distribution, and which claim is defensible?"
+
+The solution summary answers "can we publish this as a point-position claim, a distributional claim, a deterministic-only calculation, or an unresolved forecast?"
 
 The ephemeris API answers "where are the bodies at each sampled time between now and `t`?"
 

@@ -296,6 +296,22 @@ def test_predict_cli_writes_solution_bundle(tmp_path) -> None:
 
     assert exit_code == 0
     assert payload["prediction_type"] == "three-body-prediction-solution"
+    assert payload["prediction_summary"]["summary_schema_version"] == 1
+    assert payload["prediction_summary"]["claim"] in {
+        "target-position-and-distribution",
+        "distributional-target-position",
+        "deterministic-target-position",
+        "unresolved-target-position",
+    }
+    assert payload["prediction_summary"]["recommended_mode"] == payload["answer"]["recommended_mode"]
+    assert "position_statement" in payload["prediction_summary"]
+    assert len(payload["prediction_summary"]["confidence_regions_95"]) == 3
+    assert len(payload["prediction_summary"]["body_95_confidence_regions"]) == 3
+    assert payload["prediction_summary"]["key_metrics"]["minimum_pair_distance"] > 0.0
+    assert (
+        payload["prediction_summary"]["key_metrics"]["minimum_pair_distance"]
+        == payload["answer"]["minimum_pair_distance"]
+    )
     assert payload["answer"]["recommended_mode"] in {"linearized-gaussian", "empirical-ensemble"}
     assert payload["answer"]["target_time_inside_forecast_horizon"] is True
     assert len(payload["answer"]["final_positions"]) == 3

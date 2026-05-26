@@ -821,35 +821,37 @@ def solve_three_body_prediction_problem(
     final_sensitivity = linearized_diagnostics.get("final_linearized_sensitivity", {})
     if not isinstance(final_sensitivity, Mapping):
         final_sensitivity = {}
+    answer = {
+        "final_positions": final_positions,
+        "final_position_distribution": final_distribution,
+        "recommended_mode": verdict.get("recommended_mode", "unresolved"),
+        "target_time_inside_forecast_horizon": verdict.get("target_time_inside_forecast_horizon") is True,
+        "deterministic_resolved": verdict.get("deterministic_resolved") is True,
+        "empirical_distribution_resolved": verdict.get("empirical_distribution_resolved") is True,
+        "linearized_ephemeris_consistent_until": ephemeris_comparison["linearized_consistent_until"],
+        "first_linearized_ephemeris_break_time": ephemeris_comparison["first_break_time"],
+        "finite_time_lyapunov_exponent": float(
+            final_sensitivity.get("finite_time_lyapunov_exponent", math.inf)
+        ),
+        "uncertainty_amplification_factor": float(
+            final_sensitivity.get("uncertainty_amplification_factor", math.inf)
+        ),
+        "minimum_pair_distance": deterministic_ephemeris["close_approach_diagnostics"][
+            "minimum_pair_distance"
+        ],
+        "close_approach_warning_level": deterministic_ephemeris["close_approach_diagnostics"][
+            "warning_level"
+        ],
+        "regularization_recommended": deterministic_ephemeris["close_approach_diagnostics"][
+            "regularization_recommended"
+        ],
+    }
     return {
         "prediction_schema_version": 1,
         "prediction_type": "three-body-prediction-solution",
         "target_time": float(target_time),
-        "answer": {
-            "final_positions": final_positions,
-            "final_position_distribution": final_distribution,
-            "recommended_mode": verdict.get("recommended_mode", "unresolved"),
-            "target_time_inside_forecast_horizon": verdict.get("target_time_inside_forecast_horizon") is True,
-            "deterministic_resolved": verdict.get("deterministic_resolved") is True,
-            "empirical_distribution_resolved": verdict.get("empirical_distribution_resolved") is True,
-            "linearized_ephemeris_consistent_until": ephemeris_comparison["linearized_consistent_until"],
-            "first_linearized_ephemeris_break_time": ephemeris_comparison["first_break_time"],
-            "finite_time_lyapunov_exponent": float(
-                final_sensitivity.get("finite_time_lyapunov_exponent", math.inf)
-            ),
-            "uncertainty_amplification_factor": float(
-                final_sensitivity.get("uncertainty_amplification_factor", math.inf)
-            ),
-            "minimum_pair_distance": deterministic_ephemeris["close_approach_diagnostics"][
-                "minimum_pair_distance"
-            ],
-            "close_approach_warning_level": deterministic_ephemeris["close_approach_diagnostics"][
-                "warning_level"
-            ],
-            "regularization_recommended": deterministic_ephemeris["close_approach_diagnostics"][
-                "regularization_recommended"
-            ],
-        },
+        "answer": answer,
+        "prediction_summary": _prediction_solution_summary(answer, ephemeris_comparison),
         "deterministic_ephemeris": deterministic_ephemeris,
         "linearized_gaussian_ephemeris": linearized_ephemeris,
         "distribution_ephemeris": distribution_ephemeris,
@@ -1836,6 +1838,206 @@ def _final_position_distribution_from_ephemeris(distribution_ephemeris: Mapping[
         "success_count": int(distribution_ephemeris.get("success_count", 0)),
         "failure_count": int(distribution_ephemeris.get("failure_count", 0)),
     }
+
+
+def _prediction_solution_summary(
+    answer: Mapping[str, object],
+    ephemeris_comparison: Mapping[str, object],
+) -> dict[str, object]:
+    recommended_mode = str(answer.get("recommended_mode", "unresolved"))
+    final_positions = answer.get("final_positions", [])
+    final_distribution = answer.get("final_position_distribution", {})
+    if not isinstance(final_distribution, Mapping):
+        final_distribution = {}
+    confidence_regions = final_distribution.get("position_confidence_regions", [])
+    confidence_95 = _body_confidence_level_summary(confidence_regions, probability=0.95)
+    target_inside_horizon = answer.get("target_time_inside_forecast_horizon") is True
+    deterministic_resolved = answer.get("deterministic_resolved") is True
+    empirical_resolved = answer.get("empirical_distribution_resolved") is True
+    regularization_recommended = answer.get("regularization_recommended") is True
+    linearized_consistent = ephemeris_comparison.get("target_time_consistent") is True
+    claim = _prediction_solution_claim(
+        recommended_mode=recommended_mode,
+        target_inside_horizon=target_inside_horizon,
+        deterministic_resolved=deterministic_resolved,
+        empirical_resolved=empirical_resolved,
+        linearized_consistent=linearized_consistent,
+        regularization_recommended=regularization_recommended,
+    )
+    if recommended_mode == "linearized-gaussian":
+        headline = "Target-time positions are locally predictable with a linearized Gaussian uncertainty model."
+    elif recommended_mode == "empirical-ensemble":
+        headline = "Target-time positions are best stated as an empirical ensemble distribution."
+    elif recommended_mode == "deterministic-only":
+        headline = "A deterministic target-time trajectory is available, but the uncertainty model is not resolved."
+    else:
+        headline = "The target-time prediction is unresolved under the configured diagnostics."
+    reliability_factors = {
+        "target_time_inside_forecast_horizon": target_inside_horizon,
+        "empirical_distribution_resolved": empirical_resolved,
+        "linearized_consistent_with_empirical_at_target": linearized_consistent,
+        "regularization_recommended": regularization_recommended,
+    }
+    limitations: list[str] = []
+    if not target_inside_horizon:
+        limitations.append("Target time is outside the configured forecast-horizon tolerance.")
+    if not empirical_resolved:
+        limitations.append("Empirical ensemble did not produce a resolved distribution.")
+    if not linearized_consistent:
+        limitations.append("Linearized Gaussian and empirical ephemeris disagree at the target-time gate.")
+    if regularization_recommended:
+        limitations.append("Sampled trajectory enters a close-approach regime; regularized coordinates may be required.")
+    if not limitations:
+        limitations.append("No configured diagnostic blocked the promoted forecast mode.")
+    if claim == "target-position-and-distribution":
+        reliability_statement = (
+            "The target time is inside the forecast horizon, the empirical distribution is resolved, "
+            "and the promoted distribution model passes the configured consistency gates."
+        )
+        actionable_next_step = (
+            "Use deterministic_final_positions for the point estimate and confidence_regions_95 for "
+            "reported target-time uncertainty."
+        )
+    elif claim == "distributional-target-position":
+        reliability_statement = (
+            "A target-time probability distribution is defensible, but a point forecast should be treated "
+            "as a distribution summary rather than a uniquely stable prediction."
+        )
+        actionable_next_step = (
+            "Report body-wise means, medians, quantiles, and confidence_regions_95 instead of only a point orbit."
+        )
+    elif claim == "deterministic-target-position":
+        reliability_statement = (
+            "The Newtonian flow integration produced a target-time position, but configured uncertainty "
+            "diagnostics did not justify a probability claim."
+        )
+        actionable_next_step = (
+            "Reduce target time, tighten tolerances, or provide a calibrated initial_state_covariance "
+            "before publishing uncertainty regions."
+        )
+    else:
+        reliability_statement = (
+            "The configured diagnostics do not support a stable point or distributional target-time claim."
+        )
+        actionable_next_step = (
+            "Increase ensemble count, shorten target time, use regularized coordinates near close approach, "
+            "or switch to a regime-local atlas claim."
+        )
+    probability_statement = (
+        "The final_position_distribution field contains the pushed-forward probability model; "
+        "confidence_regions_95 gives per-body 95 percent Gaussian-equivalent regions."
+        if confidence_95
+        else "No 95 percent confidence region was available from the configured distribution path."
+    )
+    risk_statement = (
+        "Close-approach diagnostics request regularized coordinates before promoting a strong forecast."
+        if regularization_recommended
+        else "No sampled close-approach diagnostic requested regularized coordinates."
+    )
+    return {
+        "summary_schema_version": 1,
+        "claim": claim,
+        "headline": headline,
+        "recommended_mode": recommended_mode,
+        "position_statement": (
+            "deterministic_final_positions is the target-time Newtonian flow-map estimate for the three bodies."
+        ),
+        "probability_statement": probability_statement,
+        "reliability_statement": reliability_statement,
+        "risk_statement": risk_statement,
+        "actionable_next_step": actionable_next_step,
+        "deterministic_final_positions": final_positions,
+        "probabilistic_final_position_mean": final_distribution.get("mean_positions", []),
+        "probabilistic_final_position_median": final_distribution.get("median_positions", []),
+        "confidence_regions_95": confidence_95,
+        "body_95_confidence_regions": confidence_95,
+        "key_metrics": {
+            "target_time_inside_forecast_horizon": target_inside_horizon,
+            "linearized_target_time_consistent": linearized_consistent,
+            "uncertainty_amplification_factor": float(
+                answer.get("uncertainty_amplification_factor", math.inf)
+            ),
+            "finite_time_lyapunov_exponent": float(
+                answer.get("finite_time_lyapunov_exponent", math.inf)
+            ),
+            "minimum_pair_distance": float(answer.get("minimum_pair_distance", math.inf)),
+            "close_approach_warning_level": str(answer.get("close_approach_warning_level", "unavailable")),
+            "regularization_recommended": regularization_recommended,
+            "final_covariance_relative_gap": float(
+                ephemeris_comparison.get("final_covariance_relative_gap", math.inf)
+            ),
+            "final_mean_gap_in_sigma_units": float(
+                ephemeris_comparison.get("final_mean_gap_in_sigma_units", math.inf)
+            ),
+        },
+        "reliability_factors": reliability_factors,
+        "limitations": limitations,
+    }
+
+
+def _prediction_solution_claim(
+    *,
+    recommended_mode: str,
+    target_inside_horizon: bool,
+    deterministic_resolved: bool,
+    empirical_resolved: bool,
+    linearized_consistent: bool,
+    regularization_recommended: bool,
+) -> str:
+    if (
+        recommended_mode == "linearized-gaussian"
+        and target_inside_horizon
+        and empirical_resolved
+        and linearized_consistent
+        and not regularization_recommended
+    ):
+        return "target-position-and-distribution"
+    if recommended_mode == "empirical-ensemble" and empirical_resolved and not regularization_recommended:
+        return "distributional-target-position"
+    if recommended_mode == "deterministic-only" and deterministic_resolved:
+        return "deterministic-target-position"
+    if empirical_resolved and not regularization_recommended:
+        return "distributional-target-position"
+    if deterministic_resolved:
+        return "deterministic-target-position"
+    return "unresolved-target-position"
+
+
+def _body_confidence_level_summary(
+    confidence_regions: object,
+    *,
+    probability: float,
+) -> list[dict[str, object]]:
+    if not isinstance(confidence_regions, Sequence) or isinstance(confidence_regions, (str, bytes, bytearray)):
+        return []
+    rows: list[dict[str, object]] = []
+    for region in confidence_regions:
+        if not isinstance(region, Mapping):
+            continue
+        levels = region.get("levels", [])
+        selected_level: Mapping[str, object] | None = None
+        if isinstance(levels, Sequence) and not isinstance(levels, (str, bytes, bytearray)):
+            for level in levels:
+                if isinstance(level, Mapping) and math.isclose(
+                    float(level.get("probability", math.nan)),
+                    probability,
+                    rel_tol=0.0,
+                    abs_tol=1.0e-12,
+                ):
+                    selected_level = level
+                    break
+        if selected_level is None:
+            continue
+        rows.append(
+            {
+                "body_index": int(region.get("body_index", len(rows))),
+                "center": region.get("center", []),
+                "probability": float(probability),
+                "semi_axes": selected_level.get("semi_axes", []),
+                "axis_directions": selected_level.get("axis_directions", []),
+            }
+        )
+    return rows
 
 
 def _position_confidence_regions(

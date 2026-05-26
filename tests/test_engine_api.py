@@ -274,6 +274,24 @@ def test_engine_api_solves_three_body_prediction_problem() -> None:
     )
 
     assert solution["prediction_type"] == "three-body-prediction-solution"
+    assert solution["prediction_summary"]["summary_schema_version"] == 1
+    assert solution["prediction_summary"]["claim"] in {
+        "target-position-and-distribution",
+        "distributional-target-position",
+        "deterministic-target-position",
+        "unresolved-target-position",
+    }
+    assert solution["prediction_summary"]["recommended_mode"] == solution["answer"]["recommended_mode"]
+    assert "Target-time positions" in solution["prediction_summary"]["headline"]
+    assert "target-time Newtonian flow-map" in solution["prediction_summary"]["position_statement"]
+    assert len(solution["prediction_summary"]["deterministic_final_positions"]) == 3
+    assert len(solution["prediction_summary"]["confidence_regions_95"]) == 3
+    assert len(solution["prediction_summary"]["body_95_confidence_regions"]) == 3
+    assert solution["prediction_summary"]["key_metrics"]["minimum_pair_distance"] > 0.0
+    assert (
+        solution["prediction_summary"]["key_metrics"]["minimum_pair_distance"]
+        == solution["answer"]["minimum_pair_distance"]
+    )
     assert solution["answer"]["recommended_mode"] in {"linearized-gaussian", "empirical-ensemble"}
     assert solution["answer"]["target_time_inside_forecast_horizon"] is True
     assert len(solution["answer"]["final_positions"]) == 3
