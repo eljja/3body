@@ -120,6 +120,16 @@ The `position_confidence_regions` block converts each body's covariance into 50%
 
 This mode is the most mathematical local answer: it gives the first-order probability distribution implied by the Newtonian flow. If no explicit `initial_state_covariance` is supplied, `preserve_center_of_mass=True` constructs `P0` on the subspace where mass-weighted center-of-mass position and velocity are unchanged. It is valid while the initial uncertainty is small enough that nonlinear curvature of the flow is not dominant.
 
+## Position Hypothesis Score
+
+To judge whether a proposed target-time position is plausible under the local mathematical forecast, include `candidate_positions` in the input JSON and run:
+
+```powershell
+threebody predict --input initial-state.json --score-positions --preserve-center-of-mass --position-scale 1e-6 --velocity-scale 1e-6 --output position-score.json
+```
+
+This computes the same linearized Gaussian forecast, then scores the proposed three-body position with per-body and joint Mahalanobis distances, Gaussian log density, and 50/90/95/99% confidence membership. This is the direct mathematical answer to "does this claimed position at time `t` fit the predicted probability distribution?"
+
 ## Linearized Gaussian Ephemeris
 
 For a time-resolved first-order probability distribution, use `threebody_engine.predict_three_body_linearized_ephemeris(...)` or:
@@ -206,6 +216,8 @@ The interpretation report answers "which of the available mathematical forecasts
 The distribution API answers "where are the bodies likely to be at time `t` if the initial state has a specified observational uncertainty?"
 
 The linearized-ephemeris API answers "what Gaussian distribution does the variational flow imply at every sampled time?"
+
+The position-score API answers "how plausible is this proposed target-time position under the forecast distribution?"
 
 The distribution-ephemeris API answers "how does that final probability distribution develop over the whole interval?"
 

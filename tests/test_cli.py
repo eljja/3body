@@ -343,6 +343,37 @@ def test_predict_cli_uses_explicit_initial_covariance_for_distribution(tmp_path)
     assert result["initial_state_covariance"] == covariance
 
 
+def test_predict_cli_scores_candidate_positions(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "position-score.json"
+    _write_prediction_input(input_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    payload["candidate_positions"] = payload["positions"]
+    input_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--score-positions",
+            "--position-scale",
+            "1e-7",
+            "--velocity-scale",
+            "1e-7",
+            "--output",
+            str(output_path),
+        ]
+    )
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert result["prediction_type"] == "three-body-position-hypothesis-score"
+    assert len(result["body_scores"]) == 3
+    assert result["joint_score"]["mahalanobis_distance"] >= 0.0
+    assert "0.95" in result["joint_score"]["inside_confidence_levels"]
+
+
 def test_predict_cli_writes_linearized_ephemeris(tmp_path) -> None:
     input_path = tmp_path / "initial-state.json"
     output_path = tmp_path / "linearized-ephemeris.json"

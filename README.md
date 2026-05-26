@@ -84,6 +84,7 @@ from threebody_engine import (
     run_verification_report,
     select_hysteresis_markov_order,
     solve_three_body_prediction_problem,
+    score_three_body_position_hypothesis,
     tune_jacobi_picard,
     validate_hysteresis_markov_chain,
     validate_public_static_artifact_receipt_contract,
@@ -106,6 +107,7 @@ from threebody_engine import (
     predict_three_body_position_distribution,
     predict_three_body_positions,
     solve_three_body_prediction_problem,
+    score_three_body_position_hypothesis,
 )
 
 masses = (1.0, 1.0, 1.0)
@@ -176,9 +178,18 @@ distribution_ephemeris = predict_three_body_distribution_ephemeris(
     position_scale=1.0e-6,
     velocity_scale=1.0e-6,
 )
+position_score = score_three_body_position_hypothesis(
+    masses,
+    positions,
+    velocities,
+    target_time=0.5,
+    candidate_positions=point_forecast["positions"],
+    position_scale=1.0e-6,
+    velocity_scale=1.0e-6,
+)
 ```
 
-`solve_three_body_prediction_problem` is the one-call solution bundle: it returns final positions, a deterministic ephemeris, linearized Gaussian ephemeris, time-resolved empirical distribution ephemeris, a time-resolved linearized-vs-empirical comparison, and a verdict describing which mathematical forecast is defensible. Its default uncertainty model preserves mass-weighted center-of-mass position and velocity, so the linearized Gaussian and empirical ensemble compare the same physical perturbation family. If the input JSON or API call supplies `initial_state_covariance`, that full state covariance is used by both the linearized and empirical probability paths. `predict_three_body_positions` returns the final positions, velocities, solver metadata, and Noether invariant drift diagnostics. `predict_three_body_ephemeris` returns the sampled positions and velocities from `0` through `target_time`, suitable for orbit tables, downstream visualization, and independent audit. `predict_three_body_forecast_horizon` estimates how far the target-time forecast remains locally tolerance-resolved by propagating initial covariance through the variational flow. `predict_three_body_interpretation_report` runs the point, forecast-horizon, variational Gaussian, and ensemble modes together, compares the distributions, and recommends `linearized-gaussian`, `empirical-ensemble`, `deterministic-only`, or `unresolved`. `predict_three_body_linearized_distribution` computes the variational state-transition matrix and pushes an initial covariance forward by `P(t) = D Phi_t P(0) D Phi_t^T`; pass `preserve_center_of_mass=True` to build `P(0)` on the center-of-mass-preserving subspace when no explicit covariance is supplied. `predict_three_body_linearized_ephemeris` performs that same covariance push-forward at every sampled time. `predict_three_body_position_distribution` samples either the supplied full initial covariance or the generated scale-based covariance, then returns empirical mean positions, quantiles, covariances, per-body 50/90/95/99% confidence regions, and the deterministic base forecast. `predict_three_body_distribution_ephemeris` applies the same ensemble idea at every sampled time, returning a probability ephemeris instead of only a final-time distribution.
+`solve_three_body_prediction_problem` is the one-call solution bundle: it returns final positions, a deterministic ephemeris, linearized Gaussian ephemeris, time-resolved empirical distribution ephemeris, a time-resolved linearized-vs-empirical comparison, and a verdict describing which mathematical forecast is defensible. Its default uncertainty model preserves mass-weighted center-of-mass position and velocity, so the linearized Gaussian and empirical ensemble compare the same physical perturbation family. If the input JSON or API call supplies `initial_state_covariance`, that full state covariance is used by both the linearized and empirical probability paths. `predict_three_body_positions` returns the final positions, velocities, solver metadata, and Noether invariant drift diagnostics. `predict_three_body_ephemeris` returns the sampled positions and velocities from `0` through `target_time`, suitable for orbit tables, downstream visualization, and independent audit. `predict_three_body_forecast_horizon` estimates how far the target-time forecast remains locally tolerance-resolved by propagating initial covariance through the variational flow. `predict_three_body_interpretation_report` runs the point, forecast-horizon, variational Gaussian, and ensemble modes together, compares the distributions, and recommends `linearized-gaussian`, `empirical-ensemble`, `deterministic-only`, or `unresolved`. `predict_three_body_linearized_distribution` computes the variational state-transition matrix and pushes an initial covariance forward by `P(t) = D Phi_t P(0) D Phi_t^T`; pass `preserve_center_of_mass=True` to build `P(0)` on the center-of-mass-preserving subspace when no explicit covariance is supplied. `score_three_body_position_hypothesis` scores a proposed target-time position against that Gaussian forecast using Mahalanobis distance, log density, and confidence-level membership. `predict_three_body_linearized_ephemeris` performs that same covariance push-forward at every sampled time. `predict_three_body_position_distribution` samples either the supplied full initial covariance or the generated scale-based covariance, then returns empirical mean positions, quantiles, covariances, per-body 50/90/95/99% confidence regions, and the deterministic base forecast. `predict_three_body_distribution_ephemeris` applies the same ensemble idea at every sampled time, returning a probability ephemeris instead of only a final-time distribution.
 
 The same layer is available from the CLI:
 
@@ -189,6 +200,7 @@ threebody predict --input initial-state.json --ephemeris --samples 256 --output 
 threebody predict --input initial-state.json --horizon --position-tolerance 1e-3 --position-scale 1e-6 --velocity-scale 1e-6 --output horizon.json
 threebody predict --input initial-state.json --report --count 128 --position-tolerance 1e-3 --position-scale 1e-6 --velocity-scale 1e-6 --output report.json
 threebody predict --input initial-state.json --linearized-distribution --preserve-center-of-mass --position-scale 1e-6 --velocity-scale 1e-6 --output linearized.json
+threebody predict --input initial-state.json --score-positions --preserve-center-of-mass --position-scale 1e-6 --velocity-scale 1e-6 --output position-score.json
 threebody predict --input initial-state.json --linearized-ephemeris --preserve-center-of-mass --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output linearized-ephemeris.json
 threebody predict --input initial-state.json --distribution --count 128 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution.json
 threebody predict --input initial-state.json --distribution-ephemeris --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution-ephemeris.json

@@ -25,6 +25,7 @@ from threebody_engine import (
     run_verification_report,
     select_hysteresis_markov_order,
     solve_three_body_prediction_problem,
+    score_three_body_position_hypothesis,
     tune_jacobi_picard,
     validate_hysteresis_markov_chain,
     validate_public_static_artifact_receipt_contract,
@@ -265,6 +266,35 @@ def test_engine_api_builds_linearized_three_body_position_distribution() -> None
             indices = [offset + body_index * scenario.system.dimension + axis for body_index in range(3)]
             axis_covariance = covariance0[np.ix_(indices, indices)]
             assert abs(float(weights @ axis_covariance @ weights)) < 1.0e-30
+
+
+def test_engine_api_scores_three_body_position_hypothesis() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+    prediction = predict_three_body_positions(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        samples=16,
+    )
+
+    score = score_three_body_position_hypothesis(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        prediction["positions"],
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        preserve_center_of_mass=True,
+    )
+
+    assert score["prediction_type"] == "three-body-position-hypothesis-score"
+    assert score["joint_score"]["mahalanobis_distance"] < 1.0e-6
+    assert score["joint_score"]["inside_confidence_levels"]["0.95"] is True
+    assert len(score["body_scores"]) == 3
+    assert score["body_scores"][0]["inside_confidence_levels"]["0.95"] is True
 
 
 def test_engine_api_builds_linearized_three_body_ephemeris() -> None:

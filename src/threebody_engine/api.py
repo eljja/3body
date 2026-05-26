@@ -916,6 +916,91 @@ def predict_three_body_linearized_distribution(
     }
 
 
+def score_three_body_position_hypothesis(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    candidate_positions: Sequence[Sequence[float]],
+    *,
+    initial_state_covariance: Sequence[Sequence[float]] | None = None,
+    position_scale: float = 1.0e-6,
+    velocity_scale: float = 1.0e-6,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    jacobian_step: float = 1.0e-6,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+    preserve_center_of_mass: bool = False,
+) -> dict[str, object]:
+    """Score a proposed target-time three-body position against the linearized forecast distribution."""
+
+    linearized = predict_three_body_linearized_distribution(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        initial_state_covariance=initial_state_covariance,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        jacobian_step=jacobian_step,
+        rtol=rtol,
+        atol=atol,
+        preserve_center_of_mass=preserve_center_of_mass,
+    )
+    dimension = int(linearized["dimension"])
+    candidate_array = np.asarray(candidate_positions, dtype=float)
+    if candidate_array.shape != (3, dimension):
+        raise ValueError("candidate_positions must have shape (3, dimension).")
+    if np.any(~np.isfinite(candidate_array)):
+        raise ValueError("candidate_positions must contain only finite values.")
+    mean_positions = np.asarray(linearized["mean_positions"], dtype=float)
+    position_covariance = np.asarray(linearized["position_covariance"], dtype=float)
+    body_covariances = np.asarray(linearized["body_position_covariances"], dtype=float)
+    body_scores = []
+    for body_index in range(3):
+        body_scores.append(
+            _gaussian_hypothesis_score(
+                candidate_array[body_index],
+                mean_positions[body_index],
+                body_covariances[body_index],
+                label=f"body-{body_index}",
+            )
+        )
+    joint_score = _gaussian_hypothesis_score(
+        candidate_array.reshape(-1),
+        mean_positions.reshape(-1),
+        position_covariance,
+        label="joint-position",
+    )
+    return {
+        "prediction_schema_version": 1,
+        "prediction_type": "three-body-position-hypothesis-score",
+        "method": "linearized-gaussian-mahalanobis-score",
+        "target_time": float(target_time),
+        "dimension": dimension,
+        "masses": list(linearized["masses"]),
+        "candidate_positions": candidate_array.tolist(),
+        "forecast": {
+            "mean_positions": linearized["mean_positions"],
+            "std_positions": linearized["std_positions"],
+            "position_covariance": linearized["position_covariance"],
+            "position_confidence_regions": linearized["position_confidence_regions"],
+            "uncertainty_model": linearized["uncertainty_model"],
+            "linearized_diagnostics": linearized["linearized_diagnostics"],
+        },
+        "joint_score": joint_score,
+        "body_scores": body_scores,
+        "interpretation": (
+            "A smaller Mahalanobis distance means the proposed target-time positions are more typical under "
+            "the local linearized Gaussian forecast. confidence_level_containing_point is the Gaussian mass "
+            "inside the ellipsoid through the candidate point."
+        ),
+    }
+
+
 def predict_three_body_linearized_ephemeris(
     masses: Sequence[float],
     positions: Sequence[Sequence[float]],
@@ -1602,6 +1687,72 @@ def _position_confidence_regions(
             }
         )
     return regions
+
+
+def _gaussian_hypothesis_score(
+    candidate: Sequence[float] | np.ndarray,
+    mean: Sequence[float] | np.ndarray,
+    covariance: Sequence[Sequence[float]] | np.ndarray,
+    *,
+    label: str,
+    levels: Sequence[float] = (0.5, 0.9, 0.95, 0.99),
+) -> dict[str, object]:
+    candidate_array = np.asarray(candidate, dtype=float).reshape(-1)
+    mean_array = np.asarray(mean, dtype=float).reshape(-1)
+    covariance_array = _symmetrize_covariance(np.asarray(covariance, dtype=float))
+    if candidate_array.shape != mean_array.shape or covariance_array.shape != (candidate_array.size, candidate_array.size):
+        raise ValueError("candidate, mean, and covariance shapes are inconsistent.")
+    residual = candidate_array - mean_array
+    if np.any(~np.isfinite(covariance_array)):
+        return {
+            "label": label,
+            "degrees_of_freedom": 0,
+            "rank": 0,
+            "mahalanobis_distance": math.inf,
+            "mahalanobis_distance_squared": math.inf,
+            "confidence_level_containing_point": 1.0,
+            "gaussian_log_density": -math.inf,
+            "inside_confidence_levels": {str(float(level)): False for level in levels},
+            "residual": residual.tolist(),
+        }
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance_array)
+    spectral_scale = float(np.max(np.abs(eigenvalues))) if eigenvalues.size else 0.0
+    tolerance = 1.0e-12 * max(spectral_scale, np.finfo(float).tiny)
+    positive = eigenvalues > tolerance
+    rank = int(np.count_nonzero(positive))
+    null_projection = eigenvectors[:, ~positive].T @ residual if rank < candidate_array.size else np.zeros(0, dtype=float)
+    outside_support = bool(null_projection.size and np.linalg.norm(null_projection) > math.sqrt(tolerance))
+    if rank == 0:
+        mahalanobis_squared = 0.0 if not outside_support else math.inf
+        log_density = 0.0 if not outside_support else -math.inf
+        confidence_level = 0.0 if not outside_support else 1.0
+    elif outside_support:
+        mahalanobis_squared = math.inf
+        log_density = -math.inf
+        confidence_level = 1.0
+    else:
+        projected = eigenvectors[:, positive].T @ residual
+        positive_eigenvalues = eigenvalues[positive]
+        mahalanobis_squared = float(np.sum((projected**2) / positive_eigenvalues))
+        log_pseudodeterminant = float(np.sum(np.log(positive_eigenvalues)))
+        log_density = float(-0.5 * (rank * math.log(2.0 * math.pi) + log_pseudodeterminant + mahalanobis_squared))
+        confidence_level = float(chi2.cdf(mahalanobis_squared, rank))
+    mahalanobis_distance = math.inf if not math.isfinite(mahalanobis_squared) else float(math.sqrt(mahalanobis_squared))
+    inside_levels = {
+        str(float(level)): bool(math.isfinite(mahalanobis_squared) and confidence_level <= float(level))
+        for level in levels
+    }
+    return {
+        "label": label,
+        "degrees_of_freedom": rank,
+        "rank": rank,
+        "mahalanobis_distance": mahalanobis_distance,
+        "mahalanobis_distance_squared": float(mahalanobis_squared),
+        "confidence_level_containing_point": confidence_level,
+        "gaussian_log_density": log_density,
+        "inside_confidence_levels": inside_levels,
+        "residual": residual.tolist(),
+    }
 
 
 def _linearized_empirical_ephemeris_comparison(

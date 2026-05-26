@@ -304,6 +304,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Propagate initial covariance through the variational flow at every sampled time.",
     )
     predict.add_argument(
+        "--score-positions",
+        action="store_true",
+        help="Score input candidate_positions against the target-time linearized Gaussian forecast.",
+    )
+    predict.add_argument(
         "--report",
         action="store_true",
         help="Run deterministic, linearized, and ensemble predictions and return a recommendation report.",
@@ -533,6 +538,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
         predict_three_body_position_distribution,
         predict_three_body_positions,
         solve_three_body_prediction_problem,
+        score_three_body_position_hypothesis,
     )
 
     payload = _read_prediction_input(args.input)
@@ -543,6 +549,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
             args.distribution_ephemeris,
             args.linearized_distribution,
             args.linearized_ephemeris,
+            args.score_positions,
             args.report,
             args.horizon,
             args.ephemeris,
@@ -552,7 +559,7 @@ def run_predict_command(args: argparse.Namespace) -> int:
     if selected_modes > 1:
         raise ValueError(
             "Choose only one of --distribution, --distribution-ephemeris, --linearized-distribution, "
-            "--linearized-ephemeris, --report, --horizon, --ephemeris, or --solution."
+            "--linearized-ephemeris, --score-positions, --report, --horizon, --ephemeris, or --solution."
         )
     target_time = args.target_time if args.target_time is not None else _required_prediction_field(payload, "target_time")
     common_kwargs = {
@@ -664,6 +671,21 @@ def run_predict_command(args: argparse.Namespace) -> int:
             **common_kwargs,
         )
         exit_code = 0 if result["success"] else 1
+    elif args.score_positions:
+        result = score_three_body_position_hypothesis(
+            _required_prediction_field(payload, "masses"),
+            _required_prediction_field(payload, "positions"),
+            _required_prediction_field(payload, "velocities"),
+            target_time,
+            _required_prediction_field(payload, "candidate_positions"),
+            initial_state_covariance=payload.get("initial_state_covariance"),
+            position_scale=args.position_scale,
+            velocity_scale=args.velocity_scale,
+            jacobian_step=args.jacobian_step,
+            preserve_center_of_mass=standalone_preserve_center_of_mass,
+            **common_kwargs,
+        )
+        exit_code = 0
     elif args.distribution_ephemeris:
         result = predict_three_body_distribution_ephemeris(
             _required_prediction_field(payload, "masses"),
