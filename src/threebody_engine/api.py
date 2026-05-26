@@ -2151,6 +2151,7 @@ def _target_position_answer_table(
 ) -> list[dict[str, object]]:
     if not isinstance(body_answers, Sequence) or isinstance(body_answers, (str, bytes, bytearray)):
         return []
+    characteristic_scale = _target_position_characteristic_scale(body_answers)
     rows: list[dict[str, object]] = []
     for answer in body_answers:
         if not isinstance(answer, Mapping):
@@ -2159,10 +2160,18 @@ def _target_position_answer_table(
         if not isinstance(confidence_region, Mapping):
             confidence_region = {}
         semi_axes = confidence_region.get("semi_axes", [])
+        max_semi_axis = _max_numeric_value(semi_axes)
+        deterministic_to_mean_distance = _euclidean_distance(
+            answer.get("deterministic_position", []),
+            answer.get("distribution_mean", []),
+        )
+        relative_95_radius = _safe_ratio(max_semi_axis, characteristic_scale)
         rows.append(
             {
                 "body_index": int(answer.get("body_index", len(rows))),
                 "claim": claim,
+                "position_claim_strength": _position_claim_strength(relative_95_radius),
+                "recommended_readout": _recommended_position_readout(claim, relative_95_radius),
                 "deterministic_position": answer.get("deterministic_position", []),
                 "probability_mean": answer.get("distribution_mean", []),
                 "probability_median": answer.get("distribution_median", []),
@@ -2174,15 +2183,72 @@ def _target_position_answer_table(
                     "center": confidence_region.get("center", []),
                     "semi_axes": semi_axes,
                     "axis_directions": confidence_region.get("axis_directions", []),
-                    "max_semi_axis": _max_numeric_value(semi_axes),
+                    "max_semi_axis": max_semi_axis,
+                    "relative_95_radius": relative_95_radius,
                 },
-                "deterministic_to_mean_distance": _euclidean_distance(
-                    answer.get("deterministic_position", []),
-                    answer.get("distribution_mean", []),
+                "deterministic_to_mean_distance": deterministic_to_mean_distance,
+                "deterministic_to_mean_distance_relative": _safe_ratio(
+                    deterministic_to_mean_distance,
+                    characteristic_scale,
                 ),
+                "characteristic_position_scale": characteristic_scale,
             }
         )
     return rows
+
+
+def _target_position_characteristic_scale(body_answers: Sequence[object]) -> float:
+    positions = []
+    for answer in body_answers:
+        if not isinstance(answer, Mapping):
+            continue
+        position = answer.get("deterministic_position", [])
+        if not isinstance(position, Sequence) or isinstance(position, (str, bytes, bytearray)):
+            continue
+        try:
+            position_array = np.asarray(position, dtype=float)
+        except (TypeError, ValueError):
+            continue
+        if position_array.ndim == 1 and position_array.size and np.all(np.isfinite(position_array)):
+            positions.append(position_array)
+    if not positions:
+        return math.nan
+    stack = np.vstack(positions)
+    if len(stack) >= 2:
+        pair_distances = [
+            float(np.linalg.norm(stack[left] - stack[right]))
+            for left in range(len(stack))
+            for right in range(left + 1, len(stack))
+        ]
+        finite_pairs = [distance for distance in pair_distances if math.isfinite(distance)]
+        if finite_pairs and max(finite_pairs) > 0.0:
+            return max(finite_pairs)
+    norms = [float(np.linalg.norm(position)) for position in stack]
+    finite_norms = [norm for norm in norms if math.isfinite(norm)]
+    if finite_norms and max(finite_norms) > 0.0:
+        return max(finite_norms)
+    return 1.0
+
+
+def _position_claim_strength(relative_95_radius: float) -> str:
+    if not math.isfinite(relative_95_radius):
+        return "unavailable"
+    if relative_95_radius <= 1.0e-3:
+        return "point-resolved"
+    if relative_95_radius <= 1.0e-1:
+        return "localized-distribution"
+    return "broad-distribution"
+
+
+def _recommended_position_readout(claim: str, relative_95_radius: float) -> str:
+    strength = _position_claim_strength(relative_95_radius)
+    if claim == "target-position-and-distribution" and strength == "point-resolved":
+        return "point-position-with-confidence-region"
+    if strength in {"point-resolved", "localized-distribution"}:
+        return "probability-region"
+    if strength == "broad-distribution":
+        return "distribution-summary-only"
+    return "unresolved"
 
 
 def _prediction_mathematical_statement(
@@ -2359,6 +2425,12 @@ def _euclidean_distance(left: object, right: object) -> float:
     if left_array.shape != right_array.shape or np.any(~np.isfinite(left_array)) or np.any(~np.isfinite(right_array)):
         return math.nan
     return float(np.linalg.norm(left_array - right_array))
+
+
+def _safe_ratio(numerator: float, denominator: float) -> float:
+    if not math.isfinite(numerator) or not math.isfinite(denominator) or denominator <= 0.0:
+        return math.nan
+    return float(numerator / denominator)
 
 
 def _position_confidence_regions(

@@ -43,7 +43,7 @@ Output includes final positions, final velocities, solver metadata, and a Noethe
 
 ## One-Call Solution Bundle
 
-Use `threebody_engine.solve_three_body_target_positions(...)` when the caller only needs the direct answer: `target_positions`, `target_position_distribution`, `target_position_table`, one row per body's target-time claim, and the core diagnostics. Use `threebody_engine.solve_three_body_prediction_problem(...)` when the full audit bundle is needed, or:
+Use `threebody_engine.solve_three_body_target_positions(...)` when the caller only needs the direct answer: `target_positions`, `target_position_distribution`, `target_position_table`, one row per body's target-time claim, and the core diagnostics. The table includes a relative 95% radius, `position_claim_strength`, and `recommended_readout` so callers can tell whether to publish a point coordinate, a confidence region, or only a distribution summary. Use `threebody_engine.solve_three_body_prediction_problem(...)` when the full audit bundle is needed, or:
 
 ```powershell
 threebody predict --input initial-state.json --target-solution --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output target-solution.json

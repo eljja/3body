@@ -361,7 +361,20 @@ def test_engine_api_returns_compact_target_position_solution() -> None:
     assert len(solution["target_position_table"][0]["central_90_interval"]["lower"]) == 2
     assert len(solution["target_position_table"][0]["central_90_interval"]["upper"]) == 2
     assert solution["target_position_table"][0]["confidence_region_95"]["max_semi_axis"] >= 0.0
+    assert solution["target_position_table"][0]["confidence_region_95"]["relative_95_radius"] >= 0.0
+    assert solution["target_position_table"][0]["characteristic_position_scale"] > 0.0
+    assert solution["target_position_table"][0]["position_claim_strength"] in {
+        "point-resolved",
+        "localized-distribution",
+        "broad-distribution",
+    }
+    assert solution["target_position_table"][0]["recommended_readout"] in {
+        "point-position-with-confidence-region",
+        "probability-region",
+        "distribution-summary-only",
+    }
     assert solution["target_position_table"][0]["deterministic_to_mean_distance"] >= 0.0
+    assert solution["target_position_table"][0]["deterministic_to_mean_distance_relative"] >= 0.0
     assert len(solution["body_answers"]) == 3
     assert solution["body_answers"][0]["deterministic_position"] == solution["target_positions"][0]
     assert solution["deterministic_flow_answer"]["definition"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
