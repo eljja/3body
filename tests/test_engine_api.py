@@ -292,6 +292,17 @@ def test_engine_api_solves_three_body_prediction_problem() -> None:
         solution["prediction_summary"]["key_metrics"]["minimum_pair_distance"]
         == solution["answer"]["minimum_pair_distance"]
     )
+    statement = solution["mathematical_statement"]
+    assert statement["statement_schema_version"] == 1
+    assert statement["problem_type"] == "general-newtonian-three-body-initial-value-problem"
+    assert statement["target_time"] == solution["target_time"]
+    assert statement["deterministic_problem"]["flow_map"] == "x(t) = Phi_t(x(0))"
+    assert "d r_i / dt = v_i" in statement["deterministic_problem"]["equations"]
+    assert statement["probability_problem"]["linearized_gaussian"] == "P_t = D Phi_t(x0) P_0 D Phi_t(x0)^T."
+    assert statement["claim_contract"]["promoted_claim"] == solution["prediction_summary"]["claim"]
+    assert len(statement["body_position_claims"]) == 3
+    assert statement["body_position_claims"][0]["deterministic_position"] == solution["answer"]["final_positions"][0]
+    assert statement["body_position_claims"][0]["confidence_region_95"]["probability"] == 0.95
     assert solution["answer"]["recommended_mode"] in {"linearized-gaussian", "empirical-ensemble"}
     assert solution["answer"]["target_time_inside_forecast_horizon"] is True
     assert len(solution["answer"]["final_positions"]) == 3

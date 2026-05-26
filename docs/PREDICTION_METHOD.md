@@ -52,6 +52,7 @@ threebody predict --input initial-state.json --solution --count 128 --samples 25
 This is the most direct public API for the original project target. It returns:
 
 - `prediction_summary`: a compact report-ready conclusion with a versioned schema, promoted claim type, point-position statement, probability statement, reliability/risk statements, key diagnostics, and per-body 95% confidence regions.
+- `mathematical_statement`: the machine-readable mathematical problem statement: Newtonian equations, flow-map readout `r_i(t) = Pi_{r_i} Phi_t(x(0))`, probability push-forward `Law(X_t) = (Phi_t)_# Law(X_0)`, linearized covariance formula, promoted claim contract, and one row per body's target-time position claim.
 - `answer.final_positions`: the three target-time positions from the deterministic flow.
 - `answer.final_position_distribution`: mean, quantiles, covariance, confidence regions, and ensemble counts for the target-time position distribution.
 - `answer.recommended_mode`: the promoted interpretation mode from the diagnostic report.
@@ -223,6 +224,8 @@ The deterministic API answers "where are the bodies at time `t` if the initial s
 The solution bundle answers "what are the target-time positions, how do they evolve, what is the probability distribution, and which claim is defensible?"
 
 The solution summary answers "can we publish this as a point-position claim, a distributional claim, a deterministic-only calculation, or an unresolved forecast?"
+
+The mathematical statement answers "which initial-value problem was solved, which flow-map readout defines `r_i(t)`, and which probability push-forward defines the returned distribution?"
 
 The ephemeris API answers "where are the bodies at each sampled time between now and `t`?"
 

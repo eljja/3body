@@ -312,6 +312,15 @@ def test_predict_cli_writes_solution_bundle(tmp_path) -> None:
         payload["prediction_summary"]["key_metrics"]["minimum_pair_distance"]
         == payload["answer"]["minimum_pair_distance"]
     )
+    statement = payload["mathematical_statement"]
+    assert statement["statement_schema_version"] == 1
+    assert statement["problem_type"] == "general-newtonian-three-body-initial-value-problem"
+    assert statement["deterministic_problem"]["position_readout"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
+    assert statement["probability_problem"]["exact_pushforward"] == "Law(X_t) = (Phi_t)_# Law(X_0)."
+    assert statement["claim_contract"]["promoted_claim"] == payload["prediction_summary"]["claim"]
+    assert len(statement["body_position_claims"]) == 3
+    assert statement["body_position_claims"][0]["deterministic_position"] == payload["answer"]["final_positions"][0]
+    assert statement["body_position_claims"][0]["confidence_region_95"]["probability"] == 0.95
     assert payload["answer"]["recommended_mode"] in {"linearized-gaussian", "empirical-ensemble"}
     assert payload["answer"]["target_time_inside_forecast_horizon"] is True
     assert len(payload["answer"]["final_positions"]) == 3

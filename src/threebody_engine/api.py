@@ -852,6 +852,11 @@ def solve_three_body_prediction_problem(
         "target_time": float(target_time),
         "answer": answer,
         "prediction_summary": _prediction_solution_summary(answer, ephemeris_comparison),
+        "mathematical_statement": _prediction_mathematical_statement(
+            answer,
+            deterministic_ephemeris,
+            ephemeris_comparison,
+        ),
         "deterministic_ephemeris": deterministic_ephemeris,
         "linearized_gaussian_ephemeris": linearized_ephemeris,
         "distribution_ephemeris": distribution_ephemeris,
@@ -2003,6 +2008,95 @@ def _prediction_solution_claim(
     return "unresolved-target-position"
 
 
+def _prediction_mathematical_statement(
+    answer: Mapping[str, object],
+    deterministic_ephemeris: Mapping[str, object],
+    ephemeris_comparison: Mapping[str, object],
+) -> dict[str, object]:
+    final_distribution = answer.get("final_position_distribution", {})
+    if not isinstance(final_distribution, Mapping):
+        final_distribution = {}
+    confidence_95 = _body_confidence_level_summary(
+        final_distribution.get("position_confidence_regions", []),
+        probability=0.95,
+    )
+    final_positions = answer.get("final_positions", [])
+    mean_positions = final_distribution.get("mean_positions", [])
+    median_positions = final_distribution.get("median_positions", [])
+    q05_positions = final_distribution.get("q05_positions", [])
+    q95_positions = final_distribution.get("q95_positions", [])
+    body_claims = []
+    for body_index in range(3):
+        body_claims.append(
+            {
+                "body_index": body_index,
+                "deterministic_position": _indexed_sequence_value(final_positions, body_index),
+                "distribution_mean": _indexed_sequence_value(mean_positions, body_index),
+                "distribution_median": _indexed_sequence_value(median_positions, body_index),
+                "distribution_q05": _indexed_sequence_value(q05_positions, body_index),
+                "distribution_q95": _indexed_sequence_value(q95_positions, body_index),
+                "confidence_region_95": _confidence_region_for_body(confidence_95, body_index),
+            }
+        )
+    target_time = float(deterministic_ephemeris.get("target_time", math.nan))
+    dimension = int(deterministic_ephemeris.get("dimension", 0))
+    softening = float(deterministic_ephemeris.get("softening", 0.0))
+    return {
+        "statement_schema_version": 1,
+        "problem_type": "general-newtonian-three-body-initial-value-problem",
+        "target_time": target_time,
+        "dimension": dimension,
+        "masses": list(deterministic_ephemeris.get("masses", [])),
+        "gravitational_constant": float(
+            deterministic_ephemeris.get("gravitational_constant", 1.0)
+        ),
+        "softening": softening,
+        "deterministic_problem": {
+            "state_vector": "x = (r_0, r_1, r_2, v_0, v_1, v_2)",
+            "equations": [
+                "d r_i / dt = v_i",
+                (
+                    "d v_i / dt = G * sum_{j != i} m_j * (r_j - r_i) / "
+                    "(||r_j - r_i||^2 + epsilon^2)^(3/2)"
+                ),
+            ],
+            "flow_map": "x(t) = Phi_t(x(0))",
+            "position_readout": "r_i(t) = Pi_{r_i} Phi_t(x(0))",
+            "softening_parameter": "epsilon",
+            "softening_value": softening,
+        },
+        "probability_problem": {
+            "initial_law": "X_0 is the declared or generated Gaussian uncertainty around x(0).",
+            "exact_pushforward": "Law(X_t) = (Phi_t)_# Law(X_0).",
+            "linearized_gaussian": "P_t = D Phi_t(x0) P_0 D Phi_t(x0)^T.",
+            "empirical_ensemble": "Samples x_t^k = Phi_t(x_0^k) approximate the pushed-forward law.",
+            "confidence_region_meaning": (
+                "Each 95 percent body region is a Gaussian-equivalent covariance region "
+                "for that body's target-time position."
+            ),
+        },
+        "claim_contract": {
+            "promoted_claim": _prediction_solution_claim(
+                recommended_mode=str(answer.get("recommended_mode", "unresolved")),
+                target_inside_horizon=answer.get("target_time_inside_forecast_horizon") is True,
+                deterministic_resolved=answer.get("deterministic_resolved") is True,
+                empirical_resolved=answer.get("empirical_distribution_resolved") is True,
+                linearized_consistent=ephemeris_comparison.get("target_time_consistent") is True,
+                regularization_recommended=answer.get("regularization_recommended") is True,
+            ),
+            "recommended_mode": str(answer.get("recommended_mode", "unresolved")),
+            "target_time_inside_forecast_horizon": (
+                answer.get("target_time_inside_forecast_horizon") is True
+            ),
+            "linearized_target_time_consistent": (
+                ephemeris_comparison.get("target_time_consistent") is True
+            ),
+            "regularization_recommended": answer.get("regularization_recommended") is True,
+        },
+        "body_position_claims": body_claims,
+    }
+
+
 def _body_confidence_level_summary(
     confidence_regions: object,
     *,
@@ -2038,6 +2132,23 @@ def _body_confidence_level_summary(
             }
         )
     return rows
+
+
+def _indexed_sequence_value(values: object, index: int) -> object:
+    if isinstance(values, Sequence) and not isinstance(values, (str, bytes, bytearray)):
+        if 0 <= index < len(values):
+            return values[index]
+    return []
+
+
+def _confidence_region_for_body(
+    confidence_regions: Sequence[Mapping[str, object]],
+    body_index: int,
+) -> dict[str, object]:
+    for region in confidence_regions:
+        if int(region.get("body_index", -1)) == body_index:
+            return dict(region)
+    return {}
 
 
 def _position_confidence_regions(
