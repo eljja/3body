@@ -865,6 +865,67 @@ def solve_three_body_prediction_problem(
     }
 
 
+def solve_three_body_target_positions(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    count: int = 64,
+    initial_state_covariance: Sequence[Sequence[float]] | None = None,
+    position_scale: float = 1.0e-6,
+    velocity_scale: float = 1.0e-6,
+    seed: int = 0,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    samples: int = 256,
+    target_times: Sequence[float] | None = None,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+    max_step: float = math.inf,
+    jacobian_step: float = 1.0e-6,
+    position_tolerance: float = 1.0e-3,
+    horizon_samples: int = 16,
+    linearized_covariance_relative_tolerance: float = 0.75,
+    preserve_center_of_mass: bool = True,
+    include_solution_bundle: bool = False,
+) -> dict[str, object]:
+    """Return the compact target-time answer for the original prediction question.
+
+    This is a small public wrapper around the full solution bundle. It keeps the
+    direct answer visible: the deterministic positions ``r_i(t)`` and, when an
+    uncertainty model is declared, the target-time probability distribution.
+    """
+
+    solution = solve_three_body_prediction_problem(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        count=count,
+        initial_state_covariance=initial_state_covariance,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        seed=seed,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        target_times=target_times,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+        jacobian_step=jacobian_step,
+        position_tolerance=position_tolerance,
+        horizon_samples=horizon_samples,
+        linearized_covariance_relative_tolerance=linearized_covariance_relative_tolerance,
+        preserve_center_of_mass=preserve_center_of_mass,
+    )
+    compact = _target_position_solution_from_bundle(solution)
+    if include_solution_bundle:
+        compact["solution_bundle"] = solution
+    return compact
+
+
 def predict_three_body_linearized_distribution(
     masses: Sequence[float],
     positions: Sequence[Sequence[float]],
@@ -2006,6 +2067,74 @@ def _prediction_solution_claim(
     if deterministic_resolved:
         return "deterministic-target-position"
     return "unresolved-target-position"
+
+
+def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dict[str, object]:
+    answer = solution.get("answer", {})
+    if not isinstance(answer, Mapping):
+        answer = {}
+    summary = solution.get("prediction_summary", {})
+    if not isinstance(summary, Mapping):
+        summary = {}
+    statement = solution.get("mathematical_statement", {})
+    if not isinstance(statement, Mapping):
+        statement = {}
+    deterministic_ephemeris = solution.get("deterministic_ephemeris", {})
+    if not isinstance(deterministic_ephemeris, Mapping):
+        deterministic_ephemeris = {}
+    comparison = solution.get("ephemeris_distribution_comparison", {})
+    if not isinstance(comparison, Mapping):
+        comparison = {}
+    final_distribution = answer.get("final_position_distribution", {})
+    if not isinstance(final_distribution, Mapping):
+        final_distribution = {}
+    return {
+        "prediction_schema_version": 1,
+        "prediction_type": "three-body-target-position-solution",
+        "target_time": float(solution.get("target_time", math.nan)),
+        "claim": str(summary.get("claim", "unresolved-target-position")),
+        "recommended_mode": str(answer.get("recommended_mode", "unresolved")),
+        "target_positions": answer.get("final_positions", []),
+        "target_position_distribution": final_distribution,
+        "body_answers": statement.get("body_position_claims", []),
+        "deterministic_flow_answer": {
+            "definition": "r_i(t) = Pi_{r_i} Phi_t(x(0))",
+            "positions": answer.get("final_positions", []),
+            "method": deterministic_ephemeris.get("method", "adaptive-DOP853"),
+            "invariant_certificate": deterministic_ephemeris.get("invariant_certificate", {}),
+        },
+        "probability_answer": {
+            "definition": "Law(X_t) = (Phi_t)_# Law(X_0)",
+            "mean_positions": final_distribution.get("mean_positions", []),
+            "median_positions": final_distribution.get("median_positions", []),
+            "q05_positions": final_distribution.get("q05_positions", []),
+            "q95_positions": final_distribution.get("q95_positions", []),
+            "confidence_regions_95": summary.get("body_95_confidence_regions", []),
+            "success_count": final_distribution.get("success_count", 0),
+            "failure_count": final_distribution.get("failure_count", 0),
+        },
+        "diagnostics": {
+            "target_time_inside_forecast_horizon": (
+                answer.get("target_time_inside_forecast_horizon") is True
+            ),
+            "linearized_target_time_consistent": comparison.get("target_time_consistent") is True,
+            "uncertainty_amplification_factor": float(
+                answer.get("uncertainty_amplification_factor", math.inf)
+            ),
+            "finite_time_lyapunov_exponent": float(
+                answer.get("finite_time_lyapunov_exponent", math.inf)
+            ),
+            "minimum_pair_distance": float(answer.get("minimum_pair_distance", math.inf)),
+            "close_approach_warning_level": str(
+                answer.get("close_approach_warning_level", "unavailable")
+            ),
+            "regularization_recommended": answer.get("regularization_recommended") is True,
+            "first_linearized_ephemeris_break_time": answer.get(
+                "first_linearized_ephemeris_break_time"
+            ),
+        },
+        "mathematical_statement": statement,
+    }
 
 
 def _prediction_mathematical_statement(

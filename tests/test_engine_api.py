@@ -25,6 +25,7 @@ from threebody_engine import (
     run_verification_report,
     select_hysteresis_markov_order,
     solve_three_body_prediction_problem,
+    solve_three_body_target_positions,
     score_three_body_position_hypothesis,
     tune_jacobi_picard,
     validate_hysteresis_markov_chain,
@@ -327,6 +328,41 @@ def test_engine_api_solves_three_body_prediction_problem() -> None:
     assert "linearized_ephemeris_consistent_until" in solution["answer"]
     assert "first_linearized_ephemeris_break_time" in solution["answer"]
     assert solution["interpretation_report"]["prediction_type"] == "three-body-interpretation-report"
+
+
+def test_engine_api_returns_compact_target_position_solution() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    solution = solve_three_body_target_positions(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        count=5,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        samples=9,
+        horizon_samples=6,
+    )
+
+    assert solution["prediction_type"] == "three-body-target-position-solution"
+    assert solution["claim"] in {
+        "target-position-and-distribution",
+        "distributional-target-position",
+        "deterministic-target-position",
+        "unresolved-target-position",
+    }
+    assert len(solution["target_positions"]) == 3
+    assert len(solution["target_position_distribution"]["mean_positions"]) == 3
+    assert len(solution["body_answers"]) == 3
+    assert solution["body_answers"][0]["deterministic_position"] == solution["target_positions"][0]
+    assert solution["deterministic_flow_answer"]["definition"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
+    assert solution["probability_answer"]["definition"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
+    assert len(solution["probability_answer"]["confidence_regions_95"]) == 3
+    assert solution["diagnostics"]["minimum_pair_distance"] > 0.0
+    assert solution["mathematical_statement"]["statement_schema_version"] == 1
+    assert "solution_bundle" not in solution
 
 
 def test_engine_api_builds_linearized_three_body_position_distribution() -> None:
