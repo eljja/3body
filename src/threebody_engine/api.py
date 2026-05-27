@@ -951,6 +951,56 @@ def solve_three_body_target_positions(
     return compact
 
 
+def validate_three_body_target_prediction_certificate(
+    target_solution: Mapping[str, object],
+) -> dict[str, object]:
+    """Validate the reproducibility certificate embedded in a compact target answer."""
+
+    certificate = target_solution.get("target_prediction_certificate", {})
+    if not isinstance(certificate, Mapping):
+        certificate = {}
+    input_contract = certificate.get("input_contract", {})
+    if not isinstance(input_contract, Mapping):
+        input_contract = {}
+    result_payload = _target_prediction_result_payload(target_solution)
+    expected_result_keys = sorted(result_payload)
+    checks = {
+        "certificate_present": bool(certificate),
+        "certificate_type_matches": (
+            certificate.get("certificate_type") == "three-body-target-prediction-reproducibility"
+        ),
+        "certificate_schema_version_matches": certificate.get("certificate_schema_version") == 1,
+        "input_contract_present": bool(input_contract),
+        "input_contract_sha256_matches": (
+            certificate.get("input_contract_sha256") == _canonical_json_sha256(input_contract)
+        ),
+        "result_payload_sha256_matches": (
+            certificate.get("result_payload_sha256") == _canonical_json_sha256(result_payload)
+        ),
+        "result_payload_keys_match": certificate.get("result_payload_keys") == expected_result_keys,
+        "prediction_schema_version_matches": (
+            certificate.get("prediction_schema_version") == target_solution.get("prediction_schema_version")
+        ),
+        "prediction_type_matches": (
+            certificate.get("prediction_type") == target_solution.get("prediction_type")
+        ),
+        "claim_matches": certificate.get("claim") == target_solution.get("claim"),
+        "recommended_mode_matches": (
+            certificate.get("recommended_mode") == target_solution.get("recommended_mode")
+        ),
+    }
+    return {
+        "validation_schema_version": 1,
+        "validation_type": "three-body-target-prediction-certificate-validation",
+        "valid": all(checks.values()),
+        "checks": checks,
+        "input_contract_sha256": certificate.get("input_contract_sha256"),
+        "computed_input_contract_sha256": _canonical_json_sha256(input_contract),
+        "result_payload_sha256": certificate.get("result_payload_sha256"),
+        "computed_result_payload_sha256": _canonical_json_sha256(result_payload),
+    }
+
+
 def predict_three_body_linearized_distribution(
     masses: Sequence[float],
     positions: Sequence[Sequence[float]],

@@ -28,6 +28,7 @@ from threebody_engine import (
     solve_three_body_target_positions,
     score_three_body_position_hypothesis,
     tune_jacobi_picard,
+    validate_three_body_target_prediction_certificate,
     validate_hysteresis_markov_chain,
     validate_public_static_artifact_receipt_contract,
     verify_public_static_artifact_bytes,
@@ -44,6 +45,7 @@ def test_engine_api_integrates_reference_scenario() -> None:
     assert callable(verify_public_static_artifacts_from_url)
     assert callable(verify_public_static_artifact_bytes)
     assert callable(public_static_artifact_audit_report_payload_sha256)
+    assert callable(validate_three_body_target_prediction_certificate)
 
     scenario, trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=30)
 
@@ -431,6 +433,14 @@ def test_engine_api_returns_compact_target_position_solution() -> None:
     assert len(certificate["result_payload_sha256"]) == 64
     assert "target_prediction_certificate" not in certificate["result_payload_keys"]
     assert "target_positions" in certificate["result_payload_keys"]
+    validation = validate_three_body_target_prediction_certificate(solution)
+    assert validation["valid"] is True
+    assert validation["checks"]["input_contract_sha256_matches"] is True
+    assert validation["checks"]["result_payload_sha256_matches"] is True
+    tampered = {**solution, "target_positions": [[999.0, 999.0], *solution["target_positions"][1:]]}
+    tampered_validation = validate_three_body_target_prediction_certificate(tampered)
+    assert tampered_validation["valid"] is False
+    assert tampered_validation["checks"]["result_payload_sha256_matches"] is False
     assert len(solution["body_answers"]) == 3
     assert solution["body_answers"][0]["deterministic_position"] == solution["target_positions"][0]
     assert solution["deterministic_flow_answer"]["definition"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
