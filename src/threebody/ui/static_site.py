@@ -529,6 +529,7 @@ def _render_page(
         "--output .runtime/research_runs/pages-verification-receipt.json"
     )
     target_answer_visual = _target_answer_visual(target_solution)
+    floating_nav = _floating_nav()
 
     return f"""<!doctype html>
 <html lang="en">
@@ -550,13 +551,62 @@ def _render_page(
       --warn: #b7791f;
     }}
     * {{ box-sizing: border-box; }}
+    html {{ scroll-behavior: smooth; }}
     body {{
       margin: 0;
       color: var(--ink);
       background: linear-gradient(135deg, #fbfdff 0%, #eef4f7 100%);
       font-family: Georgia, "Times New Roman", serif;
     }}
-    main {{ width: min(1180px, calc(100vw - 32px)); margin: 0 auto; padding: 42px 0 56px; }}
+    .floating-nav {{
+      position: fixed;
+      z-index: 20;
+      left: 14px;
+      top: 82px;
+      display: grid;
+      gap: 8px;
+      width: 172px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 18px 48px rgba(22, 33, 47, 0.14);
+      backdrop-filter: blur(14px);
+    }}
+    .floating-nav strong {{
+      padding: 4px 6px 7px;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.84rem;
+    }}
+    .floating-nav a {{
+      display: flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 9px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      color: var(--ink);
+      text-decoration: none;
+      font: 700 0.78rem ui-monospace, SFMono-Regular, Consolas, monospace;
+    }}
+    .floating-nav a:hover, .floating-nav a:focus-visible {{
+      border-color: var(--accent);
+      color: var(--accent);
+      outline: none;
+      background: rgba(11,132,243,0.08);
+    }}
+    .floating-nav .repo-link {{
+      margin-top: 4px;
+      border-color: var(--ink);
+      background: var(--ink);
+      color: #fff;
+    }}
+    .floating-nav .repo-link:hover, .floating-nav .repo-link:focus-visible {{
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }}
+    main {{ width: min(1080px, calc(100vw - 232px)); margin-left: 210px; margin-right: auto; padding: 42px 0 56px; }}
     header {{
       display: grid;
       gap: 14px;
@@ -813,7 +863,7 @@ def _render_page(
       color: var(--success);
       font: 700 0.78rem ui-monospace, SFMono-Regular, Consolas, monospace;
     }}
-    section {{ padding: 18px; margin: 18px 0; overflow: hidden; }}
+    section {{ padding: 18px; margin: 18px 0; overflow: hidden; scroll-margin-top: 22px; }}
     .figure-grid {{ display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr); gap: 18px; align-items: stretch; }}
     pre {{
       margin: 0;
@@ -826,13 +876,34 @@ def _render_page(
       line-height: 1.5;
     }}
     a {{ color: var(--accent); }}
+    @media (max-width: 1100px) {{
+      .floating-nav {{
+        left: 8px;
+        top: 72px;
+        width: 48px;
+        padding: 7px;
+      }}
+      .floating-nav strong {{ display: none; }}
+      .floating-nav a {{
+        justify-content: center;
+        min-height: 36px;
+        padding: 0;
+        font-size: 0;
+      }}
+      .floating-nav a::before {{
+        content: attr(data-short);
+        font-size: 0.78rem;
+      }}
+      main {{ width: min(100vw - 72px, 1080px); margin-left: 64px; margin-right: 8px; }}
+    }}
     @media (max-width: 900px) {{
       .hero-lab, .answer-flow, .answer-strip, .research-stack, .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .change-ledger, .claim-seal, .seal-checks, .evidence-grid {{ grid-template-columns: 1fr; }}
-      main {{ width: min(100vw - 18px, 1180px); padding-top: 12px; }}
+      main {{ padding-top: 12px; }}
     }}
   </style>
 </head>
 <body>
+{floating_nav}
 <main>
   <header>
     <div class="hero-lab">
@@ -902,7 +973,7 @@ def _render_page(
     </div>
   </section>
 
-  <section>
+  <section id="progress-map">
     <h2>Research progress map</h2>
     <p>
       The static site now shows how the verification engine changed from visual orbit demos into gated,
@@ -912,7 +983,7 @@ def _render_page(
     {progress_map}
   </section>
 
-  <section>
+  <section id="change-ledger">
     <h2>Current change ledger</h2>
     <p>
       This compact ledger shows the newest public-facing shifts: what became easier to audit,
@@ -922,7 +993,7 @@ def _render_page(
     {recent_change_ledger_html}
   </section>
 
-  <section>
+  <section id="public-audit">
     <h2>Public claim audit chain</h2>
     <p>
       The public audit surface is intentionally compact: the page shows the four checks that make the current
@@ -932,7 +1003,7 @@ def _render_page(
     {claim_verification_seal}
   </section>
 
-  <section>
+  <section id="engine-upgrades">
     <h2>Verification engine upgrades</h2>
     <p>
       The latest build visualizes the move from trajectory display to certificate-driven research:
@@ -945,7 +1016,7 @@ def _render_page(
     </div>
   </section>
 
-  <section>
+  <section id="two-body">
     <h2>Two-body analytic baseline</h2>
     <div class="figure-grid">
       <div>{figure_html[0]}</div>
@@ -953,7 +1024,7 @@ def _render_page(
     </div>
   </section>
 
-  <section>
+  <section id="restricted-l4">
     <h2>Restricted three-body L4 transport</h2>
     <div class="figure-grid">
       <div>{figure_html[2]}</div>
@@ -961,7 +1032,7 @@ def _render_page(
     </div>
   </section>
 
-  <section>
+  <section id="figure-eight">
     <h2>General three-body figure-eight</h2>
     <div class="figure-grid">
       <div>{figure_html[4]}</div>
@@ -969,7 +1040,7 @@ def _render_page(
     </div>
   </section>
 
-  <section>
+  <section id="jacobi-certificate">
     <h2>Jacobi escape-cone theorem candidate</h2>
     <p>
       Representative hierarchical flyby used to visualize the current theorem candidate:
@@ -982,7 +1053,7 @@ def _render_page(
     </div>
   </section>
 
-  <section>
+  <section id="promotion-gates">
     <h2>Picard and symbolic-dynamics promotion gates</h2>
     <p>
       These panels expose the newest proof-engine changes: automatic Picard tuning with contraction reserve,
@@ -997,7 +1068,7 @@ def _render_page(
     </div>
   </section>
 
-  <section>
+  <section id="atlas-snapshot">
     <h2>Analysis atlas snapshot</h2>
     <div class="figure-grid">
       <pre>{html.escape(json.dumps(chart_distribution, indent=2, sort_keys=True))}</pre>
@@ -1005,7 +1076,7 @@ def _render_page(
     </div>
   </section>
 
-  <section>
+  <section id="build-provenance">
     <h2>Build provenance</h2>
     <p>
       This block records the deployment identity behind the embedded numerical evidence, so public figures can be
@@ -1031,6 +1102,31 @@ audit = audit_public_static_artifacts_from_url("https://eljja.github.io/3body/",
 </body>
 </html>
 """, certificate_bundle
+
+
+def _floating_nav() -> str:
+    items = [
+        ("#target-answer", "Answer", "A"),
+        ("#progress-map", "Progress", "P"),
+        ("#public-audit", "Audit", "U"),
+        ("#engine-upgrades", "Engine", "E"),
+        ("#figure-eight", "Figure-eight", "F"),
+        ("#jacobi-certificate", "Jacobi", "J"),
+        ("#promotion-gates", "Gates", "G"),
+        ("#build-provenance", "Build", "B"),
+    ]
+    links = "\n".join(
+        f'<a href="{html.escape(href)}" data-short="{html.escape(short)}">{html.escape(label)}</a>'
+        for href, label, short in items
+    )
+    return (
+        '<nav class="floating-nav" aria-label="Page section navigation">'
+        "<strong>Navigate</strong>"
+        f"{links}"
+        '<a class="repo-link" href="https://github.com/eljja/3body" data-short="GH" '
+        'target="_blank" rel="noopener noreferrer">GitHub repo</a>'
+        "</nav>"
+    )
 
 
 def _target_answer_visual(target_solution: dict[str, object]) -> str:

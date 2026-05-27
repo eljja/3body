@@ -39,6 +39,14 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert "ThreeBody Dynamics Lab" in content
     assert '<link rel="icon" href="favicon.svg" type="image/svg+xml">' in content
     assert '<meta name="theme-color" content="#16212f">' in content
+    assert 'class="floating-nav"' in content
+    assert 'aria-label="Page section navigation"' in content
+    assert 'href="#target-answer"' in content
+    assert 'href="#progress-map"' in content
+    assert 'href="#public-audit"' in content
+    assert 'href="#build-provenance"' in content
+    assert 'href="https://github.com/eljja/3body"' in content
+    assert 'target="_blank" rel="noopener noreferrer">GitHub repo</a>' in content
     assert "General three-body figure-eight" in content
     assert "autoscale extent" in content
     assert "scaleanchor" not in content
