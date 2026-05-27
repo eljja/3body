@@ -422,6 +422,17 @@ def test_engine_api_returns_compact_target_position_solution() -> None:
         "sampling-noisy",
     }
     assert solution["probability_answer"]["distribution_quality"] == distribution_quality
+    sensitivity_budget = solution["target_sensitivity_budget"]
+    assert sensitivity_budget["budget_schema_version"] == 1
+    assert sensitivity_budget["budget_type"] == "three-body-target-sensitivity-budget"
+    assert sensitivity_budget["target_time_resolved"] is True
+    assert sensitivity_budget["position_tolerance"] > 0.0
+    assert sensitivity_budget["final_max_position_std"] >= 0.0
+    assert sensitivity_budget["final_uncertainty_to_tolerance_ratio"] >= 0.0
+    assert sensitivity_budget["forecast_margin_to_tolerance"] > 0.0
+    assert sensitivity_budget["uncertainty_amplification_factor"] >= 1.0
+    assert sensitivity_budget["minimum_pair_distance"] > 0.0
+    assert solution["probability_answer"]["sensitivity_budget"] == sensitivity_budget
     readout_decision = solution["target_readout_decision"]
     assert readout_decision["decision_schema_version"] == 1
     assert readout_decision["decision_type"] == "three-body-target-readout-decision"
@@ -436,6 +447,7 @@ def test_engine_api_returns_compact_target_position_solution() -> None:
     assert readout_decision["probability_answer_available"] is True
     assert readout_decision["mathematical_objects"]["point_position"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
     assert readout_decision["mathematical_objects"]["probability_distribution"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
+    assert readout_decision["diagnostic_gates"]["final_uncertainty_to_tolerance_ratio"] >= 0.0
     assert len(readout_decision["decision_reasons"]) >= 1
     assert isinstance(readout_decision["blocking_reasons"], list)
     assert len(readout_decision["per_body_readouts"]) == 3
@@ -452,6 +464,7 @@ def test_engine_api_returns_compact_target_position_solution() -> None:
     assert "target_prediction_certificate" not in certificate["result_payload_keys"]
     assert "target_positions" in certificate["result_payload_keys"]
     assert "target_readout_decision" in certificate["result_payload_keys"]
+    assert "target_sensitivity_budget" in certificate["result_payload_keys"]
     validation = validate_three_body_target_prediction_certificate(solution)
     assert validation["valid"] is True
     assert validation["checks"]["input_contract_sha256_matches"] is True

@@ -2180,6 +2180,7 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         final_distribution,
         characteristic_scale=_target_position_characteristic_scale(body_answers),
     )
+    target_sensitivity_budget = _target_sensitivity_budget_summary(solution, answer)
     compact = {
         "prediction_schema_version": 1,
         "prediction_type": "three-body-target-position-solution",
@@ -2192,6 +2193,7 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         "center_of_mass_frame": center_of_mass_frame,
         "target_pair_geometry": target_pair_geometry,
         "target_distribution_quality": target_distribution_quality,
+        "target_sensitivity_budget": target_sensitivity_budget,
         "body_answers": body_answers,
         "deterministic_flow_answer": {
             "definition": "r_i(t) = Pi_{r_i} Phi_t(x(0))",
@@ -2218,6 +2220,7 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
             ),
             "pair_geometry": target_pair_geometry.get("probability", {}),
             "distribution_quality": target_distribution_quality,
+            "sensitivity_budget": target_sensitivity_budget,
             "success_count": final_distribution.get("success_count", 0),
             "failure_count": final_distribution.get("failure_count", 0),
         },
@@ -2264,6 +2267,9 @@ def _target_readout_decision(compact_solution: Mapping[str, object]) -> dict[str
     distribution_quality = compact_solution.get("target_distribution_quality", {})
     if not isinstance(distribution_quality, Mapping):
         distribution_quality = {}
+    sensitivity_budget = compact_solution.get("target_sensitivity_budget", {})
+    if not isinstance(sensitivity_budget, Mapping):
+        sensitivity_budget = {}
     table = compact_solution.get("target_position_table", [])
     deterministic_available = _position_matrix_or_none(target_positions) is not None
     distribution_available = _position_matrix_or_none(distribution.get("mean_positions", [])) is not None
@@ -2328,11 +2334,72 @@ def _target_readout_decision(compact_solution: Mapping[str, object]) -> dict[str
             "target_time_inside_forecast_horizon": inside_horizon,
             "linearized_target_time_consistent": linearized_consistent,
             "sampling_error_strength": sampling_strength,
+            "final_uncertainty_to_tolerance_ratio": float(
+                sensitivity_budget.get("final_uncertainty_to_tolerance_ratio", math.inf)
+            ),
             "regularization_recommended": regularization_required,
         },
         "decision_reasons": decision_reasons,
         "blocking_reasons": blocking_reasons,
         "per_body_readouts": _target_per_body_readout_decisions(table),
+    }
+
+
+def _target_sensitivity_budget_summary(
+    solution: Mapping[str, object],
+    answer: Mapping[str, object],
+) -> dict[str, object]:
+    report = solution.get("interpretation_report", {})
+    if not isinstance(report, Mapping):
+        report = {}
+    horizon = report.get("forecast_horizon", {})
+    if not isinstance(horizon, Mapping):
+        horizon = {}
+    rows = horizon.get("rows", [])
+    final_row: Mapping[str, object] = {}
+    if isinstance(rows, Sequence) and not isinstance(rows, (str, bytes, bytearray)) and rows:
+        candidate = rows[-1]
+        if isinstance(candidate, Mapping):
+            final_row = candidate
+    uncertainty_model = horizon.get("uncertainty_model", {})
+    if not isinstance(uncertainty_model, Mapping):
+        uncertainty_model = {}
+    target_time_resolved = horizon.get("target_time_resolved") is True
+    final_ratio = float(horizon.get("final_uncertainty_to_tolerance_ratio", math.inf))
+    max_position_std = float(final_row.get("max_position_std", math.nan))
+    position_tolerance = float(horizon.get("position_tolerance", math.nan))
+    return {
+        "budget_schema_version": 1,
+        "budget_type": "three-body-target-sensitivity-budget",
+        "target_time": float(solution.get("target_time", math.nan)),
+        "position_tolerance": position_tolerance,
+        "target_time_resolved": target_time_resolved,
+        "reliable_until": horizon.get("reliable_until"),
+        "first_unresolved_time": horizon.get("first_unresolved_time"),
+        "reliability_fraction": float(horizon.get("reliability_fraction", math.nan)),
+        "final_max_position_std": max_position_std,
+        "final_rms_position_std": float(final_row.get("rms_position_std", math.nan)),
+        "final_uncertainty_to_tolerance_ratio": final_ratio,
+        "forecast_margin_to_tolerance": (
+            float(position_tolerance - max_position_std)
+            if math.isfinite(position_tolerance) and math.isfinite(max_position_std)
+            else math.nan
+        ),
+        "uncertainty_amplification_factor": float(
+            answer.get("uncertainty_amplification_factor", math.inf)
+        ),
+        "finite_time_lyapunov_exponent": float(
+            answer.get("finite_time_lyapunov_exponent", math.inf)
+        ),
+        "minimum_pair_distance": float(answer.get("minimum_pair_distance", math.inf)),
+        "regularization_recommended": answer.get("regularization_recommended") is True,
+        "uncertainty_model": dict(uncertainty_model),
+        "interpretation": (
+            "This local budget compares the variationally propagated target-position "
+            "standard deviation against the declared position_tolerance. It is a "
+            "finite-time numerical predictability certificate for the supplied initial "
+            "uncertainty model, not a global closed-form solution."
+        ),
     }
 
 
