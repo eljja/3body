@@ -8,12 +8,13 @@ The static build performs these steps during GitHub Actions deployment:
 1. Install the Python package.
 2. Integrate representative two-body, restricted three-body, and general figure-eight trajectories.
 3. Compute invariant drift, stability, analysis-atlas distribution, representative Jacobi escape-cone certificates, Picard contraction tuning, hysteresis grammar Markov diagnostics with bootstrap uncertainty, Markov order selection, and Poincare-section word diagnostics.
-4. Embed the resulting Plotly figures, certificate bars, promotion gates, progress-map timeline, compact current change ledger, public claim audit chain, and metrics into `site/index.html`.
-5. Write the same machine-readable evidence bundle to `site/certificate.json`.
-6. Write `site/favicon.svg` as the browser/tab icon for the public site.
-7. Write `site/.gitattributes` to pin generated static artifact line endings to LF during branch publication.
-8. Write `site/manifest.json` with `hash_algorithm: sha256`, SHA-256 hashes, and byte sizes for the HTML, certificate, favicon, and `.gitattributes` policy artifacts.
-9. Publish the generated `site` directory through GitHub Pages.
+4. Build a compact target-time prediction answer for the representative general three-body run, including `target_readout_decision`, `target_sensitivity_budget`, and a reproducibility certificate.
+5. Embed the resulting Plotly figures, target-answer visual, certificate bars, promotion gates, progress-map timeline, compact current change ledger, public claim audit chain, and metrics into `site/index.html`.
+6. Write the same machine-readable evidence bundle to `site/certificate.json`.
+7. Write `site/favicon.svg` as the browser/tab icon for the public site.
+8. Write `site/.gitattributes` to pin generated static artifact line endings to LF during branch publication.
+9. Write `site/manifest.json` with `hash_algorithm: sha256`, SHA-256 hashes, and byte sizes for the HTML, certificate, favicon, and `.gitattributes` policy artifacts.
+10. Publish the generated `site` directory through GitHub Pages.
 
 The workflow opts JavaScript actions into the Node 24 runner path and embeds build provenance in the generated HTML
 and `certificate.json`:
@@ -46,7 +47,8 @@ Limitations:
 - The Picard and symbolic-dynamics panel shows representative promotion gates: contraction reserve, hysteresis Markov-vs-baseline diagnostics, bootstrap gain interval, and BIC-selected memory order.
 - The refined chart-word promotion gate is accompanied by a multi-coordinate Poincare sweep. The fixed hierarchy-perturbation section remains a falsification diagnostic, while the coordinate sweep searches common chart diagnostics on training phases, reports the best crossing-rich section, validates its Markov memory on a held-out binary phase against both an independent-symbol baseline and a shuffled-symbol permutation control, and reports whether nearby section quantiles and nearby atlas strides pass the same held-out memory gates.
 - The research progress map summarizes the current verification path visually: Picard tuning, hysteresis grammar, Markov order, Poincare sweep, permutation control, section robustness, stride robustness, and API packaging.
+- The first viewport now summarizes the original prediction target visually: deterministic `r_i(t)`, probability push-forward `Law(X_t)`, readout decision, sensitivity budget, and certificate digest.
 - The public claim audit chain consolidates the older ladder, pipeline, and seal views into one compact section: commit-pinned build, scientific gate profile, bounded numerical drift, and active canonical profile digest.
-- The current change ledger gives a compact visual summary of the latest research and audit-surface deltas: reduced-state report bridge, branch line-ending policy verification, timestamp-independent fingerprints, and stable public API contract.
+- The current change ledger gives a compact visual summary of the latest research and audit-surface deltas: compact target answer, sensitivity budget, readout decision, and certificate validation.
 - The raw certificate JSON is no longer dumped into the page body; it remains available through `certificate.json` for external review and automated verification.
 - New public scenarios require adding them to `threebody.ui.static_site` and rebuilding.

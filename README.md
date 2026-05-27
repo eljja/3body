@@ -241,7 +241,7 @@ Build the static GitHub Pages visualizer:
 & 'D:\Codex\.venv\Scripts\python.exe' -m threebody.ui.static_site --output site
 ```
 
-The static build includes a visual research progress map, a compact public claim audit chain, a browser favicon, and machine-readable `certificate.json` and `manifest.json` artifacts for reproducible public review.
+The static build includes a visual target-time prediction answer, research progress map, compact public claim audit chain, browser favicon, and machine-readable `certificate.json` and `manifest.json` artifacts for reproducible public review.
 
 Verify a generated static evidence bundle:
 

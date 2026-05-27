@@ -47,6 +47,7 @@ from threebody.diagnostics import InvariantMonitor, StabilityAnalyzer
 from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
 from threebody.types import TrajectoryResult
+from threebody_engine import solve_three_body_target_positions
 
 
 PALETTE = ["#0b84f3", "#f95d6a", "#00a878", "#ffa600", "#6c63ff"]
@@ -366,6 +367,18 @@ def _render_page(
         "hysteresis_markov_perplexity_ratio": float(markov_comparison.perplexity_ratio),
         "hysteresis_log_likelihood_gain": float(markov_comparison.log_likelihood_gain),
     }
+    initial_positions, initial_velocities = general_system.split_state(general.y[0])
+    target_solution = solve_three_body_target_positions(
+        general_system.masses,
+        initial_positions,
+        initial_velocities,
+        float(general.t[-1]),
+        count=24,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        samples=96,
+        horizon_samples=8,
+    )
     promotion_gates = {
         "picard_certified": jacobi_picard.picard_flow_certified,
         "picard_contraction_reserve": jacobi_tuning.contraction_reserve,
@@ -486,6 +499,15 @@ def _render_page(
         "public_change_summary": public_change_summary,
         "metrics": metrics,
         "promotion_gates": promotion_gates,
+        "target_prediction_answer": {
+            "claim": target_solution["claim"],
+            "recommended_mode": target_solution["recommended_mode"],
+            "target_readout_decision": target_solution["target_readout_decision"],
+            "target_sensitivity_budget": target_solution["target_sensitivity_budget"],
+            "target_distribution_quality": target_solution["target_distribution_quality"],
+            "target_pair_geometry": target_solution["target_pair_geometry"],
+            "target_prediction_certificate": target_solution["target_prediction_certificate"],
+        },
         "jacobi_escape_cone": jacobi_summary,
         "analysis_atlas_snapshot": {
             "chart_distribution": chart_distribution,
@@ -506,6 +528,7 @@ def _render_page(
         "--require-public-claim "
         "--output .runtime/research_runs/pages-verification-receipt.json"
     )
+    target_answer_visual = _target_answer_visual(target_solution)
 
     return f"""<!doctype html>
 <html lang="en">
@@ -548,6 +571,116 @@ def _render_page(
     h1 {{ margin: 0; font-size: clamp(2rem, 5vw, 4.4rem); line-height: 0.95; letter-spacing: 0; }}
     h2 {{ margin: 0 0 14px; font-size: 1.35rem; letter-spacing: 0; }}
     p {{ margin: 0; color: var(--muted); line-height: 1.65; }}
+    .hero-lab {{
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(380px, 1.05fr);
+      gap: 24px;
+      align-items: stretch;
+    }}
+    .hero-copy {{
+      display: grid;
+      align-content: center;
+      gap: 18px;
+    }}
+    .hero-copy h1 {{ font-size: clamp(2.8rem, 6vw, 5.8rem); }}
+    .hero-copy strong {{ color: var(--ink); }}
+    .hero-actions {{ display: flex; flex-wrap: wrap; gap: 10px; }}
+    .hero-actions a {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 42px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      text-decoration: none;
+      font: 700 0.86rem ui-monospace, SFMono-Regular, Consolas, monospace;
+    }}
+    .hero-actions a:first-child {{ border-color: var(--accent); color: var(--accent); }}
+    .answer-board {{
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,251,255,0.96)),
+        radial-gradient(circle at 15% 15%, rgba(11,132,243,0.14), transparent 30%);
+      box-shadow: 0 24px 70px rgba(22, 33, 47, 0.10);
+    }}
+    .orbit-map {{
+      width: 100%;
+      min-height: 280px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+    }}
+    .answer-flow {{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }}
+    .flow-cell {{
+      display: grid;
+      gap: 8px;
+      min-height: 110px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }}
+    .flow-cell span {{ color: var(--muted); font-size: 0.76rem; text-transform: uppercase; }}
+    .flow-cell strong {{ font-size: 0.94rem; line-height: 1.35; }}
+    .flow-cell code {{ font: 700 0.82rem ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--accent); }}
+    .answer-strip {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }}
+    .answer-stat {{
+      display: grid;
+      gap: 6px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.92);
+    }}
+    .answer-stat span {{ color: var(--muted); font-size: 0.76rem; text-transform: uppercase; }}
+    .answer-stat strong {{ font: 700 1rem ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }}
+    .research-stack {{
+      display: grid;
+      grid-template-columns: minmax(240px, 0.72fr) minmax(0, 1.28fr);
+      gap: 14px;
+      align-items: stretch;
+    }}
+    .stack-map {{
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }}
+    .stack-step {{
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 10px;
+      align-items: start;
+    }}
+    .stack-step span:first-child {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: rgba(11,132,243,0.12);
+      color: var(--accent);
+      font: 700 0.82rem ui-monospace, SFMono-Regular, Consolas, monospace;
+    }}
+    .stack-step strong {{ display: block; margin-bottom: 3px; }}
+    .stack-step p {{ font-size: 0.88rem; line-height: 1.5; }}
     .grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 20px 0 24px; }}
     .upgrade-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }}
     .gate-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }}
@@ -694,7 +827,7 @@ def _render_page(
     }}
     a {{ color: var(--accent); }}
     @media (max-width: 900px) {{
-      .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .change-ledger, .claim-seal, .seal-checks, .evidence-grid {{ grid-template-columns: 1fr; }}
+      .hero-lab, .answer-flow, .answer-strip, .research-stack, .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .change-ledger, .claim-seal, .seal-checks, .evidence-grid {{ grid-template-columns: 1fr; }}
       main {{ width: min(100vw - 18px, 1180px); padding-top: 12px; }}
     }}
   </style>
@@ -702,12 +835,28 @@ def _render_page(
 <body>
 <main>
   <header>
-    <h1>ThreeBody Dynamics Lab</h1>
-    <p>
-      Static GitHub Pages build from the Python research engine. The browser page is not a solver server:
-      trajectories, invariant drift, atlas summaries, and theorem-suite status are computed during deployment and
-      embedded as interactive Plotly figures.
-    </p>
+    <div class="hero-lab">
+      <div class="hero-copy">
+        <h1>ThreeBody</h1>
+        <p>
+          ThreeBody Dynamics Lab now focuses on the original mathematical target:
+          given any Newtonian three-body initial state, compute <strong>r_i(t)</strong>
+          when a point forecast is defensible, or report the pushed-forward probability law
+          <strong>Law(X_t)</strong> when uncertainty dominates.
+        </p>
+        <p>
+          The public page is a static evidence bundle, not a live solver server. It embeds
+          representative trajectories, diagnostics, symbolic-dynamics gates, and a compact
+          target-answer certificate generated during deployment.
+        </p>
+        <div class="hero-actions">
+          <a href="#target-answer">Inspect target answer</a>
+          <a href="certificate.json">Open certificate JSON</a>
+          <a href="manifest.json">Open manifest</a>
+        </div>
+      </div>
+      {target_answer_visual}
+    </div>
   </header>
 
   <div class="grid">
@@ -716,6 +865,42 @@ def _render_page(
     {_metric_card("General energy drift", metrics["general_max_energy_drift"])}
     {_metric_card("Figure-eight FTLE", metrics["figure_eight_finite_time_lyapunov"])}
   </div>
+
+  <section id="target-answer">
+    <h2>Original problem answer: position or distribution at t</h2>
+    <div class="research-stack">
+      <div class="stack-map">
+        <div class="stack-step">
+          <span>1</span>
+          <div><strong>Deterministic flow</strong><p>Integrate x(t)=Phi_t(x(0)) and read body coordinates r_i(t).</p></div>
+        </div>
+        <div class="stack-step">
+          <span>2</span>
+          <div><strong>Probability push-forward</strong><p>Propagate declared initial uncertainty through the same flow.</p></div>
+        </div>
+        <div class="stack-step">
+          <span>3</span>
+          <div><strong>Sensitivity budget</strong><p>Compare propagated target-position spread against the tolerance horizon.</p></div>
+        </div>
+        <div class="stack-step">
+          <span>4</span>
+          <div><strong>Readout decision</strong><p>Promote point coordinates, probability regions, deterministic-only, or unresolved.</p></div>
+        </div>
+      </div>
+      <div>
+        <p>
+          The compact API result on this page is the same contract exposed by
+          <code>solve_three_body_target_positions(...)</code>. It deliberately avoids claiming a
+          global closed form: the answer is a finite-time mathematical object plus numerical gates.
+        </p>
+        <div class="gate-grid">
+          {_gate_card("Promoted claim", "pass", str(target_solution["claim"]), str(target_solution["recommended_mode"]))}
+          {_gate_card("Readout", "pass", str(target_solution["target_readout_decision"]["primary_readout"]), "point vs distribution gate")}
+          {_gate_card("Sensitivity ratio", "pass" if target_solution["target_sensitivity_budget"]["target_time_resolved"] else "wait", f"{target_solution['target_sensitivity_budget']['final_uncertainty_to_tolerance_ratio']:.3e}", "final uncertainty / tolerance")}
+        </div>
+      </div>
+    </div>
+  </section>
 
   <section>
     <h2>Research progress map</h2>
@@ -848,6 +1033,112 @@ audit = audit_public_static_artifacts_from_url("https://eljja.github.io/3body/",
 """, certificate_bundle
 
 
+def _target_answer_visual(target_solution: dict[str, object]) -> str:
+    readout = target_solution["target_readout_decision"]
+    budget = target_solution["target_sensitivity_budget"]
+    quality = target_solution["target_distribution_quality"]
+    pair_geometry = target_solution["target_pair_geometry"]
+    certificate = target_solution["target_prediction_certificate"]
+    claim = str(target_solution["claim"])
+    mode = str(target_solution["recommended_mode"])
+    primary_readout = str(readout["primary_readout"])
+    ratio = float(budget["final_uncertainty_to_tolerance_ratio"])
+    amplification = float(budget["uncertainty_amplification_factor"])
+    min_pair = float(budget["minimum_pair_distance"])
+    sampling = str(quality["sampling_error_strength"])
+    perimeter = float(pair_geometry["deterministic"]["perimeter"])
+    certificate_digest = str(certificate["result_payload_sha256"])[:16]
+    return (
+        '<div class="answer-board">'
+        f"{_target_orbit_svg(target_solution)}"
+        '<div class="answer-flow">'
+        '<div class="flow-cell"><span>Point object</span><strong>Deterministic target positions</strong><code>r_i(t) = Pi_r Phi_t(x0)</code></div>'
+        '<div class="flow-cell"><span>Distribution object</span><strong>Push-forward uncertainty law</strong><code>Law(X_t) = (Phi_t)# Law(X0)</code></div>'
+        '<div class="flow-cell"><span>Decision object</span>'
+        f"<strong>{html.escape(primary_readout)}</strong><code>{html.escape(claim)}</code></div>"
+        "</div>"
+        '<div class="answer-strip">'
+        f'{_answer_stat("Mode", mode)}'
+        f'{_answer_stat("Uncertainty / tol", _format_scientific(ratio))}'
+        f'{_answer_stat("Amplification", _format_scientific(amplification))}'
+        f'{_answer_stat("Min pair distance", _format_scientific(min_pair))}'
+        f'{_answer_stat("Sampling", sampling)}'
+        f'{_answer_stat("Perimeter", _format_scientific(perimeter))}'
+        f'{_answer_stat("Certificate", certificate_digest)}'
+        f'{_answer_stat("Horizon", "resolved" if budget["target_time_resolved"] else "unresolved")}'
+        "</div>"
+        "</div>"
+    )
+
+
+def _target_orbit_svg(target_solution: dict[str, object]) -> str:
+    positions = np.asarray(target_solution["target_positions"], dtype=float)
+    distribution = target_solution.get("target_position_distribution", {})
+    mean_positions = (
+        np.asarray(distribution.get("mean_positions", positions), dtype=float)
+        if isinstance(distribution, dict)
+        else positions
+    )
+    if positions.ndim != 2 or positions.shape[0] < 3 or positions.shape[1] < 2:
+        positions = np.asarray([[0.2, 0.8], [0.8, 0.7], [0.5, 0.25]], dtype=float)
+        mean_positions = positions
+    points = np.vstack([positions[:, :2], mean_positions[:, :2]])
+    lower = np.min(points, axis=0)
+    upper = np.max(points, axis=0)
+    span = np.maximum(upper - lower, 1.0e-9)
+
+    def project(point: np.ndarray) -> tuple[float, float]:
+        scaled = (point[:2] - lower) / span
+        return 60.0 + 520.0 * float(scaled[0]), 300.0 - 240.0 * float(scaled[1])
+
+    projected = [project(row) for row in positions[:3]]
+    mean_projected = [project(row) for row in mean_positions[:3]]
+    colors = ("#0b84f3", "#00a878", "#ffa600")
+    body_marks = []
+    for index, ((x_value, y_value), (mean_x, mean_y), color) in enumerate(
+        zip(projected, mean_projected, colors, strict=False)
+    ):
+        body_marks.append(
+            f'<ellipse cx="{mean_x:.2f}" cy="{mean_y:.2f}" rx="{26 + index * 6}" ry="{14 + index * 4}" '
+            f'fill="none" stroke="{color}" stroke-width="2" opacity="0.36"/>'
+        )
+        body_marks.append(
+            f'<line x1="{mean_x:.2f}" y1="{mean_y:.2f}" x2="{x_value:.2f}" y2="{y_value:.2f}" '
+            f'stroke="{color}" stroke-width="1.6" stroke-dasharray="4 5" opacity="0.55"/>'
+        )
+        body_marks.append(f'<circle cx="{x_value:.2f}" cy="{y_value:.2f}" r="7" fill="{color}"/>')
+        body_marks.append(
+            f'<text x="{x_value + 12:.2f}" y="{y_value - 10:.2f}" fill="#16212f" font-size="13" '
+            f'font-family="ui-monospace, Consolas, monospace">body {index}</text>'
+        )
+    path_points = " ".join(f"{x_value:.2f},{y_value:.2f}" for x_value, y_value in projected)
+    return (
+        '<svg class="orbit-map" viewBox="0 0 640 340" role="img" '
+        'aria-label="Three body target positions with uncertainty ellipses">'
+        '<rect x="0" y="0" width="640" height="340" rx="8" fill="#ffffff"/>'
+        '<path d="M40 286 C140 190 210 318 302 174 S470 34 590 92" fill="none" stroke="#d9e1ec" stroke-width="2"/>'
+        '<path d="M70 62 C160 160 250 32 340 142 S500 278 594 164" fill="none" stroke="#e8eef6" stroke-width="2"/>'
+        f'<polyline points="{path_points}" fill="none" stroke="#16212f" stroke-width="1.8" stroke-dasharray="6 7" opacity="0.48"/>'
+        f'{"".join(body_marks)}'
+        '<text x="28" y="32" fill="#16212f" font-size="18" font-family="Georgia, Times New Roman, serif">target-time geometry</text>'
+        '<text x="28" y="316" fill="#667085" font-size="13" font-family="ui-monospace, Consolas, monospace">ellipses: empirical 95% region proxy, points: deterministic r_i(t)</text>'
+        "</svg>"
+    )
+
+
+def _answer_stat(label: str, value: str) -> str:
+    return (
+        '<div class="answer-stat">'
+        f"<span>{html.escape(label)}</span>"
+        f"<strong>{html.escape(value)}</strong>"
+        "</div>"
+    )
+
+
+def _format_scientific(value: float) -> str:
+    return f"{float(value):.3e}" if np.isfinite(float(value)) else str(value)
+
+
 def _build_provenance() -> dict[str, object]:
     commit_sha = os.environ.get("GITHUB_SHA", "local")
     return {
@@ -880,32 +1171,32 @@ def _public_gate_summary(promotion_gates: dict[str, object]) -> dict[str, int]:
 def _recent_change_ledger(provenance: dict[str, object], verifier_feature_set_sha256: str) -> list[dict[str, str]]:
     return [
         {
-            "stage": "Atlas surface",
-            "title": "Reduced-state report bridge",
-            "detail": "General analysis reports now carry a ReducedThreeBodyState snapshot alongside chart features.",
+            "stage": "Original target",
+            "title": "Compact t-time answer",
+            "detail": "The public page now surfaces the direct r_i(t) or Law(X_t) answer path exposed by solve_three_body_target_positions.",
             "value": str(provenance["commit_sha_short"]),
             "status": "landed",
         },
         {
-            "stage": "Artifact policy",
-            "title": "Branch line endings verified",
-            "detail": ".gitattributes is hashed in the manifest and must declare LF publication semantics.",
-            "value": "* text eol=lf",
-            "status": "verified",
+            "stage": "Predictability",
+            "title": "Sensitivity budget",
+            "detail": "Forecast-horizon status, propagated target spread, tolerance ratio, FTLE, and close-approach gate are shown together.",
+            "value": "target_sensitivity_budget",
+            "status": "measured",
+        },
+        {
+            "stage": "Readout logic",
+            "title": "Point vs distribution decision",
+            "detail": "The visible answer now says whether point coordinates, probability regions, deterministic-only, or unresolved is defensible.",
+            "value": "target_readout_decision",
+            "status": "explicit",
         },
         {
             "stage": "Audit identity",
-            "title": "Receipt and audit fingerprints",
-            "detail": "Timestamp-independent digests identify both verifier receipts and full audit bundles.",
+            "title": "Certificate validation",
+            "detail": "The target answer payload and public Pages artifact bundle are digest-pinned for reproducible external review.",
             "value": verifier_feature_set_sha256[:12],
             "status": "pinned",
-        },
-        {
-            "stage": "Public API",
-            "title": "Stable claim contract",
-            "detail": "threebody_engine exposes public verifier, contract validator, and audit report helpers.",
-            "value": PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE,
-            "status": "api ready",
         },
     ]
 
