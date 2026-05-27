@@ -422,6 +422,24 @@ def test_engine_api_returns_compact_target_position_solution() -> None:
         "sampling-noisy",
     }
     assert solution["probability_answer"]["distribution_quality"] == distribution_quality
+    readout_decision = solution["target_readout_decision"]
+    assert readout_decision["decision_schema_version"] == 1
+    assert readout_decision["decision_type"] == "three-body-target-readout-decision"
+    assert readout_decision["primary_readout"] in {
+        "point-positions-with-probability-regions",
+        "probability-distribution",
+        "deterministic-positions",
+        "unresolved",
+    }
+    assert readout_decision["promoted_claim"] == solution["claim"]
+    assert readout_decision["deterministic_answer_available"] is True
+    assert readout_decision["probability_answer_available"] is True
+    assert readout_decision["mathematical_objects"]["point_position"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
+    assert readout_decision["mathematical_objects"]["probability_distribution"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
+    assert len(readout_decision["decision_reasons"]) >= 1
+    assert isinstance(readout_decision["blocking_reasons"], list)
+    assert len(readout_decision["per_body_readouts"]) == 3
+    assert readout_decision["per_body_readouts"][0]["body_index"] == 0
     certificate = solution["target_prediction_certificate"]
     assert certificate["certificate_schema_version"] == 1
     assert certificate["certificate_type"] == "three-body-target-prediction-reproducibility"
@@ -433,6 +451,7 @@ def test_engine_api_returns_compact_target_position_solution() -> None:
     assert len(certificate["result_payload_sha256"]) == 64
     assert "target_prediction_certificate" not in certificate["result_payload_keys"]
     assert "target_positions" in certificate["result_payload_keys"]
+    assert "target_readout_decision" in certificate["result_payload_keys"]
     validation = validate_three_body_target_prediction_certificate(solution)
     assert validation["valid"] is True
     assert validation["checks"]["input_contract_sha256_matches"] is True

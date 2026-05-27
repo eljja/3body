@@ -2243,11 +2243,118 @@ def _target_position_solution_from_bundle(solution: Mapping[str, object]) -> dic
         },
         "mathematical_statement": statement,
     }
+    compact["target_readout_decision"] = _target_readout_decision(compact)
     compact["target_prediction_certificate"] = _target_prediction_certificate(
         compact,
         solution,
     )
     return compact
+
+
+def _target_readout_decision(compact_solution: Mapping[str, object]) -> dict[str, object]:
+    claim = str(compact_solution.get("claim", "unresolved-target-position"))
+    recommended_mode = str(compact_solution.get("recommended_mode", "unresolved"))
+    target_positions = compact_solution.get("target_positions", [])
+    distribution = compact_solution.get("target_position_distribution", {})
+    if not isinstance(distribution, Mapping):
+        distribution = {}
+    diagnostics = compact_solution.get("diagnostics", {})
+    if not isinstance(diagnostics, Mapping):
+        diagnostics = {}
+    distribution_quality = compact_solution.get("target_distribution_quality", {})
+    if not isinstance(distribution_quality, Mapping):
+        distribution_quality = {}
+    table = compact_solution.get("target_position_table", [])
+    deterministic_available = _position_matrix_or_none(target_positions) is not None
+    distribution_available = _position_matrix_or_none(distribution.get("mean_positions", [])) is not None
+    publishable_probability = claim in {
+        "target-position-and-distribution",
+        "distributional-target-position",
+    }
+    publishable_point = claim in {
+        "target-position-and-distribution",
+        "deterministic-target-position",
+    }
+    regularization_required = diagnostics.get("regularization_recommended") is True
+    linearized_consistent = diagnostics.get("linearized_target_time_consistent") is True
+    inside_horizon = diagnostics.get("target_time_inside_forecast_horizon") is True
+    sampling_strength = str(distribution_quality.get("sampling_error_strength", "unavailable"))
+    if publishable_point and publishable_probability:
+        primary_readout = "point-positions-with-probability-regions"
+    elif publishable_probability:
+        primary_readout = "probability-distribution"
+    elif publishable_point:
+        primary_readout = "deterministic-positions"
+    else:
+        primary_readout = "unresolved"
+    blocking_reasons: list[str] = []
+    if not deterministic_available:
+        blocking_reasons.append("deterministic target positions are unavailable")
+    if not distribution_available:
+        blocking_reasons.append("target probability distribution is unavailable")
+    if not inside_horizon:
+        blocking_reasons.append("target time is outside the configured forecast horizon")
+    if not linearized_consistent:
+        blocking_reasons.append("linearized Gaussian and empirical distribution disagree at target time")
+    if regularization_required:
+        blocking_reasons.append("close approach requests regularized coordinates before a strong claim")
+    if sampling_strength == "sampling-noisy":
+        blocking_reasons.append("empirical distribution mean is sampling-noisy")
+    decision_reasons = (
+        blocking_reasons
+        if blocking_reasons
+        else ["no configured diagnostic blocks the selected readout"]
+    )
+    return {
+        "decision_schema_version": 1,
+        "decision_type": "three-body-target-readout-decision",
+        "question_answered": (
+            "Given masses, initial positions, initial velocities, and target time t, "
+            "which target-time position statement is defensible?"
+        ),
+        "primary_readout": primary_readout,
+        "promoted_claim": claim,
+        "recommended_mode": recommended_mode,
+        "deterministic_answer_available": deterministic_available,
+        "probability_answer_available": distribution_available,
+        "publishable_point_positions": publishable_point and deterministic_available,
+        "publishable_probability_distribution": publishable_probability and distribution_available,
+        "requires_regularized_coordinates": regularization_required,
+        "mathematical_objects": {
+            "point_position": "r_i(t) = Pi_{r_i} Phi_t(x(0))",
+            "probability_distribution": "Law(X_t) = (Phi_t)_# Law(X_0)",
+        },
+        "diagnostic_gates": {
+            "target_time_inside_forecast_horizon": inside_horizon,
+            "linearized_target_time_consistent": linearized_consistent,
+            "sampling_error_strength": sampling_strength,
+            "regularization_recommended": regularization_required,
+        },
+        "decision_reasons": decision_reasons,
+        "blocking_reasons": blocking_reasons,
+        "per_body_readouts": _target_per_body_readout_decisions(table),
+    }
+
+
+def _target_per_body_readout_decisions(table: object) -> list[dict[str, object]]:
+    if not isinstance(table, Sequence) or isinstance(table, (str, bytes, bytearray)):
+        return []
+    rows: list[dict[str, object]] = []
+    for row in table:
+        if not isinstance(row, Mapping):
+            continue
+        rows.append(
+            {
+                "body_index": int(row.get("body_index", len(rows))),
+                "position_claim_strength": str(row.get("position_claim_strength", "unavailable")),
+                "recommended_readout": str(row.get("recommended_readout", "unresolved")),
+                "deterministic_position": row.get("deterministic_position", []),
+                "probability_mean": row.get("probability_mean", []),
+                "central_90_interval": row.get("central_90_interval", {}),
+                "confidence_region_95": row.get("confidence_region_95", {}),
+            }
+        )
+    return rows
 
 
 def _target_distribution_quality_summary(
