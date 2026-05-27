@@ -47,6 +47,7 @@ from threebody.diagnostics import InvariantMonitor, StabilityAnalyzer
 from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
 from threebody.types import TrajectoryResult
+from threebody.ui.static_content import render_content_workspace, render_floating_nav
 from threebody_engine import solve_three_body_target_positions
 
 
@@ -529,7 +530,8 @@ def _render_page(
         "--output .runtime/research_runs/pages-verification-receipt.json"
     )
     target_answer_visual = _target_answer_visual(target_solution)
-    floating_nav = _floating_nav()
+    floating_nav = render_floating_nav()
+    content_workspace = render_content_workspace()
 
     return f"""<!doctype html>
 <html lang="en">
@@ -573,23 +575,23 @@ def _render_page(
       box-shadow: 0 18px 48px rgba(22, 33, 47, 0.14);
       backdrop-filter: blur(14px);
     }}
-    .floating-nav strong {{
-      padding: 4px 6px 7px;
-      border-bottom: 1px solid var(--line);
-      font-size: 0.84rem;
-    }}
-    .floating-nav a {{
+    .floating-nav a,
+    .floating-nav button {{
       display: flex;
       align-items: center;
       min-height: 34px;
       padding: 0 9px;
       border: 1px solid transparent;
       border-radius: 6px;
+      background: transparent;
       color: var(--ink);
       text-decoration: none;
       font: 700 0.78rem ui-monospace, SFMono-Regular, Consolas, monospace;
+      cursor: pointer;
     }}
-    .floating-nav a:hover, .floating-nav a:focus-visible {{
+    .floating-nav a:hover, .floating-nav a:focus-visible,
+    .floating-nav button:hover, .floating-nav button:focus-visible,
+    .floating-nav button.active {{
       border-color: var(--accent);
       color: var(--accent);
       outline: none;
@@ -646,6 +648,22 @@ def _render_page(
       color: var(--ink);
       text-decoration: none;
       font: 700 0.86rem ui-monospace, SFMono-Regular, Consolas, monospace;
+    }}
+    .hero-actions button {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 42px;
+      padding: 0 14px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--accent);
+      font: 700 0.86rem ui-monospace, SFMono-Regular, Consolas, monospace;
+      cursor: pointer;
+    }}
+    .hero-actions button:hover, .hero-actions button:focus-visible {{
+      outline: none;
+      background: rgba(11,132,243,0.08);
     }}
     .hero-actions a:first-child {{ border-color: var(--accent); color: var(--accent); }}
     .answer-board {{
@@ -731,6 +749,41 @@ def _render_page(
     }}
     .stack-step strong {{ display: block; margin-bottom: 3px; }}
     .stack-step p {{ font-size: 0.88rem; line-height: 1.5; }}
+    .content-workspace {{
+      display: grid;
+      grid-template-columns: minmax(230px, 0.38fr) minmax(0, 0.62fr);
+      gap: 16px;
+      align-items: start;
+    }}
+    .workspace-heading {{
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }}
+    .content-panel-stack {{
+      min-height: 390px;
+    }}
+    .content-panel {{
+      display: none;
+      gap: 14px;
+      min-height: 390px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }}
+    .content-panel.active {{ display: grid; }}
+    .content-panel h3 {{ margin: 0; font-size: 1.24rem; }}
+    .content-panel ul {{ margin: 0; padding-left: 20px; color: var(--muted); line-height: 1.55; }}
+    .content-panel li + li {{ margin-top: 8px; }}
+    .panel-status {{
+      width: fit-content;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(11,132,243,0.10);
+      color: var(--accent);
+      font: 700 0.78rem ui-monospace, SFMono-Regular, Consolas, monospace;
+    }}
     .grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 20px 0 24px; }}
     .upgrade-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }}
     .gate-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }}
@@ -883,21 +936,22 @@ def _render_page(
         width: 48px;
         padding: 7px;
       }}
-      .floating-nav strong {{ display: none; }}
-      .floating-nav a {{
+      .floating-nav a,
+      .floating-nav button {{
         justify-content: center;
         min-height: 36px;
         padding: 0;
         font-size: 0;
       }}
-      .floating-nav a::before {{
+      .floating-nav a::before,
+      .floating-nav button::before {{
         content: attr(data-short);
         font-size: 0.78rem;
       }}
       main {{ width: min(100vw - 72px, 1080px); margin-left: 64px; margin-right: 8px; }}
     }}
     @media (max-width: 900px) {{
-      .hero-lab, .answer-flow, .answer-strip, .research-stack, .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .change-ledger, .claim-seal, .seal-checks, .evidence-grid {{ grid-template-columns: 1fr; }}
+      .hero-lab, .answer-flow, .answer-strip, .research-stack, .content-workspace, .grid, .figure-grid, .upgrade-grid, .gate-grid, .progress-track, .change-ledger, .claim-seal, .seal-checks, .evidence-grid {{ grid-template-columns: 1fr; }}
       main {{ padding-top: 12px; }}
     }}
   </style>
@@ -921,7 +975,7 @@ def _render_page(
           target-answer certificate generated during deployment.
         </p>
         <div class="hero-actions">
-          <a href="#target-answer">Inspect target answer</a>
+          <button type="button" class="nav-panel-button" data-panel-target="threebody-answer">Inspect target answer</button>
           <a href="certificate.json">Open certificate JSON</a>
           <a href="manifest.json">Open manifest</a>
         </div>
@@ -929,6 +983,8 @@ def _render_page(
       {target_answer_visual}
     </div>
   </header>
+
+  {content_workspace}
 
   <div class="grid">
     {_metric_card("Two-body energy drift", metrics["two_body_max_energy_drift"])}
@@ -1099,34 +1155,29 @@ contract = public_static_artifact_claim_contract()
 audit = audit_public_static_artifacts_from_url("https://eljja.github.io/3body/", require_commit="{html.escape(str(provenance['commit_sha']))}")</pre>
   </section>
 </main>
+<script>
+(() => {{
+  const buttons = Array.from(document.querySelectorAll("[data-panel-target]"));
+  const panels = Array.from(document.querySelectorAll("[data-panel-id]"));
+  const activatePanel = (panelId) => {{
+    panels.forEach((panel) => {{
+      panel.classList.toggle("active", panel.dataset.panelId === panelId);
+    }});
+    buttons.forEach((button) => {{
+      const selected = button.dataset.panelTarget === panelId;
+      button.classList.toggle("active", selected);
+      button.setAttribute("aria-selected", selected ? "true" : "false");
+    }});
+  }};
+  buttons.forEach((button) => {{
+    button.addEventListener("click", () => activatePanel(button.dataset.panelTarget));
+  }});
+  activatePanel("threebody-answer");
+}})();
+</script>
 </body>
 </html>
 """, certificate_bundle
-
-
-def _floating_nav() -> str:
-    items = [
-        ("#target-answer", "Answer", "A"),
-        ("#progress-map", "Progress", "P"),
-        ("#public-audit", "Audit", "U"),
-        ("#engine-upgrades", "Engine", "E"),
-        ("#figure-eight", "Figure-eight", "F"),
-        ("#jacobi-certificate", "Jacobi", "J"),
-        ("#promotion-gates", "Gates", "G"),
-        ("#build-provenance", "Build", "B"),
-    ]
-    links = "\n".join(
-        f'<a href="{html.escape(href)}" data-short="{html.escape(short)}">{html.escape(label)}</a>'
-        for href, label, short in items
-    )
-    return (
-        '<nav class="floating-nav" aria-label="Page section navigation">'
-        "<strong>Navigate</strong>"
-        f"{links}"
-        '<a class="repo-link" href="https://github.com/eljja/3body" data-short="GH" '
-        'target="_blank" rel="noopener noreferrer">GitHub repo</a>'
-        "</nav>"
-    )
 
 
 def _target_answer_visual(target_solution: dict[str, object]) -> str:

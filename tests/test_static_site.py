@@ -40,11 +40,18 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert '<link rel="icon" href="favicon.svg" type="image/svg+xml">' in content
     assert '<meta name="theme-color" content="#16212f">' in content
     assert 'class="floating-nav"' in content
-    assert 'aria-label="Page section navigation"' in content
-    assert 'href="#target-answer"' in content
-    assert 'href="#progress-map"' in content
-    assert 'href="#public-audit"' in content
-    assert 'href="#build-provenance"' in content
+    assert 'aria-label="Content panel navigation"' in content
+    assert 'data-panel-target="threebody-answer"' in content
+    assert 'data-panel-target="riemann-hypothesis"' in content
+    assert 'data-panel-target="collatz-conjecture"' in content
+    assert 'data-panel-target="goldbach-conjecture"' in content
+    assert 'data-panel-target="twin-prime"' in content
+    assert "Research content workspace" in content
+    assert "Riemann Hypothesis" in content
+    assert "Collatz Conjecture" in content
+    assert "Goldbach Conjecture" in content
+    assert "Twin Prime Workbench" in content
+    assert "Proof Workbench" not in content
     assert 'href="https://github.com/eljja/3body"' in content
     assert 'target="_blank" rel="noopener noreferrer">GitHub repo</a>' in content
     assert "General three-body figure-eight" in content
