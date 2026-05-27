@@ -634,7 +634,7 @@ def _render_page(
       align-content: center;
       gap: 18px;
     }}
-    .hero-copy h1 {{ font-size: clamp(2.8rem, 6vw, 5.8rem); }}
+    .hero-copy h1 {{ font-size: clamp(2.72rem, 5.55vw, 5.35rem); }}
     .hero-copy strong {{ color: var(--ink); }}
     .hero-actions {{ display: flex; flex-wrap: wrap; gap: 10px; }}
     .hero-actions a {{
