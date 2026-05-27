@@ -739,6 +739,7 @@ def solve_three_body_prediction_problem(
         gravitational_constant=gravitational_constant,
         softening=softening,
         samples=samples,
+        target_times=target_times,
         rtol=rtol,
         atol=atol,
         max_step=max_step,
@@ -3273,7 +3274,14 @@ def _linearized_empirical_ephemeris_comparison(
     empirical_means = np.asarray(empirical_summary.get("mean_positions", []), dtype=float)
     empirical_covariances = np.asarray(empirical_summary.get("flat_covariances", []), dtype=float)
     times = np.asarray(empirical_ephemeris.get("times", []), dtype=float)
+    linearized_times = np.asarray(linearized_ephemeris.get("times", []), dtype=float)
     row_count = min(len(linearized_rows), len(empirical_means), len(empirical_covariances))
+    compared_times = times[:row_count] if len(times) >= row_count else linearized_times[:row_count]
+    if len(linearized_times) >= row_count and len(times) >= row_count and row_count:
+        time_mismatches = np.abs(linearized_times[:row_count] - times[:row_count])
+        maximum_time_mismatch = float(np.max(time_mismatches))
+    else:
+        maximum_time_mismatch = math.inf if row_count else 0.0
     rows: list[dict[str, object]] = []
     linearized_consistent_until: float | None = None
     first_break_time: float | None = None
@@ -3346,6 +3354,9 @@ def _linearized_empirical_ephemeris_comparison(
     return {
         "comparison_schema_version": 1,
         "row_count": len(rows),
+        "times": np.asarray(compared_times, dtype=float).tolist(),
+        "time_grid_aligned": bool(maximum_time_mismatch <= 1.0e-12),
+        "maximum_time_mismatch": maximum_time_mismatch,
         "covariance_relative_tolerance": float(covariance_relative_tolerance),
         "mean_sigma_tolerance": float(mean_sigma_tolerance),
         "linearized_consistent_until": linearized_consistent_until,

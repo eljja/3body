@@ -68,6 +68,8 @@ The bundle is intentionally not a closed-form theorem for all initial conditions
 
 By default, the bundle uses a center-of-mass-preserving uncertainty model for both the empirical ensemble and the linearized Gaussian covariance. This keeps mass-weighted center-of-mass position and velocity fixed under initial perturbations, avoiding a comparison where the ensemble and Gaussian forecast start from different physical assumptions. When `initial_state_covariance` is supplied in the API call or input JSON, that full state covariance replaces the generated scale-based covariance in the empirical ensemble, linearized Gaussian ephemeris, forecast horizon, and interpretation report.
 
+If `target_times` is supplied, the one-call solution now uses that exact nonuniform time grid for the deterministic ephemeris, linearized Gaussian ephemeris, empirical distribution ephemeris, and the `ephemeris_distribution_comparison.times` field. The comparison also reports `time_grid_aligned` and `maximum_time_mismatch`, so downstream notebooks can verify that the point trajectory and probability forecasts are being compared at the same observation times.
+
 ## Ephemeris Forecast
 
 Use `threebody_engine.predict_three_body_ephemeris(...)` or:

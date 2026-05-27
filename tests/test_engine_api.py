@@ -337,6 +337,41 @@ def test_engine_api_solves_three_body_prediction_problem() -> None:
     assert solution["interpretation_report"]["prediction_type"] == "three-body-interpretation-report"
 
 
+def test_engine_api_solution_uses_requested_times_across_ephemeris_layers() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+    target_times = [0.0, 0.011, 0.027, 0.05]
+
+    solution = solve_three_body_prediction_problem(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        count=5,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        samples=9,
+        target_times=target_times,
+        horizon_samples=6,
+    )
+
+    assert solution["deterministic_ephemeris"]["times"] == target_times
+    assert solution["linearized_gaussian_ephemeris"]["times"] == target_times
+    assert solution["distribution_ephemeris"]["times"] == target_times
+    assert solution["ephemeris_distribution_comparison"]["times"] == target_times
+    assert solution["ephemeris_distribution_comparison"]["time_grid_aligned"] is True
+    assert solution["ephemeris_distribution_comparison"]["maximum_time_mismatch"] == 0.0
+    assert solution["ephemeris_distribution_comparison"]["row_count"] == len(target_times)
+    assert (
+        solution["answer"]["final_positions"]
+        == solution["deterministic_ephemeris"]["positions"][-1]
+    )
+    assert (
+        solution["prediction_input_contract"]["inputs"]["target_times"]
+        == target_times
+    )
+
+
 def test_engine_api_returns_compact_target_position_solution() -> None:
     scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
     positions, velocities = scenario.system.split_state(scenario.initial_state)

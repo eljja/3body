@@ -1326,10 +1326,10 @@ def _recent_change_ledger(provenance: dict[str, object], verifier_feature_set_sh
         },
         {
             "stage": "Predictability",
-            "title": "Sensitivity budget",
-            "detail": "Forecast-horizon status, propagated target spread, tolerance ratio, FTLE, and close-approach gate are shown together.",
-            "value": "target_sensitivity_budget",
-            "status": "measured",
+            "title": "Aligned observation grid",
+            "detail": "Deterministic, Gaussian, empirical, and comparison ephemerides now share the same requested target_times grid.",
+            "value": "time_grid_aligned",
+            "status": "verified",
         },
         {
             "stage": "Readout logic",

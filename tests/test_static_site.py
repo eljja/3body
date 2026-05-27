@@ -134,7 +134,8 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert verifier_feature_set_sha256 in content
     assert certificate["recent_change_ledger"]
     assert certificate["recent_change_ledger"][0]["title"] == "Compact t-time answer"
-    assert certificate["recent_change_ledger"][1]["value"] == "target_sensitivity_budget"
+    assert certificate["recent_change_ledger"][1]["title"] == "Aligned observation grid"
+    assert certificate["recent_change_ledger"][1]["value"] == "time_grid_aligned"
     assert certificate["recent_change_ledger"][2]["value"] == "target_readout_decision"
     assert certificate["recent_change_ledger"][-1]["value"] == verifier_feature_set_sha256[:12]
     assert certificate["public_change_summary"]
