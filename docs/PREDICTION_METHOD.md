@@ -1,6 +1,10 @@
 # Three-Body Prediction Method
 
 This project now exposes the original practical target as an operational prediction layer.
+It also exposes a separate global closed-form research contract for the
+Sundman-style convergent-series route. That contract is intentionally separate
+from the finite-time prediction API because it does not claim a finite
+elementary formula for the generic problem.
 
 For a general Newtonian three-body initial condition
 
@@ -17,6 +21,29 @@ d v_i / dt = G sum_{j != i} m_j (r_j - r_i) / (|r_j - r_i|^2 + eps^2)^(3/2)
 ```
 
 and returns the positions `r_i(t)` at the requested target time. This is not a global closed-form solution claim. It is a reproducible numerical evaluation of the Newtonian flow map with conservation diagnostics.
+
+## Global Closed-Form Route
+
+Use `threebody_engine.assess_three_body_global_closed_form_claim(...)` or:
+
+```powershell
+threebody closed-form --input initial-state.json --output closed-form.json
+```
+
+This returns a machine-readable certificate for the only currently promoted
+global analytic route:
+
+```text
+x(tau) = sum_{k >= 0} a_k tau^k
+r_i(t) = Pi_{r_i} Phi_t(x(0))
+```
+
+The certificate explicitly separates the viable Sundman-style regularized
+convergent series contract from an unclaimed finite elementary-function global
+formula. It checks finite positive masses, finite 2D/3D state data, no initial
+binary collision, and the current nonzero-angular-momentum gate. It also reports
+the missing work: coefficient recurrences, collision charts, interval
+truncation bounds, and inverse time-map recovery.
 
 ## Deterministic Forecast
 

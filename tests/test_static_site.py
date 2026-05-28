@@ -42,11 +42,14 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert 'class="floating-nav"' in content
     assert 'aria-label="Content panel navigation"' in content
     assert 'data-panel-target="threebody-answer"' in content
+    assert 'data-panel-target="closed-form-route"' in content
     assert 'data-panel-target="riemann-hypothesis"' in content
     assert 'data-panel-target="collatz-conjecture"' in content
     assert 'data-panel-target="goldbach-conjecture"' in content
     assert 'data-panel-target="twin-prime"' in content
     assert "Research content workspace" in content
+    assert "Global closed-form route" in content
+    assert "Sundman-style regularized convergent series contract" in content
     assert "Riemann Hypothesis" in content
     assert "Collatz Conjecture" in content
     assert "Goldbach Conjecture" in content
@@ -66,8 +69,8 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert "target_sensitivity_budget" in content
     assert "target_readout_decision" in content
     assert "Current change ledger" in content
-    assert "Compact t-time answer" in content
-    assert "Sensitivity budget" in content
+    assert "Sundman series contract" in content
+    assert "Aligned observation grid" in content
     assert "Point vs distribution decision" in content
     assert "Certificate validation" in content
     assert "Permutation confidence" in content
@@ -133,7 +136,8 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert certificate["verification_schema_features_sha256"] == verifier_feature_set_sha256
     assert verifier_feature_set_sha256 in content
     assert certificate["recent_change_ledger"]
-    assert certificate["recent_change_ledger"][0]["title"] == "Compact t-time answer"
+    assert certificate["recent_change_ledger"][0]["title"] == "Sundman series contract"
+    assert certificate["recent_change_ledger"][0]["value"] == "closed_form_contract"
     assert certificate["recent_change_ledger"][1]["title"] == "Aligned observation grid"
     assert certificate["recent_change_ledger"][1]["value"] == "time_grid_aligned"
     assert certificate["recent_change_ledger"][2]["value"] == "target_readout_decision"

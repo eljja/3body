@@ -1497,6 +1497,160 @@ def predict_three_body_interpretation_report(
     }
 
 
+def global_closed_form_solution_contract() -> dict[str, object]:
+    """Return the only currently defensible global closed-form research contract.
+
+    The contract deliberately separates a finite elementary-function formula,
+    which this project does not claim, from a Sundman-style globally convergent
+    regularized series representation, which is the viable analytic route for
+    the general Newtonian three-body problem under explicit admissibility gates.
+    """
+
+    return {
+        "contract_schema_version": 1,
+        "contract_type": "three-body-global-closed-form-research-contract",
+        "promoted_route": "sundman-style-regularized-convergent-series",
+        "not_promoted": "finite-elementary-function-global-formula",
+        "mathematical_object": {
+            "state": "x = (r_0, r_1, r_2, v_0, v_1, v_2)",
+            "flow": "x(t) = Phi_t(x(0))",
+            "regularized_time_series": "x(tau) = sum_{k >= 0} a_k tau^k after collision/time regularization",
+            "physical_time_recovery": "t = T(tau), with T monotone on admissible branches",
+            "position_readout": "r_i(t) = Pi_{r_i} Phi_t(x(0))",
+        },
+        "admissibility_gates": [
+            "three finite positive masses",
+            "finite 2D or 3D initial positions and velocities",
+            "no initial binary collision",
+            "nonzero angular momentum gate for the currently promoted Sundman contract",
+            "triple-collision branch is not promoted until a regularized collision chart is implemented",
+        ],
+        "claim_boundaries": {
+            "elementary_closed_form_certified": False,
+            "global_convergent_series_contract_certified": "conditional-on-admissibility-gates",
+            "effective_computation_claim": (
+                "not claimed; the contract is an analytic representation target, while numerical "
+                "prediction remains the practical solver path"
+            ),
+        },
+        "implementation_status": {
+            "initial_state_admissibility_certificate": "implemented",
+            "series_coefficient_generator": "not-yet-implemented",
+            "collision_regularized_chart_atlas": "not-yet-implemented",
+            "effective_truncation_error_bound": "not-yet-implemented",
+        },
+        "research_program": [
+            "prove and encode the regularized time transform used by the series branch",
+            "derive coefficient recurrences in center-of-mass and collision-regularized coordinates",
+            "add interval bounds for truncation error and inverse time-map recovery",
+            "connect the certificate to existing close-approach and Picard gates",
+        ],
+    }
+
+
+def assess_three_body_global_closed_form_claim(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    *,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    angular_momentum_atol: float = 1.0e-12,
+    angular_momentum_rtol: float = 1.0e-12,
+    collision_distance_atol: float = 0.0,
+) -> dict[str, object]:
+    """Assess whether an initial state can enter the global closed-form route.
+
+    This does not claim a new elementary solution. It returns a machine-readable
+    certificate saying whether the supplied initial state passes the gates for a
+    Sundman-style regularized convergent-series research program.
+    """
+
+    system, initial_state = _general_prediction_system(
+        masses,
+        positions,
+        velocities,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+    )
+    angular_momentum_atol = _nonnegative_float(angular_momentum_atol, "angular_momentum_atol")
+    angular_momentum_rtol = _nonnegative_float(angular_momentum_rtol, "angular_momentum_rtol")
+    collision_distance_atol = _nonnegative_float(collision_distance_atol, "collision_distance_atol")
+    positions_array, velocities_array = system.split_state(initial_state)
+    pair_diagnostics = _initial_pair_distance_diagnostics(positions_array, collision_distance_atol)
+    angular_momentum = _angular_momentum_vector(system.masses, positions_array, velocities_array)
+    angular_momentum_norm = float(np.linalg.norm(angular_momentum))
+    characteristic_scale = _angular_momentum_characteristic_scale(
+        system.masses,
+        positions_array,
+        velocities_array,
+    )
+    angular_momentum_ratio = _safe_ratio(angular_momentum_norm, characteristic_scale)
+    nonzero_angular_momentum = bool(
+        angular_momentum_norm > angular_momentum_atol
+        and angular_momentum_ratio > angular_momentum_rtol
+    )
+    no_initial_binary_collision = pair_diagnostics["minimum_pair_distance"] > collision_distance_atol
+    sundman_admissible = bool(no_initial_binary_collision and nonzero_angular_momentum)
+    if sundman_admissible:
+        claim_status = "conditional-global-convergent-series-contract"
+        promoted_claim = (
+            "This initial state passes the implemented gates for the Sundman-style global "
+            "regularized convergent-series route."
+        )
+    elif not no_initial_binary_collision:
+        claim_status = "blocked-initial-binary-collision"
+        promoted_claim = (
+            "The closed-form route is not promoted because the supplied initial state starts "
+            "at or below the configured binary-collision distance."
+        )
+    else:
+        claim_status = "blocked-zero-angular-momentum-gate"
+        promoted_claim = (
+            "The currently implemented global series contract is not promoted because the "
+            "angular-momentum gate fails; triple-collision analysis remains unresolved."
+        )
+    contract = global_closed_form_solution_contract()
+    return {
+        "certificate_schema_version": 1,
+        "certificate_type": "three-body-global-closed-form-claim-assessment",
+        "claim_status": claim_status,
+        "promoted_claim": promoted_claim,
+        "contract": contract,
+        "problem": {
+            "dimension": system.dimension,
+            "masses": [float(mass) for mass in system.masses],
+            "gravitational_constant": float(system.gravitational_constant),
+            "softening": float(system.softening),
+        },
+        "initial_state_diagnostics": {
+            "pair_distances": pair_diagnostics,
+            "angular_momentum_vector": angular_momentum.tolist(),
+            "angular_momentum_norm": angular_momentum_norm,
+            "characteristic_angular_momentum_scale": characteristic_scale,
+            "angular_momentum_ratio": angular_momentum_ratio,
+            "center_of_mass_position": _mass_weighted_center(system.masses, positions_array.tolist()),
+            "center_of_mass_velocity": _mass_weighted_center(system.masses, velocities_array.tolist()),
+        },
+        "readiness_checks": {
+            "valid_initial_state": True,
+            "no_initial_binary_collision": no_initial_binary_collision,
+            "nonzero_angular_momentum": nonzero_angular_momentum,
+            "sundman_contract_admissible": sundman_admissible,
+            "elementary_closed_form_certified": False,
+            "series_coefficient_generator_available": False,
+            "collision_regularized_chart_atlas_available": False,
+            "effective_truncation_error_bound_available": False,
+        },
+        "next_required_work": [
+            "implement coefficient recurrences for the regularized series branch",
+            "add binary-collision and triple-collision chart transitions",
+            "prove interval truncation bounds for finite partial sums",
+            "compare partial sums against the existing adaptive-flow API on benchmark intervals",
+        ],
+    }
+
+
 def _general_prediction_system(
     masses: Sequence[float],
     positions: Sequence[Sequence[float]],
@@ -1527,6 +1681,65 @@ def _general_prediction_system(
         softening=softening,
     )
     return system, system.flatten_state(positions_array, velocities_array)
+
+
+def _initial_pair_distance_diagnostics(
+    positions: np.ndarray,
+    collision_distance_atol: float,
+) -> dict[str, object]:
+    pair_order = ((0, 1), (0, 2), (1, 2))
+    rows: list[dict[str, object]] = []
+    distances: list[float] = []
+    for left, right in pair_order:
+        separation = np.asarray(positions[right] - positions[left], dtype=float)
+        distance = float(np.linalg.norm(separation))
+        distances.append(distance)
+        rows.append(
+            {
+                "body_pair": [left, right],
+                "distance": distance,
+                "separation_vector": separation.tolist(),
+                "passes_collision_gate": bool(distance > collision_distance_atol),
+            }
+        )
+    minimum_index = int(np.argmin(distances)) if distances else -1
+    return {
+        "collision_distance_atol": float(collision_distance_atol),
+        "minimum_pair_distance": distances[minimum_index] if minimum_index >= 0 else math.inf,
+        "minimum_pair": list(pair_order[minimum_index]) if minimum_index >= 0 else [],
+        "pairs": rows,
+    }
+
+
+def _angular_momentum_vector(
+    masses: Sequence[float],
+    positions: np.ndarray,
+    velocities: np.ndarray,
+) -> np.ndarray:
+    masses_array = np.asarray(masses, dtype=float)
+    if positions.shape[1] == 2:
+        z_component = float(
+            np.sum(masses_array * (positions[:, 0] * velocities[:, 1] - positions[:, 1] * velocities[:, 0]))
+        )
+        return np.asarray([0.0, 0.0, z_component], dtype=float)
+    return np.sum(masses_array[:, None] * np.cross(positions, velocities), axis=0)
+
+
+def _angular_momentum_characteristic_scale(
+    masses: Sequence[float],
+    positions: np.ndarray,
+    velocities: np.ndarray,
+) -> float:
+    masses_array = np.asarray(masses, dtype=float)
+    total_mass = float(np.sum(masses_array))
+    center_position = np.sum(masses_array[:, None] * positions, axis=0) / total_mass
+    center_velocity = np.sum(masses_array[:, None] * velocities, axis=0) / total_mass
+    position_radii = np.linalg.norm(positions - center_position[None, :], axis=1)
+    velocity_radii = np.linalg.norm(velocities - center_velocity[None, :], axis=1)
+    length_scale = float(np.max(position_radii)) if position_radii.size else 0.0
+    velocity_scale = float(np.max(velocity_radii)) if velocity_radii.size else 0.0
+    scale = total_mass * length_scale * velocity_scale
+    return scale if math.isfinite(scale) and scale > 0.0 else 0.0
 
 
 def _finite_float(value: float, name: str) -> float:

@@ -6,6 +6,7 @@ from threebody_engine import (
     audit_public_static_artifact_bytes,
     audit_public_static_artifacts,
     audit_public_static_artifacts_from_url,
+    assess_three_body_global_closed_form_claim,
     build_hysteresis_markov_chain,
     compare_hysteresis_markov_to_baseline,
     compare_hysteresis_markov_to_baseline_with_uncertainty,
@@ -20,6 +21,7 @@ from threebody_engine import (
     predict_three_body_linearized_ephemeris,
     predict_three_body_position_distribution,
     predict_three_body_positions,
+    global_closed_form_solution_contract,
     public_static_artifact_audit_report_payload_sha256,
     public_static_artifact_claim_contract,
     run_verification_report,
@@ -52,6 +54,42 @@ def test_engine_api_integrates_reference_scenario() -> None:
     assert scenario.name == "general-figure-eight"
     assert trajectory.success is True
     assert len(trajectory.t) == 30
+
+
+def test_engine_api_assesses_global_closed_form_contract() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    contract = global_closed_form_solution_contract()
+    assessment = assess_three_body_global_closed_form_claim(
+        scenario.system.masses,
+        positions,
+        velocities,
+    )
+
+    assert contract["promoted_route"] == "sundman-style-regularized-convergent-series"
+    assert contract["claim_boundaries"]["elementary_closed_form_certified"] is False
+    assert assessment["certificate_type"] == "three-body-global-closed-form-claim-assessment"
+    assert assessment["contract"]["not_promoted"] == "finite-elementary-function-global-formula"
+    assert assessment["readiness_checks"]["valid_initial_state"] is True
+    assert assessment["readiness_checks"]["no_initial_binary_collision"] is True
+    assert assessment["readiness_checks"]["elementary_closed_form_certified"] is False
+    assert assessment["readiness_checks"]["series_coefficient_generator_available"] is False
+    assert assessment["initial_state_diagnostics"]["pair_distances"]["minimum_pair_distance"] > 0.0
+    assert len(assessment["initial_state_diagnostics"]["angular_momentum_vector"]) == 3
+    assert assessment["claim_status"] in {
+        "conditional-global-convergent-series-contract",
+        "blocked-zero-angular-momentum-gate",
+    }
+    assert assessment["next_required_work"]
+
+    rotating_assessment = assess_three_body_global_closed_form_claim(
+        [1.0, 1.0, 1.0],
+        [[1.0, 0.0], [-0.5, 0.8660254037844386], [-0.5, -0.8660254037844386]],
+        [[0.0, 1.0], [-0.8660254037844386, -0.5], [0.8660254037844386, -0.5]],
+    )
+    assert rotating_assessment["claim_status"] == "conditional-global-convergent-series-contract"
+    assert rotating_assessment["readiness_checks"]["sundman_contract_admissible"] is True
 
 
 def test_engine_api_predicts_three_body_positions_from_initial_state() -> None:

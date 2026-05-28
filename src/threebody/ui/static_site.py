@@ -1318,11 +1318,11 @@ def _public_gate_summary(promotion_gates: dict[str, object]) -> dict[str, int]:
 def _recent_change_ledger(provenance: dict[str, object], verifier_feature_set_sha256: str) -> list[dict[str, str]]:
     return [
         {
-            "stage": "Original target",
-            "title": "Compact t-time answer",
-            "detail": "The public page now surfaces the direct r_i(t) or Law(X_t) answer path exposed by solve_three_body_target_positions.",
-            "value": str(provenance["commit_sha_short"]),
-            "status": "landed",
+            "stage": "Closed-form route",
+            "title": "Sundman series contract",
+            "detail": "The public page now separates the viable global convergent-series route from an unclaimed elementary formula.",
+            "value": "closed_form_contract",
+            "status": "contract",
         },
         {
             "stage": "Predictability",

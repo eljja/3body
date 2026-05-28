@@ -134,6 +134,32 @@ def test_predict_cli_writes_deterministic_three_body_forecast(tmp_path) -> None:
     assert payload["close_approach_diagnostics"]["minimum_pair_distance"] > 0.0
 
 
+def test_closed_form_cli_writes_global_series_contract_assessment(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "closed-form.json"
+    _write_prediction_input(input_path)
+
+    exit_code = main(
+        [
+            "closed-form",
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+        ]
+    )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code in {0, 1}
+    assert payload["certificate_type"] == "three-body-global-closed-form-claim-assessment"
+    assert payload["contract"]["promoted_route"] == "sundman-style-regularized-convergent-series"
+    assert payload["contract"]["not_promoted"] == "finite-elementary-function-global-formula"
+    assert payload["readiness_checks"]["valid_initial_state"] is True
+    assert payload["readiness_checks"]["elementary_closed_form_certified"] is False
+    assert payload["initial_state_diagnostics"]["pair_distances"]["minimum_pair_distance"] > 0.0
+    assert "series_coefficient_generator" in payload["contract"]["implementation_status"]
+
+
 def test_predict_cli_writes_ephemeris(tmp_path) -> None:
     input_path = tmp_path / "initial-state.json"
     output_path = tmp_path / "ephemeris.json"

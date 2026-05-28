@@ -382,6 +382,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     predict.add_argument("--output", type=Path, default=None, help="Optional JSON output path.")
     predict.set_defaults(func=run_predict_command)
+    closed_form = subparsers.add_parser(
+        "closed-form",
+        help="Assess whether a general three-body initial state passes the global closed-form series contract.",
+    )
+    closed_form.add_argument(
+        "--input",
+        type=Path,
+        required=True,
+        help="JSON file with masses, positions, and velocities.",
+    )
+    closed_form.add_argument("--gravitational-constant", type=float, default=1.0, help="Newtonian gravitational constant.")
+    closed_form.add_argument("--softening", type=float, default=0.0, help="Optional Plummer-style softening length.")
+    closed_form.add_argument(
+        "--angular-momentum-atol",
+        type=float,
+        default=1.0e-12,
+        help="Absolute nonzero-angular-momentum gate.",
+    )
+    closed_form.add_argument(
+        "--angular-momentum-rtol",
+        type=float,
+        default=1.0e-12,
+        help="Relative nonzero-angular-momentum gate against the characteristic scale.",
+    )
+    closed_form.add_argument(
+        "--collision-distance-atol",
+        type=float,
+        default=0.0,
+        help="Minimum allowed initial pair distance for the binary-collision gate.",
+    )
+    closed_form.add_argument("--output", type=Path, default=None, help="Optional JSON output path.")
+    closed_form.set_defaults(func=run_closed_form_command)
     verify_static = subparsers.add_parser(
         "verify-static-artifacts",
         help="Verify static Pages certificate and manifest artifact integrity.",
@@ -779,6 +811,26 @@ def run_predict_command(args: argparse.Namespace) -> int:
     if args.output is not None:
         print(f"wrote {args.output}")
     return exit_code
+
+
+def run_closed_form_command(args: argparse.Namespace) -> int:
+    from threebody_engine import assess_three_body_global_closed_form_claim
+
+    payload = _read_prediction_input(args.input)
+    result = assess_three_body_global_closed_form_claim(
+        _required_prediction_field(payload, "masses"),
+        _required_prediction_field(payload, "positions"),
+        _required_prediction_field(payload, "velocities"),
+        gravitational_constant=args.gravitational_constant,
+        softening=args.softening,
+        angular_momentum_atol=args.angular_momentum_atol,
+        angular_momentum_rtol=args.angular_momentum_rtol,
+        collision_distance_atol=args.collision_distance_atol,
+    )
+    _write_json_result(result, args.output)
+    if args.output is not None:
+        print(f"wrote {args.output}")
+    return 0 if result["readiness_checks"]["sundman_contract_admissible"] else 1
 
 
 def run_flyby_sweep_command(args: argparse.Namespace) -> int:

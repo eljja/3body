@@ -26,6 +26,7 @@ class ContentPanel:
 
 FLOATING_MENU_ITEMS: tuple[MenuItem, ...] = (
     MenuItem("threebody-answer", "Three-body answer", "3B"),
+    MenuItem("closed-form-route", "Closed-form route", "CF"),
     MenuItem("riemann-hypothesis", "Riemann Hypothesis", "RH"),
     MenuItem("collatz-conjecture", "Collatz Conjecture", "C"),
     MenuItem("goldbach-conjecture", "Goldbach Conjecture", "G"),
@@ -52,6 +53,23 @@ CONTENT_PANELS: tuple[ContentPanel, ...] = (
             "Predictability budget: target_sensitivity_budget ties the answer to horizon, tolerance, FTLE, and close-approach diagnostics.",
         ),
         status="implemented",
+    ),
+    ContentPanel(
+        panel_id="closed-form-route",
+        title="Global closed-form route",
+        lead=(
+            "The defensible global route is not a finite elementary formula. It is a "
+            "Sundman-style regularized convergent series contract, gated by no initial "
+            "binary collision and a nonzero-angular-momentum condition until collision "
+            "charts are implemented."
+        ),
+        equation="x(tau)=sum_{k>=0} a_k tau^k;  r_i(t)=Pi_{r_i} Phi_t(x(0))",
+        bullets=(
+            "API: assess_three_body_global_closed_form_claim returns a machine-readable admissibility certificate.",
+            "Boundary: elementary closed-form global formula is not promoted.",
+            "Next proof work: coefficient recurrences, collision charts, and interval truncation bounds.",
+        ),
+        status="contract-implemented",
     ),
     ContentPanel(
         panel_id="riemann-hypothesis",
