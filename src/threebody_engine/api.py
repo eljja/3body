@@ -1497,6 +1497,207 @@ def predict_three_body_interpretation_report(
     }
 
 
+def generate_random_three_body_case(
+    *,
+    seed: int = 0,
+    dimension: int = 2,
+    mass_range: tuple[float, float] = (0.6, 1.6),
+    position_scale: float = 1.0,
+    velocity_scale: float = 0.35,
+    minimum_pair_distance: float = 0.35,
+    recenter: bool = True,
+    max_attempts: int = 512,
+) -> dict[str, object]:
+    """Generate a reproducible non-collisional random three-body initial state."""
+
+    dimension = int(dimension)
+    if dimension not in (2, 3):
+        raise ValueError("dimension must be 2 or 3.")
+    mass_low, mass_high = (float(mass_range[0]), float(mass_range[1]))
+    if not (math.isfinite(mass_low) and math.isfinite(mass_high) and 0.0 < mass_low <= mass_high):
+        raise ValueError("mass_range must contain finite positive bounds with low <= high.")
+    position_scale = _positive_float(position_scale, "position_scale")
+    velocity_scale = _positive_float(velocity_scale, "velocity_scale")
+    minimum_pair_distance = _nonnegative_float(minimum_pair_distance, "minimum_pair_distance")
+    max_attempts = _validated_positive_int(max_attempts, "max_attempts")
+    rng = np.random.default_rng(seed)
+    masses = rng.uniform(mass_low, mass_high, size=3)
+    positions = np.empty((3, dimension), dtype=float)
+    for attempt in range(max_attempts):
+        candidate = rng.normal(0.0, position_scale, size=(3, dimension))
+        pair_diagnostics = _initial_pair_distance_diagnostics(candidate, minimum_pair_distance)
+        if pair_diagnostics["minimum_pair_distance"] > minimum_pair_distance:
+            positions = candidate
+            break
+    else:
+        raise ValueError("Could not generate a random case satisfying minimum_pair_distance.")
+    velocities = rng.normal(0.0, velocity_scale, size=(3, dimension))
+    if recenter:
+        positions = _recenter_rows_by_mass(positions, masses)
+        velocities = _recenter_rows_by_mass(velocities, masses)
+    pair_diagnostics = _initial_pair_distance_diagnostics(positions, minimum_pair_distance)
+    return {
+        "case_schema_version": 1,
+        "case_type": "random-general-three-body-initial-state",
+        "seed": int(seed),
+        "dimension": dimension,
+        "masses": masses.tolist(),
+        "positions": positions.tolist(),
+        "velocities": velocities.tolist(),
+        "generation_parameters": {
+            "mass_range": [mass_low, mass_high],
+            "position_scale": position_scale,
+            "velocity_scale": velocity_scale,
+            "minimum_pair_distance": minimum_pair_distance,
+            "recenter": bool(recenter),
+        },
+        "diagnostics": {
+            "pair_distances": pair_diagnostics,
+            "center_of_mass_position": _mass_weighted_center(masses.tolist(), positions.tolist()),
+            "center_of_mass_velocity": _mass_weighted_center(masses.tolist(), velocities.tolist()),
+        },
+    }
+
+
+def solve_random_three_body_prediction_demo(
+    *,
+    seed: int = 0,
+    target_time: float = 0.1,
+    dimension: int = 2,
+    count: int = 16,
+    samples: int = 64,
+    reference_samples: int = 128,
+    position_scale: float = 1.0,
+    velocity_scale: float = 0.35,
+    uncertainty_position_scale: float = 1.0e-7,
+    uncertainty_velocity_scale: float = 1.0e-7,
+    success_tolerance: float = 1.0e-6,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+) -> dict[str, object]:
+    """Run a reproducible random three-body forecast and compare approaches.
+
+    The reference is the same Newtonian model integrated with stricter tolerances
+    and denser sampling. The report is meant to demonstrate a successful
+    operational forecast, not a global closed-form theorem.
+    """
+
+    target_time = _finite_float(target_time, "target_time")
+    count = _validated_positive_int(count, "count")
+    samples = _validated_sample_count(samples)
+    reference_samples = _validated_sample_count(reference_samples)
+    success_tolerance = _positive_float(success_tolerance, "success_tolerance")
+    case = generate_random_three_body_case(
+        seed=seed,
+        dimension=dimension,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+    )
+    masses = case["masses"]
+    positions = case["positions"]
+    velocities = case["velocities"]
+    point = predict_three_body_positions(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        rtol=1.0e-10,
+        atol=1.0e-12,
+    )
+    ephemeris = predict_three_body_ephemeris(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        rtol=1.0e-10,
+        atol=1.0e-12,
+    )
+    target_solution = solve_three_body_target_positions(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        count=count,
+        position_scale=uncertainty_position_scale,
+        velocity_scale=uncertainty_velocity_scale,
+        samples=samples,
+        horizon_samples=min(16, samples),
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        preserve_center_of_mass=True,
+    )
+    reference = predict_three_body_positions(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=reference_samples,
+        rtol=1.0e-12,
+        atol=1.0e-14,
+    )
+    reference_positions = np.asarray(reference["positions"], dtype=float)
+    approaches = _random_demo_approach_rows(
+        point,
+        ephemeris,
+        target_solution,
+        reference_positions,
+    )
+    max_error = min((float(row["max_body_position_error"]) for row in approaches), default=math.inf)
+    point_error = float(approaches[0]["max_body_position_error"]) if approaches else math.inf
+    invariant_drift = float(point["invariant_certificate"]["maximum_relative_energy_drift"])
+    close_warning = str(point["close_approach_diagnostics"]["warning_level"])
+    success = bool(
+        point.get("success") is True
+        and reference.get("success") is True
+        and point_error <= success_tolerance
+        and invariant_drift <= 1.0e-8
+        and close_warning in {"nominal", "close-approach"}
+    )
+    return {
+        "demo_schema_version": 1,
+        "demo_type": "random-three-body-prediction-demo",
+        "seed": int(seed),
+        "target_time": target_time,
+        "case": case,
+        "reference": {
+            "method": "adaptive-DOP853-high-precision-reference",
+            "positions": reference["positions"],
+            "velocities": reference["velocities"],
+            "success": reference["success"],
+            "invariant_certificate": reference["invariant_certificate"],
+        },
+        "approaches": approaches,
+        "target_solution": {
+            "claim": target_solution["claim"],
+            "recommended_mode": target_solution["recommended_mode"],
+            "target_readout_decision": target_solution["target_readout_decision"],
+            "target_sensitivity_budget": target_solution["target_sensitivity_budget"],
+            "target_distribution_quality": target_solution["target_distribution_quality"],
+        },
+        "success_report": {
+            "success": success,
+            "success_tolerance": success_tolerance,
+            "best_max_body_position_error": max_error,
+            "point_forecast_max_body_position_error": point_error,
+            "maximum_relative_energy_drift": invariant_drift,
+            "close_approach_warning_level": close_warning,
+            "interpretation": (
+                "Success means the random-case point forecast agrees with a stricter reference "
+                "integration inside success_tolerance while invariant drift and close-approach "
+                "diagnostics remain within configured gates."
+            ),
+        },
+    }
+
+
 def global_closed_form_solution_contract() -> dict[str, object]:
     """Return the only currently defensible global closed-form research contract.
 
@@ -1740,6 +1941,68 @@ def _angular_momentum_characteristic_scale(
     velocity_scale = float(np.max(velocity_radii)) if velocity_radii.size else 0.0
     scale = total_mass * length_scale * velocity_scale
     return scale if math.isfinite(scale) and scale > 0.0 else 0.0
+
+
+def _recenter_rows_by_mass(rows: np.ndarray, masses: np.ndarray) -> np.ndarray:
+    weights = masses / float(np.sum(masses))
+    center = np.sum(weights[:, None] * rows, axis=0)
+    return rows - center[None, :]
+
+
+def _random_demo_approach_rows(
+    point: Mapping[str, object],
+    ephemeris: Mapping[str, object],
+    target_solution: Mapping[str, object],
+    reference_positions: np.ndarray,
+) -> list[dict[str, object]]:
+    target_distribution = target_solution.get("target_position_distribution", {})
+    if not isinstance(target_distribution, Mapping):
+        target_distribution = {}
+    candidates = [
+        (
+            "adaptive-flow-final-state",
+            point.get("positions", []),
+            "Direct DOP853 integration to target_time.",
+        ),
+        (
+            "ephemeris-final-row",
+            _indexed_sequence_value(ephemeris.get("positions", []), len(ephemeris.get("positions", [])) - 1),
+            "Final row of the sampled deterministic ephemeris.",
+        ),
+        (
+            "target-solution-deterministic-readout",
+            target_solution.get("target_positions", []),
+            "Compact target solver deterministic r_i(t) readout.",
+        ),
+        (
+            "empirical-mean-readout",
+            target_distribution.get("mean_positions", []),
+            "Mean of the pushed-forward uncertainty ensemble.",
+        ),
+    ]
+    rows: list[dict[str, object]] = []
+    for name, positions, interpretation in candidates:
+        position_array = _position_matrix_or_none(positions)
+        if position_array is None or reference_positions.shape != position_array.shape:
+            max_error = math.inf
+            rms_error = math.inf
+            errors: list[float] = []
+        else:
+            body_errors = np.linalg.norm(position_array - reference_positions, axis=1)
+            errors = body_errors.tolist()
+            max_error = float(np.max(body_errors))
+            rms_error = float(np.sqrt(np.mean(body_errors**2)))
+        rows.append(
+            {
+                "approach": name,
+                "positions": positions,
+                "body_position_errors": errors,
+                "max_body_position_error": max_error,
+                "rms_body_position_error": rms_error,
+                "interpretation": interpretation,
+            }
+        )
+    return rows
 
 
 def _finite_float(value: float, name: str) -> float:

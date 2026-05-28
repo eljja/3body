@@ -160,6 +160,43 @@ def test_closed_form_cli_writes_global_series_contract_assessment(tmp_path) -> N
     assert "series_coefficient_generator" in payload["contract"]["implementation_status"]
 
 
+def test_random_demo_cli_writes_successful_prediction_report(tmp_path) -> None:
+    output_path = tmp_path / "random-demo.json"
+
+    exit_code = main(
+        [
+            "random-demo",
+            "--seed",
+            "7",
+            "--target-time",
+            "0.05",
+            "--count",
+            "5",
+            "--samples",
+            "16",
+            "--reference-samples",
+            "32",
+            "--success-tolerance",
+            "1e-6",
+            "--output",
+            str(output_path),
+        ]
+    )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["demo_type"] == "random-three-body-prediction-demo"
+    assert payload["success_report"]["success"] is True
+    assert payload["success_report"]["point_forecast_max_body_position_error"] <= 1.0e-6
+    assert payload["approaches"][0]["approach"] == "adaptive-flow-final-state"
+    assert payload["target_solution"]["target_readout_decision"]["primary_readout"] in {
+        "point-positions-with-probability-regions",
+        "probability-distribution",
+        "deterministic-positions",
+        "unresolved",
+    }
+
+
 def test_predict_cli_writes_ephemeris(tmp_path) -> None:
     input_path = tmp_path / "initial-state.json"
     output_path = tmp_path / "ephemeris.json"

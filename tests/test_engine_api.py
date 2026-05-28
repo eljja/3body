@@ -12,6 +12,7 @@ from threebody_engine import (
     compare_hysteresis_markov_to_baseline_with_uncertainty,
     certify_jacobi_escape,
     certify_jacobi_escape_report,
+    generate_random_three_body_case,
     integrate_reference_scenario,
     predict_three_body_distribution_ephemeris,
     predict_three_body_ephemeris,
@@ -25,6 +26,7 @@ from threebody_engine import (
     public_static_artifact_audit_report_payload_sha256,
     public_static_artifact_claim_contract,
     run_verification_report,
+    solve_random_three_body_prediction_demo,
     select_hysteresis_markov_order,
     solve_three_body_prediction_problem,
     solve_three_body_target_positions,
@@ -117,6 +119,32 @@ def test_engine_api_predicts_three_body_positions_from_initial_state() -> None:
         "softening-scale",
         "collision-scale",
     }
+
+
+def test_engine_api_solves_random_three_body_prediction_demo() -> None:
+    case = generate_random_three_body_case(seed=7, dimension=2, minimum_pair_distance=0.25)
+    demo = solve_random_three_body_prediction_demo(
+        seed=7,
+        target_time=0.05,
+        count=5,
+        samples=16,
+        reference_samples=32,
+        success_tolerance=1.0e-6,
+    )
+
+    assert case["case_type"] == "random-general-three-body-initial-state"
+    assert len(case["masses"]) == 3
+    assert len(case["positions"]) == 3
+    assert case["diagnostics"]["pair_distances"]["minimum_pair_distance"] > 0.25
+    assert demo["demo_type"] == "random-three-body-prediction-demo"
+    assert demo["success_report"]["success"] is True
+    assert demo["success_report"]["point_forecast_max_body_position_error"] <= 1.0e-6
+    assert demo["success_report"]["maximum_relative_energy_drift"] <= 1.0e-8
+    assert len(demo["approaches"]) >= 4
+    assert demo["approaches"][0]["approach"] == "adaptive-flow-final-state"
+    assert demo["target_solution"]["target_readout_decision"]["decision_type"] == (
+        "three-body-target-readout-decision"
+    )
 
 
 def test_engine_api_builds_three_body_ephemeris() -> None:

@@ -22,6 +22,31 @@ d v_i / dt = G sum_{j != i} m_j (r_j - r_i) / (|r_j - r_i|^2 + eps^2)^(3/2)
 
 and returns the positions `r_i(t)` at the requested target time. This is not a global closed-form solution claim. It is a reproducible numerical evaluation of the Newtonian flow map with conservation diagnostics.
 
+## Random-Case Success Demo
+
+Use `threebody_engine.generate_random_three_body_case(...)` and
+`threebody_engine.solve_random_three_body_prediction_demo(...)`, or:
+
+```powershell
+threebody random-demo --seed 7 --target-time 0.05 --count 16 --samples 64 --reference-samples 128 --output random-demo.json
+```
+
+The demo creates a reproducible non-collisional random three-body initial
+state, recenters position and velocity in the mass-weighted center-of-mass
+frame, and runs four readouts against a stricter reference integration:
+
+- adaptive-flow final state;
+- final row of the deterministic ephemeris;
+- compact target-solution deterministic readout;
+- empirical mean of the pushed-forward initial uncertainty.
+
+The result promotes success only when the point forecast agrees with the
+stricter reference within `success_tolerance`, relative energy drift remains
+inside the invariant gate, and close-approach diagnostics do not demand
+collision regularization. This is the concrete operational demonstration for
+the original question "given a random three-body initial state, estimate
+`r_i(t)`"; it remains separate from any global closed-form theorem claim.
+
 ## Global Closed-Form Route
 
 Use `threebody_engine.assess_three_body_global_closed_form_claim(...)` or:

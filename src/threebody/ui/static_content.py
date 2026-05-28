@@ -49,6 +49,7 @@ CONTENT_PANELS: tuple[ContentPanel, ...] = (
         equation="r_i(t) = Pi_{r_i} Phi_t(x(0));  Law(X_t) = (Phi_t)# Law(X_0)",
         bullets=(
             "Compact answer: target positions, probability regions, pair geometry, and center-of-mass readout.",
+            "Random challenge: threebody random-demo generates an arbitrary non-collisional case and checks predictions against a stricter reference.",
             "Decision gate: target_readout_decision chooses point positions, probability regions, deterministic-only, or unresolved.",
             "Predictability budget: target_sensitivity_budget ties the answer to horizon, tolerance, FTLE, and close-approach diagnostics.",
         ),

@@ -66,12 +66,14 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert "Original problem answer: position or distribution at t" in content
     assert "target-time geometry" in content
     assert "solve_three_body_target_positions" in content
+    assert "seeded random three-body challenge" in content
+    assert "certificate.json.random_prediction_demo" in content
     assert "target_sensitivity_budget" in content
     assert "target_readout_decision" in content
     assert "Current change ledger" in content
-    assert "Sundman series contract" in content
-    assert "Aligned observation grid" in content
-    assert "Point vs distribution decision" in content
+    assert "Random target demo" in content
+    assert "Position or distribution" in content
+    assert "Sundman route scoped" in content
     assert "Certificate validation" in content
     assert "Permutation confidence" in content
     assert "Poincare sweep" in content
@@ -136,11 +138,11 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert certificate["verification_schema_features_sha256"] == verifier_feature_set_sha256
     assert verifier_feature_set_sha256 in content
     assert certificate["recent_change_ledger"]
-    assert certificate["recent_change_ledger"][0]["title"] == "Sundman series contract"
-    assert certificate["recent_change_ledger"][0]["value"] == "closed_form_contract"
-    assert certificate["recent_change_ledger"][1]["title"] == "Aligned observation grid"
-    assert certificate["recent_change_ledger"][1]["value"] == "time_grid_aligned"
-    assert certificate["recent_change_ledger"][2]["value"] == "target_readout_decision"
+    assert certificate["recent_change_ledger"][0]["title"] == "Random target demo"
+    assert certificate["recent_change_ledger"][0]["status"] == "passed"
+    assert certificate["recent_change_ledger"][1]["title"] == "Position or distribution"
+    assert certificate["recent_change_ledger"][1]["value"] == "r_i(t)_or_Law(X_t)"
+    assert certificate["recent_change_ledger"][2]["value"] == "closed_form_contract"
     assert certificate["recent_change_ledger"][-1]["value"] == verifier_feature_set_sha256[:12]
     assert certificate["public_change_summary"]
     assert certificate["public_change_summary"][-1]["title"] == "Active profile digest"
@@ -161,6 +163,10 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert certificate["target_prediction_answer"]["target_prediction_certificate"]["certificate_type"] == (
         "three-body-target-prediction-reproducibility"
     )
+    assert certificate["random_prediction_demo"]["demo_type"] == "random-three-body-prediction-demo"
+    assert certificate["random_prediction_demo"]["success_report"]["success"] is True
+    assert certificate["random_prediction_demo"]["success_report"]["point_forecast_max_body_position_error"] <= 1.0e-6
+    assert certificate["random_prediction_demo"]["approaches"][0]["approach"] == "adaptive-flow-final-state"
     assert certificate["build_provenance"]["generator"] == "threebody.ui.static_site"
     assert "analysis_atlas_snapshot" in certificate
     assert "interval_box_margin_lower" in certificate["jacobi_escape_cone"]["parameter_box_latest"]

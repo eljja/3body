@@ -48,7 +48,7 @@ from threebody.experiments import OrbitLibrary
 from threebody.solvers import AdaptiveIntegrator
 from threebody.types import TrajectoryResult
 from threebody.ui.static_content import render_content_workspace, render_floating_nav
-from threebody_engine import solve_three_body_target_positions
+from threebody_engine import solve_random_three_body_prediction_demo, solve_three_body_target_positions
 
 
 PALETTE = ["#0b84f3", "#f95d6a", "#00a878", "#ffa600", "#6c63ff"]
@@ -380,6 +380,24 @@ def _render_page(
         samples=96,
         horizon_samples=8,
     )
+    random_prediction_demo = solve_random_three_body_prediction_demo(
+        seed=7,
+        target_time=0.05,
+        count=16,
+        samples=64,
+        reference_samples=128,
+        success_tolerance=1.0e-6,
+    )
+    metrics.update(
+        {
+            "random_demo_point_error": float(
+                random_prediction_demo["success_report"]["point_forecast_max_body_position_error"]
+            ),
+            "random_demo_energy_drift": float(
+                random_prediction_demo["success_report"]["maximum_relative_energy_drift"]
+            ),
+        }
+    )
     promotion_gates = {
         "picard_certified": jacobi_picard.picard_flow_certified,
         "picard_contraction_reserve": jacobi_tuning.contraction_reserve,
@@ -473,7 +491,7 @@ def _render_page(
     public_claim_profile_descriptor = static_artifact_requirement_profile_descriptor(PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE)
     verifier_feature_set = list(STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES)
     verifier_feature_set_sha256 = static_artifact_verification_features_sha256(verifier_feature_set)
-    recent_change_ledger = _recent_change_ledger(provenance, verifier_feature_set_sha256)
+    recent_change_ledger = _recent_change_ledger(random_prediction_demo, verifier_feature_set_sha256)
     public_change_summary = _public_change_summary(public_gate_summary, metrics, provenance, public_claim_profile_sha256)
     certificate_bundle = {
         "certificate_schema_version": 1,
@@ -508,6 +526,15 @@ def _render_page(
             "target_distribution_quality": target_solution["target_distribution_quality"],
             "target_pair_geometry": target_solution["target_pair_geometry"],
             "target_prediction_certificate": target_solution["target_prediction_certificate"],
+        },
+        "random_prediction_demo": {
+            "demo_type": random_prediction_demo["demo_type"],
+            "seed": random_prediction_demo["seed"],
+            "target_time": random_prediction_demo["target_time"],
+            "success_report": random_prediction_demo["success_report"],
+            "approaches": random_prediction_demo["approaches"],
+            "case_diagnostics": random_prediction_demo["case"]["diagnostics"],
+            "target_solution": random_prediction_demo["target_solution"],
         },
         "jacobi_escape_cone": jacobi_summary,
         "analysis_atlas_snapshot": {
@@ -1025,6 +1052,16 @@ def _render_page(
           {_gate_card("Readout", "pass", str(target_solution["target_readout_decision"]["primary_readout"]), "point vs distribution gate")}
           {_gate_card("Sensitivity ratio", "pass" if target_solution["target_sensitivity_budget"]["target_time_resolved"] else "wait", f"{target_solution['target_sensitivity_budget']['final_uncertainty_to_tolerance_ratio']:.3e}", "final uncertainty / tolerance")}
         </div>
+        <p>
+          The build also runs a seeded random three-body challenge and checks four readouts against a
+          stricter reference integration. This is the public success demonstration for arbitrary finite-time
+          prediction, with the full result embedded in <code>certificate.json.random_prediction_demo</code>.
+        </p>
+        <div class="gate-grid">
+          {_gate_card("Random demo", "pass" if random_prediction_demo["success_report"]["success"] else "wait", "seed 7", "generated initial state")}
+          {_gate_card("Point error", "pass" if random_prediction_demo["success_report"]["point_forecast_max_body_position_error"] <= random_prediction_demo["success_report"]["success_tolerance"] else "wait", f"{random_prediction_demo['success_report']['point_forecast_max_body_position_error']:.3e}", f"tol {random_prediction_demo['success_report']['success_tolerance']:.1e}")}
+          {_gate_card("Energy drift", "pass" if random_prediction_demo["success_report"]["maximum_relative_energy_drift"] <= 1.0e-8 else "wait", f"{random_prediction_demo['success_report']['maximum_relative_energy_drift']:.3e}", str(random_prediction_demo["success_report"]["close_approach_warning_level"]))}
+        </div>
       </div>
     </div>
   </section>
@@ -1315,28 +1352,34 @@ def _public_gate_summary(promotion_gates: dict[str, object]) -> dict[str, int]:
     return {"pass_count": sum(gates), "total": len(gates)}
 
 
-def _recent_change_ledger(provenance: dict[str, object], verifier_feature_set_sha256: str) -> list[dict[str, str]]:
+def _recent_change_ledger(
+    random_prediction_demo: dict[str, object],
+    verifier_feature_set_sha256: str,
+) -> list[dict[str, str]]:
+    success_report = random_prediction_demo["success_report"]
+    random_status = "passed" if success_report["success"] else "review"
+    point_error = float(success_report["point_forecast_max_body_position_error"])
     return [
         {
-            "stage": "Closed-form route",
-            "title": "Sundman series contract",
-            "detail": "The public page now separates the viable global convergent-series route from an unclaimed elementary formula.",
+            "stage": "Random forecast",
+            "title": "Random target demo",
+            "detail": "A seeded arbitrary initial state is generated and four readouts are compared against a stricter reference integration.",
+            "value": f"err={point_error:.2e}",
+            "status": random_status,
+        },
+        {
+            "stage": "Target answer",
+            "title": "Position or distribution",
+            "detail": "The operational answer remains a finite-time flow-map coordinate when resolved, otherwise a pushed-forward probability law.",
+            "value": "r_i(t)_or_Law(X_t)",
+            "status": "implemented",
+        },
+        {
+            "stage": "Closed-form boundary",
+            "title": "Sundman route scoped",
+            "detail": "The global analytic discussion is kept separate from the practical finite-time solver and does not claim an elementary formula.",
             "value": "closed_form_contract",
-            "status": "contract",
-        },
-        {
-            "stage": "Predictability",
-            "title": "Aligned observation grid",
-            "detail": "Deterministic, Gaussian, empirical, and comparison ephemerides now share the same requested target_times grid.",
-            "value": "time_grid_aligned",
-            "status": "verified",
-        },
-        {
-            "stage": "Readout logic",
-            "title": "Point vs distribution decision",
-            "detail": "The visible answer now says whether point coordinates, probability regions, deterministic-only, or unresolved is defensible.",
-            "value": "target_readout_decision",
-            "status": "explicit",
+            "status": "scoped",
         },
         {
             "stage": "Audit identity",

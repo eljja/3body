@@ -9,7 +9,8 @@ The static build performs these steps during GitHub Actions deployment:
 2. Integrate representative two-body, restricted three-body, and general figure-eight trajectories.
 3. Compute invariant drift, stability, analysis-atlas distribution, representative Jacobi escape-cone certificates, Picard contraction tuning, hysteresis grammar Markov diagnostics with bootstrap uncertainty, Markov order selection, and Poincare-section word diagnostics.
 4. Build a compact target-time prediction answer for the representative general three-body run, including `target_readout_decision`, `target_sensitivity_budget`, and a reproducibility certificate.
-5. Embed the resulting Plotly figures, target-answer visual, fixed left panel navigation, GitHub repo shortcut, certificate bars, promotion gates, progress-map timeline, compact current change ledger, public claim audit chain, and metrics into `site/index.html`.
+5. Run the seeded random three-body prediction challenge and embed its success report in `certificate.json.random_prediction_demo`.
+6. Embed the resulting Plotly figures, target-answer visual, fixed left panel navigation, GitHub repo shortcut, random-demo gates, promotion gates, progress-map timeline, compact current change ledger, public claim audit chain, and metrics into `site/index.html`.
 6. Write the same machine-readable evidence bundle to `site/certificate.json`.
 7. Write `site/favicon.svg` as the browser/tab icon for the public site.
 8. Write `site/.gitattributes` to pin generated static artifact line endings to LF during branch publication.
@@ -51,6 +52,6 @@ Limitations:
 - A fixed left navigation rail swaps the right-side research content workspace in place, including ThreeBody, the closed-form route, Riemann, Collatz, Goldbach, and twin-prime panels, plus a direct GitHub repository shortcut.
 - The left navigation definitions and right-side panel content are maintained in `threebody.ui.static_content` so future page sections can be changed without editing the main site renderer.
 - The public claim audit chain consolidates the older ladder, pipeline, and seal views into one compact section: commit-pinned build, scientific gate profile, bounded numerical drift, and active canonical profile digest.
-- The current change ledger gives a compact visual summary of the latest research and audit-surface deltas: Sundman-style closed-form contract, aligned observation grid, readout decision, and certificate validation.
+- The current change ledger gives a compact visual summary of the latest research and audit-surface deltas: random target prediction success, finite-time position-or-distribution readout, scoped Sundman route, and certificate validation.
 - The raw certificate JSON is no longer dumped into the page body; it remains available through `certificate.json` for external review and automated verification.
 - New public scenarios require adding them to `threebody.ui.static_site` and rebuilding.

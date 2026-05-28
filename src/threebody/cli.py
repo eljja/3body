@@ -414,6 +414,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     closed_form.add_argument("--output", type=Path, default=None, help="Optional JSON output path.")
     closed_form.set_defaults(func=run_closed_form_command)
+    random_demo = subparsers.add_parser(
+        "random-demo",
+        help="Generate a random three-body case and demonstrate target-time prediction accuracy.",
+    )
+    random_demo.add_argument("--seed", type=int, default=0, help="Random case seed.")
+    random_demo.add_argument("--target-time", type=float, default=0.1, help="Target time to predict.")
+    random_demo.add_argument("--dimension", type=int, choices=(2, 3), default=2, help="Physical dimension.")
+    random_demo.add_argument("--count", type=int, default=16, help="Uncertainty ensemble size.")
+    random_demo.add_argument("--samples", type=int, default=64, help="Solver sample count.")
+    random_demo.add_argument("--reference-samples", type=int, default=128, help="High-precision reference sample count.")
+    random_demo.add_argument("--position-scale", type=float, default=1.0, help="Random initial position scale.")
+    random_demo.add_argument("--velocity-scale", type=float, default=0.35, help="Random initial velocity scale.")
+    random_demo.add_argument(
+        "--success-tolerance",
+        type=float,
+        default=1.0e-6,
+        help="Maximum body-position error allowed for the point forecast.",
+    )
+    random_demo.add_argument("--output", type=Path, default=None, help="Optional JSON output path.")
+    random_demo.set_defaults(func=run_random_demo_command)
     verify_static = subparsers.add_parser(
         "verify-static-artifacts",
         help="Verify static Pages certificate and manifest artifact integrity.",
@@ -831,6 +851,26 @@ def run_closed_form_command(args: argparse.Namespace) -> int:
     if args.output is not None:
         print(f"wrote {args.output}")
     return 0 if result["readiness_checks"]["sundman_contract_admissible"] else 1
+
+
+def run_random_demo_command(args: argparse.Namespace) -> int:
+    from threebody_engine import solve_random_three_body_prediction_demo
+
+    result = solve_random_three_body_prediction_demo(
+        seed=args.seed,
+        target_time=args.target_time,
+        dimension=args.dimension,
+        count=args.count,
+        samples=args.samples,
+        reference_samples=args.reference_samples,
+        position_scale=args.position_scale,
+        velocity_scale=args.velocity_scale,
+        success_tolerance=args.success_tolerance,
+    )
+    _write_json_result(result, args.output)
+    if args.output is not None:
+        print(f"wrote {args.output}")
+    return 0 if result["success_report"]["success"] else 1
 
 
 def run_flyby_sweep_command(args: argparse.Namespace) -> int:
