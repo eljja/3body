@@ -1,49 +1,56 @@
 # 로컬 변화에 대한 기술적/학술적 전략 감사 보고서 (Technical & Academic Strategic Audit)
 
 본 보고서는 최근 로컬 저장소(`ThreeBody`)에서 대대적으로 이루어진 커밋 및 코드 변화들을 추적하고, 최초 프로젝트의 방향성과의 일치 여부, 상업적/학문적 가치 상승도에 대해 냉정하고 비판적인 시각으로 진단한 감사 문서입니다.
+이 문서는 변경 이력을 보존하는 historical audit이며, 논문 제출용 현재 주장은
+`docs/PAPER_READINESS_REVIEW.md`와 `docs/VALIDATION_GUARDRAILS.md`의 claim
+taxonomy를 우선한다.
+
+English note: this is a historical change audit. Superseded bottlenecks and
+strategy assessments must be read together with the later "follow-up
+implementation" section and the repository-wide paper-readiness standard.
 
 ---
 
 ## 1. 최근 로컬 변화 분석 (Commit & Run Audit)
 
-최근 로컬 저장소에는 매우 고밀도의 수학적 검증 시스템 및 물리학적 제약 조건들이 커밋되었습니다. 
+최근 로컬 저장소에는 수학적 검증 후보와 물리학적 제약 조건을 감사하기 위한 고밀도 시스템이 커밋되었습니다.
 *   **물리 보존 제약 강화:** 질량중심 환원(Center-of-mass reduction), Lagrange-Jacobi 항등식, Sundman 부등식, Noether 불변량 진단 도입.
-*   **증명 시스템 급진화:** `Jacobi Escape Cone` 정리 후보를 입증하기 위한 **Picard 구간 반복(Interval Picard propagation)**, 야코비안 수축 한계(Jacobian contraction bound), 구간 흐름 튜브(Interval flow tube) 도입.
-*   **regularization 심화:** Levi-Civita 근접 충돌 정규화의 잔차 및 스케일링 검증 완료.
+*   **정리 후보 감사 강화:** `Jacobi Escape Cone` 정리 후보를 검증/반증하기 위한 **Picard 구간 반복(Interval Picard propagation)**, 야코비안 수축 한계(Jacobian contraction bound), 구간 흐름 튜브(Interval flow tube) 도입.
+*   **regularization 심화:** Levi-Civita 근접 충돌 정규화의 잔차 및 스케일링 진단 도입. 이는 finite diagnostic이며, 완전한 충돌 정규화 정리의 증명은 아니다.
 
 자체 검증 엔진(`threebody theorem-suite`)을 구동한 결과, 이 시스템의 구체적인 성패가 드러났습니다.
 
-### 🚨 핵심 실패 영역 (Failing Proof Obligations)
+### 초기 핵심 병목 (Historical Bottlenecks)
 1.  **`interval_picard_flow_propagation` 및 수축 한계 실패:**
-    *   Picard 반복을 통한 수학적 궤도 연속성 증명(`jacobi_interval_picard_flow`)이 실패하고 있습니다. 수축 인자(contraction factor)가 **1.406**으로 목표치인 **0.35**를 초과하였습니다.
-    *   이는 수치적으로 계산된 궤도가 물리적으로 존재함을 구간 연산으로 증명하려 할 때, 구간 폭이 너무 넓거나 미분 방정식의 야코비안 바운드가 너무 커서 수렴성이 깨졌음을 의미합니다.
+    *   초기 감사 시점에는 Picard 반복 기반 validated-flow 후보(`jacobi_interval_picard_flow`)가 실패했습니다. 당시 수축 인자(contraction factor)가 **1.406**으로 목표치인 **0.35**를 초과하였습니다.
+    *   후속 구현에서는 scaled phase-space Jacobian tuning과 resolution/tolerance crosscheck가 추가되었으므로, 이 항목은 현재 결론이 아니라 병목 이력으로 인용해야 합니다.
 2.  **경계 산란 ML 모델의 붕괴 (`heldout_scattering_validation` 실패):**
     *   플라이바이(flyby) 탈출/진입 경계를 위상(phase)이나 산란각(deflection angle) 등의 물리적 특징으로 설명하려 했던 산란 맵(Scattering map) 모델들이 엄격한 Held-out 데이터 셋 검증에서 전부 탈락했습니다.
 3.  **문법 모델(Grammar Model)의 성패 갈림:**
-    *   경로를 단어 구조로 바꾼 'Chart-Word Grammar'가 **재진입(High re-entry) 예측에서는 무작위 대조군을 이기지 못해 실패**했으나, **이력 현상(Hysteresis width)에서는 대조군을 성공적으로 이겨내며 메모리 효과를 증명**했습니다.
+    *   경로를 단어 구조로 바꾼 'Chart-Word Grammar'가 **재진입(High re-entry) 예측에서는 무작위 대조군을 이기지 못해 실패**했으나, **이력 현상(Hysteresis width)에서는 대조군을 이기는 held-out signal**을 보였습니다. 이것은 메모리 효과와 일치하는 증거이지, 아직 일반 정리의 증명은 아닙니다.
 
 ---
 
 ## 2. 최초 방향성과의 일치 여부 평가
 
 *   **최초 방향성:** 시뮬레이션 데이터를 뽑아서 차트(해석 공간)로 분류하고, 기계학습 등을 융합해 단순 '컴팩트 대리 모델(Compact Surrogate Model)'을 피팅하는 **데이터 엔지니어링 중심의 탐색 도구**였습니다.
-*   **현재 상태:** 단순 데이터 피팅 수준을 완전히 탈피하여, 수치적 궤도가 엄밀한 뉴턴 운동 방정식의 참 해(True trajectory)인지 수학적으로 보증하는 **'컴퓨터 보조 증명 엔진(Computer-Assisted Proof Engine)'으로의 피봇**이 일어났습니다.
-*   **일치성 진단 (A+):** 이 피봇은 대단히 긍정적입니다. 3체 문제에서 단순한 ML 피팅이나 시각화는 학술적 깊이가 얕고 이미 수많은 선행 연구가 존재합니다. 반면, Noether 불변량과 Sundman 부등식의 엄격한 가이드레일 하에서 **수학적 전리 법칙을 '인증서(Certificate)' 형태로 체계화한 것은 프로젝트의 클래스를 몇 단계 격상시킨 진화**입니다.
+*   **현재 상태:** 단순 데이터 피팅 수준에서 벗어나, 수치 궤도와 국소 해석 주장이 뉴턴 방정식, 보존량, 구간/민감도 진단과 양립하는지 감사하는 **컴퓨터 보조 검증 후보 엔진**으로 피봇했습니다.
+*   **일치성 진단:** 이 피봇은 프로젝트 목표와 일치합니다. 다만 `certificate`는 논문 보조자료로 유용한 감사 단위이지, validated ODE propagation이 없는 한 자동으로 수학적 증명을 뜻하지 않습니다.
 
 ---
 
 ## 3. 상업적 / 학문적 가치 상승도 냉정 평가
 
-### 🎓 학문적 가치 (폭발적 상승 📈)
+### 학문적 가치 (조건부 상승)
 *   **과거:** "3체 문제를 시뮬레이션하고 몇 가지 카오스 경계를 시각화했다" -> 학술적 신뢰도 낮음.
-*   **현재:** "Noether, Sundman, Levi-Civita 보존량 가이드레일을 완전히 충족하며, Jacobi Hamiltonian 분할에 따른 엄밀한 탈출 조건(Escape Cone)을 구간 연산으로 인증했다" -> **Annals of Mathematics, Nonlinearity 등 최상위 물리학/수학 저널에 도전 가능한 고유 가치 확보.**
-*   **현재 한계:** Picard 흐름 전파가 실패하고 있어, "완전한 수학적 컴퓨터 보조 증명" 타이틀을 달기 직전의 병목에 갇혀 있습니다. 이 병목만 뚫어내면 학술적 가치는 세계 최고 수준이 됩니다.
+*   **현재:** "Noether, Sundman, Levi-Civita 관련 진단과 Jacobi Hamiltonian 분할을 같은 재현성 파이프라인에 묶었다"는 점은 연구 가치가 있습니다.
+*   **현재 한계:** 논문 제출 수준의 정리 주장은 여전히 독립 validated ODE backend, interval parameter enclosure, 명시적 regime inequality가 필요합니다. 현재 결과는 정리 후보와 재현성 증거로 표현해야 합니다.
 
 ### 💼 상업적 가치 (잠재력의 변화 및 현실화 🔄)
 *   **기존 관점:** 3체 문제 시뮬레이터 자체로는 돈을 벌 수 없습니다. 시장이 거의 존재하지 않습니다.
 *   **새로운 관점:**
-    1.  **고신뢰성 항공우주 설계 툴 (Safety-critical Astrodynamics):** 지구-달 시스템(제한적 3체 문제)에서 우주선이나 위성의 장기 궤도 안정성을 '수학적으로 엄밀하게 보증(Safety Certificate)'해 주는 특수 소프트웨어 모듈로서 고부가가치 상업화가 가능합니다. (SpaceX, NASA 등의 하이엔드 미션 검증용)
-    2.  **AI for Science를 위한 엄밀 물리 샌드박스:** 단순 오차가 누적되는 시뮬레이터가 아닌, 물리 보존 법칙이 수학적으로 완벽히 지켜지는 동역학 학습 샌드박스로서, DeepMind 등 대형 AI 연구소에서 'AI 과학 발견 모델(AI Science Agent)'을 학습시키기 위한 최적의 벤치마크 환경으로 패키징 및 라이선스 판매가 가능합니다.
+    1.  **고신뢰성 항공우주 설계 보조 툴 (Astrodynamics verification aid):** 지구-달 시스템(제한적 3체 문제)에서 라그랑주/매니폴드 궤도 설계 후보를 감사하는 보조 SDK로 발전할 수 있습니다. 다만 현재 단계는 mission-critical 보증 소프트웨어가 아니라 연구용 검증 보조 도구입니다.
+    2.  **AI for Science 물리 샌드박스:** 보존량과 진단 gate가 있는 동역학 학습 환경으로 패키징할 수 있습니다. "수학적으로 완벽히 지켜지는" 환경이 아니라, drift와 실패 조건을 기록하는 reproducible benchmark로 표현해야 합니다.
 
 ---
 
@@ -57,7 +64,7 @@
 
 ### 2단계: 스칼라 경계식 포기 및 기호/위상 전향
 *   Held-out 검증에서 처참하게 깨진 '스칼라 산란 모델(Scattering map)'에 더는 자원을 낭비하지 마십시오. 3체 카오스는 연속적인 부드러운 스칼라 함수로 피팅되지 않는 것이 정상입니다.
-*   성공을 거둔 **Hysteresis grammar 모델(메모리 효과 입증)**에 집중하여, 상태 전이를 연속 함수가 아닌 이산적 기호 동역학(Topological Transition Words) 마르코프 체인으로 완전히 설계 방향을 전향해야 합니다.
+*   held-out signal이 확인된 **Hysteresis grammar 모델(메모리 효과 후보)**에 집중하여, 상태 전이를 연속 함수 하나로 강제하지 말고 이산적 기호 동역학(Topological Transition Words)과 마르코프 체인 후보로 분리해 검증해야 합니다.
 
 ### 3단계: B2B API 패키징 및 AI 벤치마크 런칭
 *   이 검증 시스템 전체를 단독 패키지로 격리(`pip install threebody-engine`)하여, AI 연구용 오픈소스 물리 샌드박스 및 항공우주 임무 신뢰성 검증용 SDK 형태로 배포용 아키텍처를 설계하십시오.

@@ -91,7 +91,7 @@ To run the quick theorem candidate harness during development:
 threebody theorem-suite
 ```
 
-To run the full paper-level theorem candidate harness, including the Picard-certified 5x5x5 Jacobi parameter half-grid:
+To run the full paper-facing theorem candidate harness, including the Picard-certified 5x5x5 Jacobi parameter half-grid:
 
 ```powershell
 threebody theorem-suite --mode paper

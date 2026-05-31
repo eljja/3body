@@ -11,11 +11,11 @@ The static build performs these steps during GitHub Actions deployment:
 4. Build a compact target-time prediction answer for the representative general three-body run, including `target_readout_decision`, `target_sensitivity_budget`, and a reproducibility certificate.
 5. Run the seeded random three-body prediction challenge and embed its success report in `certificate.json.random_prediction_demo`.
 6. Embed the resulting Plotly figures, target-answer visual, fixed left panel navigation, GitHub repo shortcut, random-demo gates, promotion gates, progress-map timeline, compact current change ledger, public claim audit chain, and metrics into `site/index.html`.
-6. Write the same machine-readable evidence bundle to `site/certificate.json`.
-7. Write `site/favicon.svg` as the browser/tab icon for the public site.
-8. Write `site/.gitattributes` to pin generated static artifact line endings to LF during branch publication.
-9. Write `site/manifest.json` with `hash_algorithm: sha256`, SHA-256 hashes, and byte sizes for the HTML, certificate, favicon, and `.gitattributes` policy artifacts.
-10. Publish the generated `site` directory through GitHub Pages.
+7. Write the same machine-readable evidence bundle to `site/certificate.json`.
+8. Write `site/favicon.svg` as the browser/tab icon for the public site.
+9. Write `site/.gitattributes` to pin generated static artifact line endings to LF during branch publication.
+10. Write `site/manifest.json` with `hash_algorithm: sha256`, SHA-256 hashes, and byte sizes for the HTML, certificate, favicon, and `.gitattributes` policy artifacts.
+11. Publish the generated `site` directory through GitHub Pages.
 
 The workflow opts JavaScript actions into the Node 24 runner path and embeds build provenance in the generated HTML
 and `certificate.json`:

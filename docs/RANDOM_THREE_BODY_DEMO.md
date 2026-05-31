@@ -30,7 +30,16 @@ The `success_report` promotes success only when:
 - relative energy drift stays below the configured invariant gate;
 - close-approach diagnostics do not demand collision regularization.
 
-This is the practical AI/engine demonstration path. It does not solve the
-general three-body problem by a new closed formula; it shows that the system can
-generate an arbitrary test case, run multiple complementary forecast layers, and
-audit whether the target-time coordinates are trustworthy.
+This is the practical engine demonstration path. It does not solve the general
+three-body problem by a new closed formula; it shows that the system can
+generate an arbitrary test case, run multiple complementary forecast layers,
+and audit whether the target-time coordinates are trustworthy under the stated
+tolerances.
+
+## Korean Summary
+
+이 데모는 임의 seed의 비충돌 삼체 초기조건을 만들고, 목표 시각 `t`의
+좌표를 여러 방식으로 계산한 뒤 고정밀 reference integration과 비교한다.
+성공은 `success_tolerance`, 상대 에너지 drift, close-approach gate를 모두
+통과할 때만 승격된다. 이것은 유한시간 예측 데모이며, 일반 삼체 문제의
+전역 닫힌형 해를 주장하지 않는다.

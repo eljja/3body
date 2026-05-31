@@ -53,6 +53,13 @@ Runs repeatable research jobs from the command line.
 - `python -m threebody.cli verify-static-artifacts --site-dir site --require-commit local --require-public-claim`
 - `python -m threebody.cli verify-static-artifacts --base-url https://eljja.github.io/3body/ --require-commit <sha-or-prefix> --require-public-claim --output .runtime/research_runs/pages-verification-receipt.json`
 
+### `src/threebody_engine`
+
+Exposes the stable JSON-ready API for external callers. The most paper-facing
+entry points are finite-time prediction, random-case prediction demonstration,
+target-answer certificates, public static-artifact verification, and scoped
+Jacobi/hysteresis verification reports.
+
 ### `src/threebody/experiments`
 
 Packages repeatable experiment setup.

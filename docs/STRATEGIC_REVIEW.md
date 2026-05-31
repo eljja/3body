@@ -2,6 +2,10 @@
 
 본 문서는 현재 `ThreeBody` 프로젝트의 진행 상황을 종합적으로 정리하고, 기술적/학문적 한계점을 비판적으로 분석하며, 향후 학문적 및 상업적 가치를 극대화할 수 있는 발전 방향을 제시합니다.
 
+English scope note: this is an advisory strategy memo. It is not a proof
+document. Paper-facing claims must follow `docs/PAPER_READINESS_REVIEW.md` and
+`docs/VALIDATION_GUARDRAILS.md`.
+
 ---
 
 ## 1. 현재 프로젝트 진행 상황 요약
@@ -22,7 +26,7 @@
 
 ## 2. 비판적 분석: 현재의 한계 및 문제점
 
-현재 프로젝트는 매우 훌륭한 학문적 접근을 취하고 있으나, 이론을 '엄밀한 증명'으로 승격시키거나 범용적인 도구로 사용하기에는 다음과 같은 치명적인 한계점들이 존재합니다.
+현재 프로젝트는 유의미한 학문적 접근을 취하고 있으나, 이론을 '엄밀한 증명'으로 승격시키거나 범용적인 도구로 사용하기에는 다음과 같은 명확한 한계점들이 존재합니다.
 
 1.  **수치적 한계와 엄밀한 증명(Interval Arithmetic)의 부재**
     *   현재의 '정리 후보(예: Jacobi Escape Cone)'들은 부동소수점 기반의 수치 계산과 유한차분(Finite-difference) 근사에 의존하고 있습니다. 이는 훌륭한 물리적 직관을 주지만, 수학적으로 엄밀한 증명(Rigorous Proof)으로 인정받기 어렵습니다. 진정한 증명을 위해서는 스칼라 형태의 여유값(Margin) 검사가 아닌, 구간 연산(Interval Arithmetic) 기반의 엄밀한 오차 한계 증명이 필수적입니다.
@@ -42,13 +46,13 @@
 ### A. 학문적 가치 극대화 (Academic Direction)
 1.  **컴퓨터 보조 증명(Computer-Assisted Proof) 파이프라인 완성**
     *   **행동 제안:** 현재의 `theorem-suite`를 Python의 `mpmath` 또는 C++의 `CAPD(Computer Assisted Proofs in Dynamics)` 라이브러리와 연동하여 '구간 연산(Interval Arithmetic)' 기반으로 업그레이드합니다.
-    *   **기대 효과:** 'Jacobi Escape Cone' 등의 조건부 정리를 수학 저널(예: Journal of Differential Equations, Nonlinearity)에 "컴퓨터 보조 증명을 통한 3체 문제 특정 영역의 탈출 조건 증명"이라는 제목의 논문으로 출판할 수 있는 강력한 무기가 됩니다.
+    *   **기대 효과:** 'Jacobi Escape Cone' 같은 조건부 정리 후보를 독립 validated ODE backend와 interval parameter enclosure까지 끌어올리면, 미분방정식/동역학 분야 저널에 제출 가능한 컴퓨터 보조 증명 논문 후보가 됩니다. 현재 상태에서는 "정리 후보와 재현성 감사 파이프라인"으로 표현해야 합니다.
 2.  **기호 동역학(Symbolic Dynamics)과의 융합**
     *   **행동 제안:** 'Chart-Word Grammar' 가설을 단순 분류기가 아닌 위상수학적 기호 동역학(Symbolic dynamics)으로 발전시킵니다. 전이 행렬(Transition Matrix)과 마르코프 체인 모델을 도입하여 카오스 궤도를 기호의 배열로 해석합니다.
 
 ### B. 상업적 / 실용적 가치 극대화 (Commercial / Applied Direction)
 1.  **우주 동역학 및 궤도 설계(Astrodynamics & Mission Design) 소프트웨어로의 피봇**
-    *   **시장 가치:** 최근 뉴스페이스 시대(SpaceX, Blue Origin 등)와 아르테미스 미션으로 인해 지구-달 시스템(Restricted 3-Body Problem)에서의 라그랑주 점(Lagrange Point) 및 매니폴드(Invariant Manifold) 궤도 설계의 수요가 폭발적입니다.
+    *   **시장 가치:** 지구-달 시스템(Restricted 3-Body Problem)에서의 라그랑주 점(Lagrange Point) 및 매니폴드(Invariant Manifold) 궤도 설계는 실용적 수요가 있는 영역입니다. 다만 이 프로젝트는 현재 mission-critical 설계 도구가 아니라 연구용 검증 보조 엔진입니다.
     *   **행동 제안:** 'Restricted/Lagrange 차트' 해석 기능을 심화하여, "저비용 행성 간 궤도(Low Energy Transfer) 탐색 및 연료(Delta-V) 최적화 라이브러리"로 패키징합니다. B2B 솔루션 혹은 GMAT/STK와 같은 상용 항공우주 소프트웨어의 플러그인 형태로 발전시킬 수 있습니다.
 2.  **물리 정보 신경망(PINN) 및 AI 시뮬레이션용 학습 환경(Surrogate Model) 제공**
     *   **시장 가치:** 3체 문제와 같은 비선형 카오스 시스템의 데이터를 AI로 학습하려는 연구 기관 및 기업이 많습니다.

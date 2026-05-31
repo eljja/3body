@@ -7,6 +7,10 @@ This file defines what the project is not allowed to claim yet.
 The project has an empirical atlas and falsification harness.
 It does not have a global solution of the Newtonian three-body problem.
 It also does not yet have theorem-level error bounds for every chart.
+In this repository, "certificate" means a structured audit record unless the
+same paragraph explicitly states that a validated-flow proof has been completed.
+한국어 기준으로도 "certificate/인증서"는 기본적으로 감사 가능한 산출물이며,
+검증된 flow enclosure가 명시되지 않으면 수학적 증명을 뜻하지 않는다.
 `threebody theorem-suite` runs quick development checks by default.
 Paper-facing Jacobi parameter-box claims require `threebody theorem-suite --mode paper`.
 
@@ -36,7 +40,7 @@ Forbidden claims:
 
 - `AnalysisReport` now carries `ReducedThreeBodyState` snapshots for general three-body classifier outputs, so downstream models can read the shared shape-scale coordinates without recomputing them. The main classifier scoring still partly uses older feature objects, so any scoring migration must remain gradual and tested against existing chart labels.
 - Periapsis phase is now measured from the trajectory, and the first `scattering_map` collapse includes periapsis distance and deflection angle. The scattering diagnostic now also reports outgoing semimajor axis, eccentricity, periapsis distance, and escape speed at infinity.
-- The stricter `theorem-suite` currently does not reproduce the low-crossing scattering-map win from the smaller smoke run. This blocks any breakthrough claim based on that model.
+- The stricter `theorem-suite` currently does not reproduce the low-crossing scattering-map win from the smaller smoke run. This blocks any promoted novelty claim based on that model.
 - The current `theorem-suite` partially supports `low_crossing_impulse`, but the high-crossing best model does not yet pass the paper threshold. A two-sided hierarchy-boundary theorem is not justified.
 - Hysteresis-width collapse also fails in the theorem harness, so re-entry should not be forced into a scalar boundary model. The current admissible target is a chart-sequence/return-map branch model, and it must be reported separately from scalar boundary collapse.
 - Branch models must report their predeclared feature protocol, discovery leave-one-out accuracy, baseline accuracy, and held-out validation accuracy. Do not select branch features by held-out validation score.

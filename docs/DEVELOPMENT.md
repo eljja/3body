@@ -41,4 +41,6 @@ Any new solver or model should be accompanied by at least one of:
 ## Git Workflow
 
 The local repository uses `main` as the primary branch.
-If a remote is added later, keep feature work on short-lived topic branches and merge back only after tests pass.
+The GitHub remote is `https://github.com/eljja/3body.git`.
+Keep feature work on short-lived topic branches or scoped commits and merge back only after tests pass.
+When changing public-facing claims, update the relevant documentation and run the static artifact verifier before deployment.

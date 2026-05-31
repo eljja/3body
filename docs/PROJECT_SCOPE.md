@@ -15,6 +15,9 @@ The working objective is an analysis atlas:
 
 The project does not claim a single universal closed-form solution of the general three-body problem.
 It aims to make the problem analyzable by decomposing it into connected local descriptions.
+For paper-facing language, the project distinguishes operational numerical
+answers, reproducibility certificates, theorem candidates, and completed
+computer-assisted proofs as separate claim levels.
 
 ## Why This Exists
 
@@ -37,6 +40,8 @@ The three-body problem is not generically integrable in the same way, so the pro
 - perturbation ensembles, transition surveys, and first-pass law mining
 - reference orbit scenarios
 - Streamlit visualizer
+- static GitHub Pages evidence bundle with machine-readable verification artifacts
+- finite-time prediction API for target positions and pushed-forward probability distributions
 - automated tests
 
 ## Boundaries

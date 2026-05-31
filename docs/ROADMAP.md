@@ -56,7 +56,10 @@
 - replace interval rules with chart-specific analytic criteria where possible
 - track law coverage, false positives, and missed transitions as first-class metrics
 
-## Current Push: Paper-Grade Certificates
+## Current Push: Paper-Facing Candidate Certificates
+
+These items are meant to make claims auditable enough for a paper supplement.
+They are not, by themselves, completed theorem proofs.
 
 - NumPy 1.x/2.x integration compatibility is part of the reproducibility baseline.
 - Jacobi escape work now includes a terminal tail-state finite-difference reserve as a bridge from open-cone scalar sensitivity toward interval-enclosed trajectories.

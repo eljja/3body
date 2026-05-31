@@ -4,6 +4,12 @@ This note records the strongest theorem candidate currently implemented in the p
 It is not a proof of the general three-body problem.
 It is a local escape theorem candidate for a large hierarchical regime.
 
+Korean summary: 이 문서는 일반 삼체 문제의 증명이 아니라, 계층적 escape
+tail에서 성립할 수 있는 조건부 정리 후보를 기록한다. 현재 구현은 sampled
+trajectory, interval tail box, segment-wise Picard guardrail을 결합하지만,
+독립 validated ODE backend와 interval parameter derivative bound가 완성되기
+전까지는 논문에서 "완성된 컴퓨터 보조 증명"으로 표현하면 안 된다.
+
 ## Setting
 
 Consider the Newtonian three-body problem with positive masses `m1`, `m2`, `m3`.

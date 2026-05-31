@@ -205,7 +205,8 @@ min(E_outer_tail) > interaction_bound_tail + future_exchange_bound + numerical_b
 ```
 
 If the quadrupole constant and the future-tail hypotheses are interval-certified with explicit inequalities on `R / |r|`, outward radial velocity, bounded binary scale, and binary action drift,
-it becomes a publishable local escape theorem candidate for a genuinely large hierarchy/escape regime.
+it becomes a plausible local escape theorem candidate for a declared hierarchy/escape regime.
+Publication would still require an independent validated-flow backend or an equivalent proof-quality enclosure.
 
 The current theorem suite also requires `jacobi_inflated_margin_lower_bound`.
 That is not a full interval proof, but it blocks promotion when the positive margin is only a floating-point artifact.

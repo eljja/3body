@@ -1,6 +1,6 @@
 # Literature Comparison
 
-This project must be compared against known three-body results before making any breakthrough claim.
+This project must be compared against known three-body results before making any novelty claim.
 
 ## Established Results We Must Not Repackage
 
@@ -21,7 +21,7 @@ The target is a reproducible `Reduced Shape-Scattering Atlas`:
 - held-out and artifact validation,
 - and proof obligations that explicitly block overclaiming.
 
-The only current breakthrough candidate is narrow:
+The only current novelty candidate is narrow:
 
 ```text
 In a declared hierarchical flyby family, trajectory-measured scattering coordinates
@@ -29,7 +29,7 @@ can improve low hierarchy-exit boundary prediction over instantaneous geometry.
 ```
 
 This is a conjecture, not a theorem.
-The current `theorem-suite` fails to reproduce this candidate under the stricter paper harness, so it is not yet a breakthrough claim.
+The current `theorem-suite` fails to reproduce this candidate under the stricter paper harness, so it is not yet a promoted novelty claim.
 The more robust current target is therefore weaker but cleaner:
 
 ```text
@@ -43,7 +43,7 @@ This is adjacent to symbolic dynamics, but the current proposal is atlas-specifi
 The refined version adds physical bins inside each chart and an extremum-based return-word proxy, which is a bridge toward return maps rather than a completed symbolic-dynamics theorem.
 The newest re-entry target treats high-crossing and hysteresis as predeclared branch classification over this grammar, explicitly separating branch prediction from failed scalar boundary collapse.
 
-## What Would Count As A Real Breakthrough
+## What Would Count As A Real Contribution
 
 - A theorem-level error bound for the hierarchy-exit scattering map in a stated mass/energy/impact regime.
 - A regularized collision chart that proves smooth continuation or classifies exchange outcomes in a stated near-collision regime.

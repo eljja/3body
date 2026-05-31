@@ -2,6 +2,12 @@
 
 These are not proven theorems.
 They are the current smallest claims that could become publishable if their proof obligations are completed.
+In this file, "certificate" means an implemented check or audit artifact unless
+the text explicitly says that a validated-flow proof is complete.
+
+한국어 요약: 이 문서의 항목들은 완성된 정리가 아니라 정리 후보이다.
+`certificate`는 기본적으로 구현된 검사/감사 산출물을 뜻하며, 독립 validated
+ODE proof가 완료되었다고 명시하지 않는 한 수학적 증명을 뜻하지 않는다.
 
 ## Candidate 1: Jacobi Escape Cone Theorem Candidate
 

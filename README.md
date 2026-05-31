@@ -43,6 +43,11 @@ The project is built around five ideas:
 
 The project does not treat the three-body problem as something to merely visualize.
 The goal is to construct a working analysis method.
+The paper-facing claim standard is defined in
+[Paper-Readiness Review](docs/PAPER_READINESS_REVIEW.md): reproducibility
+certificates are audit artifacts, theorem candidates remain conditional, and
+the project does not claim a finite elementary closed-form solution of the
+generic Newtonian three-body problem.
 
 - The two-body problem remains the analytic reference because center-of-mass separation and relative-coordinate reduction turn it into a one-body central-force problem.
 - The general three-body problem is not generically integrable by one global formula, so the project treats it as an atlas problem.
@@ -81,8 +86,10 @@ from threebody_engine import (
     predict_three_body_position_distribution,
     predict_three_body_positions,
     public_static_artifact_claim_contract,
+    generate_random_three_body_case,
     run_verification_report,
     select_hysteresis_markov_order,
+    solve_random_three_body_prediction_demo,
     solve_three_body_prediction_problem,
     solve_three_body_target_positions,
     score_three_body_position_hypothesis,
@@ -302,6 +309,7 @@ Run a transition survey:
 ## Documentation
 
 - [Project Scope](docs/PROJECT_SCOPE.md)
+- [Paper-Readiness Review](docs/PAPER_READINESS_REVIEW.md)
 - [Science Foundation](docs/SCIENCE_FOUNDATION.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development Guide](docs/DEVELOPMENT.md)
@@ -309,8 +317,17 @@ Run a transition survey:
 - [Research Runs](docs/RESEARCH_RUNS.md)
 - [Current Hypotheses](docs/CURRENT_HYPOTHESES.md)
 - [Jacobi Escape Cone Theorem](docs/JACOBI_ESCAPE_CONE_THEOREM.md)
+- [Theorem Candidates](docs/THEOREM_CANDIDATES.md)
+- [Interpretation Method](docs/INTERPRETATION_METHOD.md)
+- [Prediction Method](docs/PREDICTION_METHOD.md)
+- [Random Three-Body Demo](docs/RANDOM_THREE_BODY_DEMO.md)
+- [Global Closed-Form Program](docs/GLOBAL_CLOSED_FORM_PROGRAM.md)
+- [Literature Comparison](docs/LITERATURE_COMPARISON.md)
+- [Solution Space](docs/SOLUTION_SPACE.md)
+- [Validation Guardrails](docs/VALIDATION_GUARDRAILS.md)
+- [Strategic Review](docs/STRATEGIC_REVIEW.md)
+- [Local Changes Audit](docs/LOCAL_CHANGES_AUDIT.md)
 - [GitHub Pages Static Visualizer](docs/GITHUB_PAGES.md)
-- [Three-Body Prediction Method](docs/PREDICTION_METHOD.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## Suggested Workflow

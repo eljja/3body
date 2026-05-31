@@ -69,3 +69,11 @@ global series solver:
 
 Until those are implemented, the closed-form route is a precise research
 contract and admissibility certificate, not a completed global formula.
+
+## Korean Summary
+
+이 문서의 핵심은 "일반 삼체 문제의 전역 초등함수 해를 얻었다"는 주장을
+금지하고, 방어 가능한 분석 경로를 Sundman식 정규화 수렴급수 연구 계약으로
+제한하는 것이다. 현재 API는 입력 초기조건이 이 연구 계약의 일부 gate를
+통과하는지 감사하지만, 계수 점화식, 충돌 chart, truncation bound, 시간 역변환
+bound가 구현되기 전까지는 완성된 전역 급수 solver가 아니다.

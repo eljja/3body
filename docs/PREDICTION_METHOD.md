@@ -6,6 +6,11 @@ Sundman-style convergent-series route. That contract is intentionally separate
 from the finite-time prediction API because it does not claim a finite
 elementary formula for the generic problem.
 
+한국어 요약: 이 문서는 주어진 초기조건과 목표 시간에 대해 `r_i(t)` 또는
+`Law(X_t)`를 계산하는 운영적 예측 계층을 설명한다. 이는 유한시간 flow-map
+평가와 불확실성 push-forward이며, 일반 삼체 문제의 전역 닫힌형 해 주장이
+아니다.
+
 For a general Newtonian three-body initial condition
 
 ```text
