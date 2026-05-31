@@ -1,5 +1,13 @@
 # ThreeBody
 
+<p>
+  <a href="#english">English</a>
+  ·
+  <a href="#korean-summary">한국어</a>
+</p>
+
+<a id="english"></a>
+
 `ThreeBody` is a research project for building an analysis atlas of the two-body, restricted three-body, and general Newtonian three-body problems.
 
 The project is built around five ideas:
@@ -9,6 +17,25 @@ The project is built around five ideas:
 - Combine classical mechanics, perturbation theory, regularization, continuation, invariant manifolds, and data-assisted discovery.
 - Decompose state space into interpretive charts and track transitions between them.
 - Build compact models only inside explicitly identified charts.
+
+## Korean Summary
+
+<a id="korean-summary"></a>
+
+`ThreeBody`는 이체, 제한 삼체, 일반 뉴턴 삼체 문제를 하나의 전역 공식으로
+해결했다고 주장하지 않는다. 대신 상태공간을 해석 가능한 chart로 나누고,
+각 chart에서 사용할 수 있는 계산/진단/정리 후보를 분리해 감사 가능한 연구
+atlas를 구축한다.
+
+현재 공개적으로 주장할 수 있는 범위는 다음과 같다.
+
+- 특정 초기조건과 목표시간에 대해 `r_i(t)` 또는 `Law(X_t)`를 계산하는 유한시간 예측 API.
+- 랜덤 삼체 초기조건을 생성하고 여러 readout을 고정밀 reference integration과 비교하는 데모.
+- Jacobi escape cone, hysteresis symbolic dynamics, static artifact verifier 같은 정리 후보/감사 산출물.
+- Sundman식 정규화 수렴급수 연구 계약. 단, 일반 삼체 문제의 유한 초등함수 전역해는 주장하지 않는다.
+
+논문용 claim 기준은 [Paper-Readiness Review](docs/PAPER_READINESS_REVIEW.md)와
+[Validation Guardrails](docs/VALIDATION_GUARDRAILS.md)를 우선한다.
 
 ## What Is Implemented
 

@@ -37,6 +37,12 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert gitattributes_path.exists()
     content = index_path.read_text(encoding="utf-8")
     assert "ThreeBody Dynamics Lab" in content
+    assert '<body class="lang-en">' in content
+    assert 'class="language-toggle"' in content
+    assert 'data-language="en"' in content
+    assert 'data-language="ko"' in content
+    assert "삼체 목표시각 답변" in content
+    assert "원래 문제의 답: t 시각 위치 또는 분포" in content
     assert '<link rel="icon" href="favicon.svg" type="image/svg+xml">' in content
     assert '<meta name="theme-color" content="#16212f">' in content
     assert 'class="floating-nav"' in content

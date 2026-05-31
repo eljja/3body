@@ -587,6 +587,36 @@ def _render_page(
       background: linear-gradient(135deg, #fbfdff 0%, #eef4f7 100%);
       font-family: Georgia, "Times New Roman", serif;
     }}
+    body.lang-en [data-lang="ko"], body.lang-ko [data-lang="en"] {{
+      display: none !important;
+    }}
+    .language-toggle {{
+      display: inline-flex;
+      width: fit-content;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }}
+    .language-toggle button {{
+      min-height: 32px;
+      padding: 0 10px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font: 700 0.78rem ui-monospace, SFMono-Regular, Consolas, monospace;
+      cursor: pointer;
+    }}
+    .language-toggle button.active,
+    .language-toggle button:hover,
+    .language-toggle button:focus-visible {{
+      border-color: var(--accent);
+      color: var(--accent);
+      outline: none;
+      background: rgba(11,132,243,0.08);
+    }}
     .floating-nav {{
       position: fixed;
       z-index: 20;
@@ -983,28 +1013,43 @@ def _render_page(
     }}
   </style>
 </head>
-<body>
+<body class="lang-en">
 {floating_nav}
 <main>
   <header>
+    <div class="language-toggle" aria-label="Language toggle">
+      <button type="button" class="language-button active" data-language="en" aria-pressed="true">English</button>
+      <button type="button" class="language-button" data-language="ko" aria-pressed="false">한국어</button>
+    </div>
     <div class="hero-lab">
       <div class="hero-copy">
         <h1>ThreeBody</h1>
-        <p>
+        <p data-lang="en">
           ThreeBody Dynamics Lab now focuses on the original mathematical target:
           given any Newtonian three-body initial state, compute <strong>r_i(t)</strong>
           when a point forecast is defensible, or report the pushed-forward probability law
           <strong>Law(X_t)</strong> when uncertainty dominates.
         </p>
-        <p>
+        <p data-lang="ko">
+          ThreeBody Dynamics Lab은 원래의 수학적 목표에 집중합니다. 임의의 뉴턴 삼체
+          초기조건이 주어졌을 때 점 예측이 방어 가능하면 <strong>r_i(t)</strong>를 계산하고,
+          불확실성이 지배적이면 밀어낸 확률법칙 <strong>Law(X_t)</strong>를 보고합니다.
+        </p>
+        <p data-lang="en">
           The public page is a static evidence bundle, not a live solver server. It embeds
           representative trajectories, diagnostics, symbolic-dynamics gates, and a compact
           target-answer certificate generated during deployment.
         </p>
+        <p data-lang="ko">
+          이 공개 페이지는 live solver 서버가 아니라 정적 증거 bundle입니다. 배포 시 생성된
+          대표 궤적, 진단, 기호동역학 gate, 압축 target-answer certificate를 포함합니다.
+        </p>
         <div class="hero-actions">
-          <button type="button" class="nav-panel-button" data-panel-target="threebody-answer">Inspect target answer</button>
-          <a href="certificate.json">Open certificate JSON</a>
-          <a href="manifest.json">Open manifest</a>
+          <button type="button" class="nav-panel-button" data-panel-target="threebody-answer">
+            <span data-lang="en">Inspect target answer</span><span data-lang="ko">목표 답변 보기</span>
+          </button>
+          <a href="certificate.json"><span data-lang="en">Open certificate JSON</span><span data-lang="ko">certificate JSON 열기</span></a>
+          <a href="manifest.json"><span data-lang="en">Open manifest</span><span data-lang="ko">manifest 열기</span></a>
         </div>
       </div>
       {target_answer_visual}
@@ -1021,41 +1066,67 @@ def _render_page(
   </div>
 
   <section id="target-answer">
-    <h2>Original problem answer: position or distribution at t</h2>
+    <h2><span data-lang="en">Original problem answer: position or distribution at t</span><span data-lang="ko">원래 문제의 답: t 시각 위치 또는 분포</span></h2>
     <div class="research-stack">
       <div class="stack-map">
         <div class="stack-step">
           <span>1</span>
-          <div><strong>Deterministic flow</strong><p>Integrate x(t)=Phi_t(x(0)) and read body coordinates r_i(t).</p></div>
+          <div>
+            <strong><span data-lang="en">Deterministic flow</span><span data-lang="ko">결정론적 흐름</span></strong>
+            <p data-lang="en">Integrate x(t)=Phi_t(x(0)) and read body coordinates r_i(t).</p>
+            <p data-lang="ko">x(t)=Phi_t(x(0))를 적분하고 각 물체 좌표 r_i(t)를 읽습니다.</p>
+          </div>
         </div>
         <div class="stack-step">
           <span>2</span>
-          <div><strong>Probability push-forward</strong><p>Propagate declared initial uncertainty through the same flow.</p></div>
+          <div>
+            <strong><span data-lang="en">Probability push-forward</span><span data-lang="ko">확률 push-forward</span></strong>
+            <p data-lang="en">Propagate declared initial uncertainty through the same flow.</p>
+            <p data-lang="ko">선언된 초기 불확실성을 같은 흐름으로 목표시각까지 전파합니다.</p>
+          </div>
         </div>
         <div class="stack-step">
           <span>3</span>
-          <div><strong>Sensitivity budget</strong><p>Compare propagated target-position spread against the tolerance horizon.</p></div>
+          <div>
+            <strong><span data-lang="en">Sensitivity budget</span><span data-lang="ko">민감도 예산</span></strong>
+            <p data-lang="en">Compare propagated target-position spread against the tolerance horizon.</p>
+            <p data-lang="ko">전파된 목표 위치 폭을 허용오차 horizon과 비교합니다.</p>
+          </div>
         </div>
         <div class="stack-step">
           <span>4</span>
-          <div><strong>Readout decision</strong><p>Promote point coordinates, probability regions, deterministic-only, or unresolved.</p></div>
+          <div>
+            <strong><span data-lang="en">Readout decision</span><span data-lang="ko">판독 결정</span></strong>
+            <p data-lang="en">Promote point coordinates, probability regions, deterministic-only, or unresolved.</p>
+            <p data-lang="ko">점 좌표, 확률 영역, 결정론 전용, 미해결 중 하나로 승격합니다.</p>
+          </div>
         </div>
       </div>
       <div>
-        <p>
+        <p data-lang="en">
           The compact API result on this page is the same contract exposed by
           <code>solve_three_body_target_positions(...)</code>. It deliberately avoids claiming a
           global closed form: the answer is a finite-time mathematical object plus numerical gates.
+        </p>
+        <p data-lang="ko">
+          이 페이지의 압축 API 결과는 <code>solve_three_body_target_positions(...)</code>가
+          노출하는 계약과 같습니다. 전역 닫힌형 해를 주장하지 않고, 유한시간 수학 객체와
+          수치 gate를 함께 제시합니다.
         </p>
         <div class="gate-grid">
           {_gate_card("Promoted claim", "pass", str(target_solution["claim"]), str(target_solution["recommended_mode"]))}
           {_gate_card("Readout", "pass", str(target_solution["target_readout_decision"]["primary_readout"]), "point vs distribution gate")}
           {_gate_card("Sensitivity ratio", "pass" if target_solution["target_sensitivity_budget"]["target_time_resolved"] else "wait", f"{target_solution['target_sensitivity_budget']['final_uncertainty_to_tolerance_ratio']:.3e}", "final uncertainty / tolerance")}
         </div>
-        <p>
+        <p data-lang="en">
           The build also runs a seeded random three-body challenge and checks four readouts against a
           stricter reference integration. This is the public success demonstration for arbitrary finite-time
           prediction, with the full result embedded in <code>certificate.json.random_prediction_demo</code>.
+        </p>
+        <p data-lang="ko">
+          빌드는 seed가 고정된 랜덤 삼체 챌린지도 실행하며, 네 가지 판독값을 더 엄격한
+          기준 적분과 비교합니다. 이는 임의 유한시간 예측의 공개 성공 데모이며 전체 결과는
+          <code>certificate.json.random_prediction_demo</code>에 들어 있습니다.
         </p>
         <div class="gate-grid">
           {_gate_card("Random demo", "pass" if random_prediction_demo["success_report"]["success"] else "wait", "seed 7", "generated initial state")}
@@ -1067,40 +1138,57 @@ def _render_page(
   </section>
 
   <section id="progress-map">
-    <h2>Research progress map</h2>
-    <p>
+    <h2><span data-lang="en">Research progress map</span><span data-lang="ko">연구 진행 지도</span></h2>
+    <p data-lang="en">
       The static site now shows how the verification engine changed from visual orbit demos into gated,
       falsifiable symbolic-dynamics evidence with held-out binary-phase validation. Each step below is
       backed by the current build output.
+    </p>
+    <p data-lang="ko">
+      정적 사이트는 검증 엔진이 단순 궤도 시각화에서 held-out binary-phase 검증을 포함한
+      반증 가능한 기호동역학 증거로 이동한 과정을 보여줍니다. 아래 단계는 현재 빌드 산출물에 근거합니다.
     </p>
     {progress_map}
   </section>
 
   <section id="change-ledger">
-    <h2>Current change ledger</h2>
-    <p>
+    <h2><span data-lang="en">Current change ledger</span><span data-lang="ko">현재 변경 요약</span></h2>
+    <p data-lang="en">
       This compact ledger shows the newest public-facing shifts: what became easier to audit,
       what became harder to spoof, and which research surface moved closer to the reduced
       shape-scale atlas target.
+    </p>
+    <p data-lang="ko">
+      이 압축 ledger는 최신 공개 변화, 감사가 쉬워진 지점, 위조가 어려워진 지점,
+      reduced shape-scale atlas 목표에 가까워진 연구 표면을 요약합니다.
     </p>
     {recent_change_ledger_html}
   </section>
 
   <section id="public-audit">
-    <h2>Public claim audit chain</h2>
-    <p>
+    <h2><span data-lang="en">Public claim audit chain</span><span data-lang="ko">공개 주장 감사 체인</span></h2>
+    <p data-lang="en">
       The public audit surface is intentionally compact: the page shows the four checks that make the current
       claim reviewable, while the full certificate and artifact manifest remain available as linked JSON files.
       CLI and threebody_engine API callers can apply the same public claim contract with one option.
+    </p>
+    <p data-lang="ko">
+      공개 감사 표면은 의도적으로 압축되어 있습니다. 페이지는 현재 주장을 검토 가능하게 하는
+      네 가지 검사를 보여주고, 전체 certificate와 artifact manifest는 JSON 링크로 제공합니다.
+      CLI와 threebody_engine API 호출자도 같은 공개 claim contract를 적용할 수 있습니다.
     </p>
     {claim_verification_seal}
   </section>
 
   <section id="engine-upgrades">
-    <h2>Verification engine upgrades</h2>
-    <p>
+    <h2><span data-lang="en">Verification engine upgrades</span><span data-lang="ko">검증 엔진 개선</span></h2>
+    <p data-lang="en">
       The latest build visualizes the move from trajectory display to certificate-driven research:
       Picard contraction tuning, hysteresis symbolic dynamics, and a public threebody-engine API surface.
+    </p>
+    <p data-lang="ko">
+      최신 빌드는 궤적 표시에서 certificate 기반 연구로 이동한 과정을 시각화합니다.
+      Picard 수축 튜닝, hysteresis 기호동역학, 공개 threebody-engine API 표면을 포함합니다.
     </p>
     <div class="upgrade-grid">
       {_upgrade_card("Picard contraction", "Scaled phase-space Jacobian tuning drives the representative tail below the target contraction threshold.", f"max {metrics['picard_max_contraction']:.3e}")}
@@ -1196,6 +1284,19 @@ audit = audit_public_static_artifacts_from_url("https://eljja.github.io/3body/",
 (() => {{
   const buttons = Array.from(document.querySelectorAll("[data-panel-target]"));
   const panels = Array.from(document.querySelectorAll("[data-panel-id]"));
+  const languageButtons = Array.from(document.querySelectorAll("[data-language]"));
+  const setLanguage = (language) => {{
+    const active = language === "ko" ? "ko" : "en";
+    document.body.classList.toggle("lang-ko", active === "ko");
+    document.body.classList.toggle("lang-en", active === "en");
+    document.documentElement.setAttribute("lang", active);
+    try {{ window.localStorage.setItem("threebody-language", active); }} catch (error) {{}}
+    languageButtons.forEach((button) => {{
+      const selected = button.dataset.language === active;
+      button.classList.toggle("active", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+    }});
+  }};
   const activatePanel = (panelId) => {{
     panels.forEach((panel) => {{
       panel.classList.toggle("active", panel.dataset.panelId === panelId);
@@ -1209,7 +1310,13 @@ audit = audit_public_static_artifacts_from_url("https://eljja.github.io/3body/",
   buttons.forEach((button) => {{
     button.addEventListener("click", () => activatePanel(button.dataset.panelTarget));
   }});
+  languageButtons.forEach((button) => {{
+    button.addEventListener("click", () => setLanguage(button.dataset.language));
+  }});
   activatePanel("threebody-answer");
+  let savedLanguage = "en";
+  try {{ savedLanguage = window.localStorage.getItem("threebody-language") || "en"; }} catch (error) {{}}
+  setLanguage(savedLanguage);
 }})();
 </script>
 </body>
