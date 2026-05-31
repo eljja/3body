@@ -43,6 +43,10 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert 'data-language="ko"' in content
     assert "삼체 목표시각 답변" in content
     assert "원래 문제의 답: t 시각 위치 또는 분포" in content
+    assert "이체 문제 해석적 기준선" in content
+    assert "Picard 및 기호동역학 승격 gate" in content
+    assert "빌드 출처와 재현 정보" in content
+    assert "GitHub 저장소" in content
     assert '<link rel="icon" href="favicon.svg" type="image/svg+xml">' in content
     assert '<meta name="theme-color" content="#16212f">' in content
     assert 'class="floating-nav"' in content
@@ -62,7 +66,8 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert "Twin Prime Workbench" in content
     assert "Proof Workbench" not in content
     assert 'href="https://github.com/eljja/3body"' in content
-    assert 'target="_blank" rel="noopener noreferrer">GitHub repo</a>' in content
+    assert 'target="_blank" rel="noopener noreferrer">' in content
+    assert ">GitHub repo</span>" in content
     assert "General three-body figure-eight" in content
     assert "autoscale extent" in content
     assert "scaleanchor" not in content

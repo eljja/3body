@@ -225,7 +225,8 @@ def render_floating_nav() -> str:
         '<nav class="floating-nav" aria-label="Content panel navigation">'
         f"{buttons}"
         f'<a class="repo-link" href="{html.escape(GITHUB_REPO_URL)}" data-short="GH" '
-        'target="_blank" rel="noopener noreferrer">GitHub repo</a>'
+        'target="_blank" rel="noopener noreferrer">'
+        '<span data-lang="en">GitHub repo</span><span data-lang="ko">GitHub 저장소</span></a>'
         "</nav>"
     )
 

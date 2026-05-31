@@ -326,26 +326,26 @@ def _render_page(
     }
 
     figures = [
-        _orbit_figure_2d([two_body.y[:, :2]], ["Relative orbit"], "Two-body Kepler baseline"),
-        _line_figure(two_body.t, two_invariants["energy_drift"], "Two-body energy drift", "dE"),
+        _orbit_figure_2d([two_body.y[:, :2]], ["상대 궤도 / Relative orbit"], "이체 Kepler 기준선 / Two-body Kepler baseline"),
+        _line_figure(two_body.t, two_invariants["energy_drift"], "이체 에너지 보존 오차 / Two-body energy drift", "dE"),
         _animated_orbit_figure_2d(
             [restricted.y[:, :2]],
-            ["Test particle"],
-            "Restricted three-body near L4",
+            ["시험입자 / Test particle"],
+            "제한 삼체 L4 근방 / Restricted three-body near L4",
             static_points=restricted_system.primary_positions,
-            static_labels=["Primary 1", "Primary 2"],
+            static_labels=["주천체 1 / Primary 1", "주천체 2 / Primary 2"],
         ),
-        _line_figure(restricted.t, restricted_invariants["jacobi_drift"], "Restricted Jacobi drift", "dC"),
+        _line_figure(restricted.t, restricted_invariants["jacobi_drift"], "제한 삼체 Jacobi 보존 오차 / Restricted Jacobi drift", "dC"),
         _animated_orbit_figure_2d(
             [body_paths[:, index, :] for index in range(general_system.body_count)],
-            ["Body 1", "Body 2", "Body 3"],
-            "General three-body figure-eight",
+            ["물체 1 / Body 1", "물체 2 / Body 2", "물체 3 / Body 3"],
+            "일반 삼체 8자 궤도 / General three-body figure-eight",
         ),
-        _line_figure(general.t, general_invariants["energy_drift"], "General energy drift", "dE"),
+        _line_figure(general.t, general_invariants["energy_drift"], "일반 삼체 에너지 보존 오차 / General energy drift", "dE"),
         _animated_orbit_figure_2d(
             [flyby_paths[:, index, :] for index in range(jacobi_flyby_system.body_count)],
-            ["Binary 1", "Binary 2", "Escaper"],
-            "Jacobi escape-cone flyby",
+            ["쌍성 1 / Binary 1", "쌍성 2 / Binary 2", "탈출체 / Escaper"],
+            "Jacobi 탈출 원뿔 flyby / Jacobi escape-cone flyby",
         ),
         _jacobi_certificate_figure(jacobi_summary),
         _picard_certificate_figure(jacobi_summary),
@@ -433,18 +433,24 @@ def _render_page(
                 "pass" if promotion_gates["picard_certified"] else "wait",
                 f"reserve {promotion_gates['picard_contraction_reserve']:.3e}",
                 "target < 0.35",
+                title_ko="Picard 수축",
+                detail_ko="목표 수축률 < 0.35",
             ),
             _gate_card(
                 "Hysteresis baseline",
                 "pass" if promotion_gates["hysteresis_significant_baseline_win"] else "wait",
                 f"beats_baseline: {str(promotion_gates['hysteresis_beats_independent_baseline']).lower()}",
                 f"95% gain CI [{promotion_gates['hysteresis_log_likelihood_gain_ci'][0]:.2e}, {promotion_gates['hysteresis_log_likelihood_gain_ci'][1]:.2e}]",
+                title_ko="Hysteresis 기준선",
+                detail_ko=f"95% 이득 신뢰구간 [{promotion_gates['hysteresis_log_likelihood_gain_ci'][0]:.2e}, {promotion_gates['hysteresis_log_likelihood_gain_ci'][1]:.2e}]",
             ),
             _gate_card(
                 "Markov order",
                 "pass",
                 f"order {promotion_gates['hysteresis_selected_markov_order']}",
                 f"BIC memory selected: {str(promotion_gates['hysteresis_memory_order_selected']).lower()}",
+                title_ko="Markov 차수",
+                detail_ko=f"BIC가 memory를 선택했는지: {str(promotion_gates['hysteresis_memory_order_selected']).lower()}",
             ),
             _gate_card(
                 "Poincare memory",
@@ -460,18 +466,24 @@ def _render_page(
                 else "wait",
                 f"{promotion_gates['poincare_best_coordinate']}: {promotion_gates['poincare_best_coordinate_crossing_count']}",
                 f"perm gap {promotion_gates['poincare_permutation_control_gap']:.2e}",
+                title_ko="Poincare memory",
+                detail_ko=f"permutation gap {promotion_gates['poincare_permutation_control_gap']:.2e}",
             ),
             _gate_card(
                 "Section robustness",
                 "pass" if promotion_gates["poincare_passes_section_robustness"] else "wait",
                 f"{promotion_gates['poincare_section_robust_pass_count']} section passes",
                 f"fraction {promotion_gates['poincare_section_robust_pass_fraction']:.2f}",
+                title_ko="Section 강건성",
+                detail_ko=f"통과 비율 {promotion_gates['poincare_section_robust_pass_fraction']:.2f}",
             ),
             _gate_card(
                 "Stride robustness",
                 "pass" if promotion_gates["symbolic_passes_stride_robustness"] else "wait",
                 f"{promotion_gates['symbolic_stride_robust_pass_count']} stride passes",
                 f"fraction {promotion_gates['symbolic_stride_robust_pass_fraction']:.2f}",
+                title_ko="Stride 강건성",
+                detail_ko=f"통과 비율 {promotion_gates['symbolic_stride_robust_pass_fraction']:.2f}",
             ),
         ]
     )
@@ -1041,8 +1053,8 @@ def _render_page(
           target-answer certificate generated during deployment.
         </p>
         <p data-lang="ko">
-          이 공개 페이지는 live solver 서버가 아니라 정적 증거 bundle입니다. 배포 시 생성된
-          대표 궤적, 진단, 기호동역학 gate, 압축 target-answer certificate를 포함합니다.
+          이 공개 페이지는 실시간 계산 서버가 아니라 정적 증거 묶음입니다. 배포 시 생성된
+          대표 궤적, 진단, 기호동역학 판정 gate, 압축 목표답변 certificate를 포함합니다.
         </p>
         <div class="hero-actions">
           <button type="button" class="nav-panel-button" data-panel-target="threebody-answer">
@@ -1059,10 +1071,10 @@ def _render_page(
   {content_workspace}
 
   <div class="grid">
-    {_metric_card("Two-body energy drift", metrics["two_body_max_energy_drift"])}
-    {_metric_card("Restricted Jacobi drift", metrics["restricted_max_jacobi_drift"])}
-    {_metric_card("General energy drift", metrics["general_max_energy_drift"])}
-    {_metric_card("Figure-eight FTLE", metrics["figure_eight_finite_time_lyapunov"])}
+    {_metric_card("Two-body energy drift", metrics["two_body_max_energy_drift"], label_ko="이체 에너지 보존 오차")}
+    {_metric_card("Restricted Jacobi drift", metrics["restricted_max_jacobi_drift"], label_ko="제한 삼체 Jacobi 보존 오차")}
+    {_metric_card("General energy drift", metrics["general_max_energy_drift"], label_ko="일반 삼체 에너지 보존 오차")}
+    {_metric_card("Figure-eight FTLE", metrics["figure_eight_finite_time_lyapunov"], label_ko="8자 궤도 유한시간 Lyapunov 지수")}
   </div>
 
   <section id="target-answer">
@@ -1114,9 +1126,9 @@ def _render_page(
           수치 gate를 함께 제시합니다.
         </p>
         <div class="gate-grid">
-          {_gate_card("Promoted claim", "pass", str(target_solution["claim"]), str(target_solution["recommended_mode"]))}
-          {_gate_card("Readout", "pass", str(target_solution["target_readout_decision"]["primary_readout"]), "point vs distribution gate")}
-          {_gate_card("Sensitivity ratio", "pass" if target_solution["target_sensitivity_budget"]["target_time_resolved"] else "wait", f"{target_solution['target_sensitivity_budget']['final_uncertainty_to_tolerance_ratio']:.3e}", "final uncertainty / tolerance")}
+          {_gate_card("Promoted claim", "pass", str(target_solution["claim"]), str(target_solution["recommended_mode"]), title_ko="승격된 주장", detail_ko="현재 빌드가 공개해도 된다고 판정한 답변 유형")}
+          {_gate_card("Readout", "pass", str(target_solution["target_readout_decision"]["primary_readout"]), "point vs distribution gate", title_ko="판독 방식", detail_ko="점 예측과 확률분포 중 무엇을 읽어야 하는지 결정하는 gate")}
+          {_gate_card("Sensitivity ratio", "pass" if target_solution["target_sensitivity_budget"]["target_time_resolved"] else "wait", f"{target_solution['target_sensitivity_budget']['final_uncertainty_to_tolerance_ratio']:.3e}", "final uncertainty / tolerance", title_ko="민감도 비율", detail_ko="최종 불확실성 / 허용오차")}
         </div>
         <p data-lang="en">
           The build also runs a seeded random three-body challenge and checks four readouts against a
@@ -1129,9 +1141,9 @@ def _render_page(
           <code>certificate.json.random_prediction_demo</code>에 들어 있습니다.
         </p>
         <div class="gate-grid">
-          {_gate_card("Random demo", "pass" if random_prediction_demo["success_report"]["success"] else "wait", "seed 7", "generated initial state")}
-          {_gate_card("Point error", "pass" if random_prediction_demo["success_report"]["point_forecast_max_body_position_error"] <= random_prediction_demo["success_report"]["success_tolerance"] else "wait", f"{random_prediction_demo['success_report']['point_forecast_max_body_position_error']:.3e}", f"tol {random_prediction_demo['success_report']['success_tolerance']:.1e}")}
-          {_gate_card("Energy drift", "pass" if random_prediction_demo["success_report"]["maximum_relative_energy_drift"] <= 1.0e-8 else "wait", f"{random_prediction_demo['success_report']['maximum_relative_energy_drift']:.3e}", str(random_prediction_demo["success_report"]["close_approach_warning_level"]))}
+          {_gate_card("Random demo", "pass" if random_prediction_demo["success_report"]["success"] else "wait", "seed 7", "generated initial state", title_ko="랜덤 데모", detail_ko="seed 7로 생성한 초기조건")}
+          {_gate_card("Point error", "pass" if random_prediction_demo["success_report"]["point_forecast_max_body_position_error"] <= random_prediction_demo["success_report"]["success_tolerance"] else "wait", f"{random_prediction_demo['success_report']['point_forecast_max_body_position_error']:.3e}", f"tol {random_prediction_demo['success_report']['success_tolerance']:.1e}", title_ko="점 위치 오차", detail_ko=f"허용오차 {random_prediction_demo['success_report']['success_tolerance']:.1e}")}
+          {_gate_card("Energy drift", "pass" if random_prediction_demo["success_report"]["maximum_relative_energy_drift"] <= 1.0e-8 else "wait", f"{random_prediction_demo['success_report']['maximum_relative_energy_drift']:.3e}", str(random_prediction_demo["success_report"]["close_approach_warning_level"]), title_ko="에너지 보존 오차", detail_ko="근접조우 경고 수준")}
         </div>
       </div>
     </div>
@@ -1191,14 +1203,15 @@ def _render_page(
       Picard 수축 튜닝, hysteresis 기호동역학, 공개 threebody-engine API 표면을 포함합니다.
     </p>
     <div class="upgrade-grid">
-      {_upgrade_card("Picard contraction", "Scaled phase-space Jacobian tuning drives the representative tail below the target contraction threshold.", f"max {metrics['picard_max_contraction']:.3e}")}
-      {_upgrade_card("Hysteresis grammar", "Return-map chart words are evaluated as a Markov chain and compared against an independent next-symbol baseline.", f"ratio {metrics['hysteresis_markov_perplexity_ratio']:.3e}")}
-      {_upgrade_card("Engine API", "The static page mirrors the JSON-ready promotion gates exposed by threebody_engine.run_verification_report.", "api ready")}
+      {_upgrade_card("Picard contraction", "Scaled phase-space Jacobian tuning drives the representative tail below the target contraction threshold.", f"max {metrics['picard_max_contraction']:.3e}", title_ko="Picard 수축", body_ko="스케일 조정된 위상공간 Jacobian 튜닝으로 대표 꼬리 구간의 수축률을 목표 임계값 아래로 낮춥니다.")}
+      {_upgrade_card("Hysteresis grammar", "Return-map chart words are evaluated as a Markov chain and compared against an independent next-symbol baseline.", f"ratio {metrics['hysteresis_markov_perplexity_ratio']:.3e}", title_ko="Hysteresis 문법", body_ko="return-map chart word를 Markov chain으로 평가하고 독립 next-symbol 기준선과 비교합니다.")}
+      {_upgrade_card("Engine API", "The static page mirrors the JSON-ready promotion gates exposed by threebody_engine.run_verification_report.", "api ready", title_ko="엔진 API", body_ko="정적 페이지는 threebody_engine.run_verification_report가 내보내는 JSON-ready 승격 gate를 그대로 반영합니다.")}
     </div>
   </section>
 
   <section id="two-body">
-    <h2>Two-body analytic baseline</h2>
+    <h2><span data-lang="en">Two-body analytic baseline</span><span data-lang="ko">이체 문제 해석적 기준선</span></h2>
+    <p data-lang="ko">먼저 정확한 해석해가 있는 이체 궤도로 적분기와 보존량 오차의 기준선을 세웁니다. 그래프 제목에는 원래 영문 실험명이 남아 있지만, 이 섹션의 의미는 “기준 적분 검증”입니다.</p>
     <div class="figure-grid">
       <div>{figure_html[0]}</div>
       <div>{figure_html[1]}</div>
@@ -1206,7 +1219,8 @@ def _render_page(
   </section>
 
   <section id="restricted-l4">
-    <h2>Restricted three-body L4 transport</h2>
+    <h2><span data-lang="en">Restricted three-body L4 transport</span><span data-lang="ko">제한 삼체 L4 수송</span></h2>
+    <p data-lang="ko">두 주천체가 만드는 L4 근방에서 시험입자의 이동과 Jacobi 보존량 오차를 확인합니다. 이전에 y축이 잘리던 영역은 자동 스케일 보조 trace로 전체 궤적 범위를 포함합니다.</p>
     <div class="figure-grid">
       <div>{figure_html[2]}</div>
       <div>{figure_html[3]}</div>
@@ -1214,7 +1228,8 @@ def _render_page(
   </section>
 
   <section id="figure-eight">
-    <h2>General three-body figure-eight</h2>
+    <h2><span data-lang="en">General three-body figure-eight</span><span data-lang="ko">일반 삼체 8자 궤도</span></h2>
+    <p data-lang="ko">동일 질량 삼체의 대표적인 8자 궤도를 사용해 일반 삼체 적분과 에너지 보존 오차를 함께 보여줍니다.</p>
     <div class="figure-grid">
       <div>{figure_html[4]}</div>
       <div>{figure_html[5]}</div>
@@ -1222,11 +1237,15 @@ def _render_page(
   </section>
 
   <section id="jacobi-certificate">
-    <h2>Jacobi escape-cone theorem candidate</h2>
-    <p>
+    <h2><span data-lang="en">Jacobi escape-cone theorem candidate</span><span data-lang="ko">Jacobi 탈출 원뿔 정리 후보</span></h2>
+    <p data-lang="en">
       Representative hierarchical flyby used to visualize the current theorem candidate:
       Jacobi split, quadrupole future-tail reserve, inflated lower margin, self-consistent radial floor,
       open-cone radius, and quadrupole acceleration envelope.
+    </p>
+    <p data-lang="ko">
+      현재 정리 후보를 시각화하기 위한 계층적 flyby 사례입니다. Jacobi 분해, quadrupole 미래 꼬리 reserve,
+      inflated lower margin, 자기일관 radial floor, open-cone 반지름, quadrupole 가속 envelope를 함께 봅니다.
     </p>
     <div class="figure-grid">
       <div>{figure_html[6]}</div>
@@ -1235,10 +1254,14 @@ def _render_page(
   </section>
 
   <section id="promotion-gates">
-    <h2>Picard and symbolic-dynamics promotion gates</h2>
-    <p>
+    <h2><span data-lang="en">Picard and symbolic-dynamics promotion gates</span><span data-lang="ko">Picard 및 기호동역학 승격 gate</span></h2>
+    <p data-lang="en">
       These panels expose the newest proof-engine changes: automatic Picard tuning with contraction reserve,
       and hysteresis grammar tested against a non-memory baseline.
+    </p>
+    <p data-lang="ko">
+      최신 증명 엔진 변화입니다. 수축 reserve를 포함한 자동 Picard 튜닝과,
+      memory가 없는 기준선과 비교한 hysteresis grammar 검정을 보여줍니다.
     </p>
     <div class="gate-grid">
       {gate_cards}
@@ -1250,7 +1273,8 @@ def _render_page(
   </section>
 
   <section id="atlas-snapshot">
-    <h2>Analysis atlas snapshot</h2>
+    <h2><span data-lang="en">Analysis atlas snapshot</span><span data-lang="ko">분석 atlas 스냅샷</span></h2>
+    <p data-lang="ko">아래 JSON은 chart 분포와 전이 행을 그대로 보여주는 감사용 원자료입니다. 영문 key는 API와 논문 부록에서 그대로 재현성을 유지하기 위해 보존합니다.</p>
     <div class="figure-grid">
       <pre>{html.escape(json.dumps(chart_distribution, indent=2, sort_keys=True))}</pre>
       <pre>{html.escape(json.dumps(transition_rows, indent=2))}</pre>
@@ -1258,20 +1282,24 @@ def _render_page(
   </section>
 
   <section id="build-provenance">
-    <h2>Build provenance</h2>
-    <p>
+    <h2><span data-lang="en">Build provenance</span><span data-lang="ko">빌드 출처와 재현 정보</span></h2>
+    <p data-lang="en">
       This block records the deployment identity behind the embedded numerical evidence, so public figures can be
       traced back to a commit, workflow run, Python runtime, and generation timestamp.
     </p>
+    <p data-lang="ko">
+      이 블록은 내장된 수치 증거가 어떤 배포에서 나왔는지 기록합니다. 공개 그림과 certificate를
+      commit, workflow run, Python runtime, 생성 시각까지 추적할 수 있게 합니다.
+    </p>
     <div class="gate-grid">
-      {_provenance_card("Commit", str(provenance["commit_sha_short"]), str(provenance["ref_name"]))}
-      {_provenance_card("Run", str(provenance["run_id"]), str(provenance["run_attempt"]))}
-      {_provenance_card("Generated UTC", str(provenance["generated_at_utc"]), str(provenance["python_version"]))}
+      {_provenance_card("Commit", str(provenance["commit_sha_short"]), str(provenance["ref_name"]), title_ko="커밋")}
+      {_provenance_card("Run", str(provenance["run_id"]), str(provenance["run_attempt"]), title_ko="실행")}
+      {_provenance_card("Generated UTC", str(provenance["generated_at_utc"]), str(provenance["python_version"]), title_ko="생성 시각 UTC")}
     </div>
     <p>
-      <a href="certificate.json">Open machine-readable certificate JSON</a>
+      <a href="certificate.json"><span data-lang="en">Open machine-readable certificate JSON</span><span data-lang="ko">기계판독 certificate JSON 열기</span></a>
       ·
-      <a href="manifest.json">Open artifact integrity manifest</a>
+      <a href="manifest.json"><span data-lang="en">Open artifact integrity manifest</span><span data-lang="ko">artifact 무결성 manifest 열기</span></a>
     </p>
     <pre>{public_verify_command}
 python -m threebody.cli verify-static-artifacts --site-dir site --require-commit local --require-public-claim
@@ -1343,20 +1371,20 @@ def _target_answer_visual(target_solution: dict[str, object]) -> str:
         '<div class="answer-board">'
         f"{_target_orbit_svg(target_solution)}"
         '<div class="answer-flow">'
-        '<div class="flow-cell"><span>Point object</span><strong>Deterministic target positions</strong><code>r_i(t) = Pi_r Phi_t(x0)</code></div>'
-        '<div class="flow-cell"><span>Distribution object</span><strong>Push-forward uncertainty law</strong><code>Law(X_t) = (Phi_t)# Law(X0)</code></div>'
-        '<div class="flow-cell"><span>Decision object</span>'
-        f"<strong>{html.escape(primary_readout)}</strong><code>{html.escape(claim)}</code></div>"
+        f'<div class="flow-cell"><span>{_lang_text("Point object", "점 위치 객체")}</span><strong>{_lang_text("Deterministic target positions", "결정론적 목표 위치")}</strong><code>r_i(t) = Pi_r Phi_t(x0)</code></div>'
+        f'<div class="flow-cell"><span>{_lang_text("Distribution object", "분포 객체")}</span><strong>{_lang_text("Push-forward uncertainty law", "밀어낸 불확실성 법칙")}</strong><code>Law(X_t) = (Phi_t)# Law(X0)</code></div>'
+        f'<div class="flow-cell"><span>{_lang_text("Decision object", "판정 객체")}</span>'
+        f"<strong>{_lang_text(primary_readout, _readout_ko(primary_readout))}</strong><code>{html.escape(claim)}</code></div>"
         "</div>"
         '<div class="answer-strip">'
-        f'{_answer_stat("Mode", mode)}'
-        f'{_answer_stat("Uncertainty / tol", _format_scientific(ratio))}'
-        f'{_answer_stat("Amplification", _format_scientific(amplification))}'
-        f'{_answer_stat("Min pair distance", _format_scientific(min_pair))}'
-        f'{_answer_stat("Sampling", sampling)}'
-        f'{_answer_stat("Perimeter", _format_scientific(perimeter))}'
-        f'{_answer_stat("Certificate", certificate_digest)}'
-        f'{_answer_stat("Horizon", "resolved" if budget["target_time_resolved"] else "unresolved")}'
+        f'{_answer_stat("Mode", mode, label_ko="모드", value_ko=_mode_ko(mode))}'
+        f'{_answer_stat("Uncertainty / tol", _format_scientific(ratio), label_ko="불확실성 / 허용오차")}'
+        f'{_answer_stat("Amplification", _format_scientific(amplification), label_ko="불확실성 증폭")}'
+        f'{_answer_stat("Min pair distance", _format_scientific(min_pair), label_ko="최소 쌍 거리")}'
+        f'{_answer_stat("Sampling", sampling, label_ko="표본화 품질", value_ko=_sampling_ko(sampling))}'
+        f'{_answer_stat("Perimeter", _format_scientific(perimeter), label_ko="삼각형 둘레")}'
+        f'{_answer_stat("Certificate", certificate_digest, label_ko="검증 digest")}'
+        f'{_answer_stat("Horizon", "resolved" if budget["target_time_resolved"] else "unresolved", label_ko="예측 지평", value_ko="해상됨" if budget["target_time_resolved"] else "미해상")}'
         "</div>"
         "</div>"
     )
@@ -1400,7 +1428,7 @@ def _target_orbit_svg(target_solution: dict[str, object]) -> str:
         body_marks.append(f'<circle cx="{x_value:.2f}" cy="{y_value:.2f}" r="7" fill="{color}"/>')
         body_marks.append(
             f'<text x="{x_value + 12:.2f}" y="{y_value - 10:.2f}" fill="#16212f" font-size="13" '
-            f'font-family="ui-monospace, Consolas, monospace">body {index}</text>'
+            f'font-family="ui-monospace, Consolas, monospace">body {index} / 물체 {index}</text>'
         )
     path_points = " ".join(f"{x_value:.2f},{y_value:.2f}" for x_value, y_value in projected)
     return (
@@ -1411,17 +1439,46 @@ def _target_orbit_svg(target_solution: dict[str, object]) -> str:
         '<path d="M70 62 C160 160 250 32 340 142 S500 278 594 164" fill="none" stroke="#e8eef6" stroke-width="2"/>'
         f'<polyline points="{path_points}" fill="none" stroke="#16212f" stroke-width="1.8" stroke-dasharray="6 7" opacity="0.48"/>'
         f'{"".join(body_marks)}'
-        '<text x="28" y="32" fill="#16212f" font-size="18" font-family="Georgia, Times New Roman, serif">target-time geometry</text>'
-        '<text x="28" y="316" fill="#667085" font-size="13" font-family="ui-monospace, Consolas, monospace">ellipses: empirical 95% region proxy, points: deterministic r_i(t)</text>'
+        '<text x="28" y="32" fill="#16212f" font-size="18" font-family="Georgia, Times New Roman, serif">목표시각 기하 / target-time geometry</text>'
+        '<text x="28" y="316" fill="#667085" font-size="13" font-family="ui-monospace, Consolas, monospace">타원: 경험적 95% 영역, 점: 결정론적 r_i(t)</text>'
         "</svg>"
     )
 
 
-def _answer_stat(label: str, value: str) -> str:
+def _readout_ko(value: str) -> str:
+    translations = {
+        "point-positions-with-probability-regions": "점 위치와 확률 영역",
+        "probability-distribution": "확률분포",
+        "deterministic-coordinates-only": "결정론 좌표만",
+        "unresolved": "미해결",
+    }
+    return translations.get(value, value)
+
+
+def _mode_ko(value: str) -> str:
+    translations = {
+        "linearized-gaussian": "선형화 Gaussian",
+        "empirical-ensemble": "경험적 ensemble",
+        "deterministic-only": "결정론 전용",
+        "unresolved": "미해결",
+    }
+    return translations.get(value, value)
+
+
+def _sampling_ko(value: str) -> str:
+    translations = {
+        "well-sampled": "표본 충분",
+        "coarse": "표본 거침",
+        "under-sampled": "표본 부족",
+    }
+    return translations.get(value, value)
+
+
+def _answer_stat(label: str, value: str, *, label_ko: str | None = None, value_ko: str | None = None) -> str:
     return (
         '<div class="answer-stat">'
-        f"<span>{html.escape(label)}</span>"
-        f"<strong>{html.escape(value)}</strong>"
+        f"<span>{_lang_text(label, label_ko or label)}</span>"
+        f"<strong>{_lang_text(value, value_ko or value)}</strong>"
         "</div>"
     )
 
@@ -1469,31 +1526,47 @@ def _recent_change_ledger(
     return [
         {
             "stage": "Random forecast",
+            "stage_ko": "랜덤 예측",
             "title": "Random target demo",
+            "title_ko": "랜덤 목표시각 데모",
             "detail": "A seeded arbitrary initial state is generated and four readouts are compared against a stricter reference integration.",
+            "detail_ko": "seed가 고정된 임의 초기조건을 만들고 네 가지 판독값을 더 엄격한 기준 적분과 비교합니다.",
             "value": f"err={point_error:.2e}",
             "status": random_status,
+            "status_ko": "통과" if random_status == "passed" else "검토",
         },
         {
             "stage": "Target answer",
+            "stage_ko": "목표시각 답변",
             "title": "Position or distribution",
+            "title_ko": "위치 또는 분포",
             "detail": "The operational answer remains a finite-time flow-map coordinate when resolved, otherwise a pushed-forward probability law.",
+            "detail_ko": "해상 가능한 경우 유한시간 flow-map 좌표를 답하고, 그렇지 않으면 밀어낸 확률법칙을 답합니다.",
             "value": "r_i(t)_or_Law(X_t)",
             "status": "implemented",
+            "status_ko": "구현됨",
         },
         {
             "stage": "Closed-form boundary",
+            "stage_ko": "닫힌형 경계",
             "title": "Sundman route scoped",
+            "title_ko": "Sundman 경로 범위화",
             "detail": "The global analytic discussion is kept separate from the practical finite-time solver and does not claim an elementary formula.",
+            "detail_ko": "전역 해석 논의는 실용적인 유한시간 solver와 분리하며 초등함수 공식을 주장하지 않습니다.",
             "value": "closed_form_contract",
             "status": "scoped",
+            "status_ko": "범위 한정",
         },
         {
             "stage": "Audit identity",
+            "stage_ko": "감사 식별자",
             "title": "Certificate validation",
+            "title_ko": "Certificate 검증",
             "detail": "The target answer payload and public Pages artifact bundle are digest-pinned for reproducible external review.",
+            "detail_ko": "목표 답변 payload와 public Pages artifact bundle을 digest로 고정해 외부 재현 검토가 가능하게 합니다.",
             "value": verifier_feature_set_sha256[:12],
             "status": "pinned",
+            "status_ko": "고정됨",
         },
     ]
 
@@ -1502,11 +1575,11 @@ def _recent_change_ledger_html(rows: list[dict[str, str]]) -> str:
     cards = "\n".join(
         (
             '<div class="change-card">'
-            f'<span class="change-kicker">{html.escape(row["stage"])}</span>'
-            f'<strong>{html.escape(row["title"])}</strong>'
-            f'<p>{html.escape(row["detail"])}</p>'
+            f'<span class="change-kicker">{_lang_text(row["stage"], row.get("stage_ko", row["stage"]))}</span>'
+            f'<strong>{_lang_text(row["title"], row.get("title_ko", row["title"]))}</strong>'
+            f'<p>{_lang_text(row["detail"], row.get("detail_ko", row["detail"]))}</p>'
             f'<code>{html.escape(row["value"])}</code>'
-            f'<span class="change-status">{html.escape(row["status"])}</span>'
+            f'<span class="change-status">{_lang_text(row["status"], row.get("status_ko", row["status"]))}</span>'
             "</div>"
         )
         for row in rows
@@ -1523,27 +1596,39 @@ def _public_change_summary(
     return [
         {
             "title": "Commit-pinned build",
+            "title_ko": "커밋 고정 빌드",
             "status": "pass",
+            "status_ko": "통과",
             "value": str(provenance["commit_sha_short"]),
             "detail": "The visible page, certificate, manifest, and branch line-ending policy are tied to one build provenance record.",
+            "detail_ko": "보이는 페이지, certificate, manifest, 브랜치 line-ending 정책이 하나의 빌드 출처 기록에 묶여 있습니다.",
         },
         {
             "title": "Scientific gate profile",
+            "title_ko": "과학적 gate profile",
             "status": "pass",
+            "status_ko": "통과",
             "value": f"{public_gate_summary['pass_count']} / {public_gate_summary['total']} gates",
             "detail": "Picard, Poincare, permutation, section, and stride gates are verified as one claim set.",
+            "detail_ko": "Picard, Poincare, permutation, section, stride gate를 하나의 주장 묶음으로 검증합니다.",
         },
         {
             "title": "Bounded numerical drift",
+            "title_ko": "제한된 수치 drift",
             "status": "pass",
+            "status_ko": "통과",
             "value": f"{metrics['general_max_energy_drift']:.2e}",
             "detail": "The public profile fixes upper bounds for invariant drift and Picard contraction.",
+            "detail_ko": "공개 profile은 보존량 drift와 Picard 수축의 상한을 고정합니다.",
         },
         {
             "title": "Active profile digest",
+            "title_ko": "활성 profile digest",
             "status": "pass",
+            "status_ko": "통과",
             "value": profile_sha256,
             "detail": "The active certificate profile and canonical descriptor digest must both match verifier expectations; CLI and threebody_engine callers share the same public verifier shortcut.",
+            "detail_ko": "활성 certificate profile과 canonical descriptor digest가 verifier 기대값과 일치해야 합니다. CLI와 threebody_engine 호출자는 같은 공개 verifier shortcut을 씁니다.",
         },
     ]
 
@@ -1556,10 +1641,10 @@ def _claim_verification_seal(
     checks = "\n".join(
         (
             f'<div class="seal-check {html.escape(str(row["status"]))}">'
-            f'<span>{html.escape(str(row["status"]).upper())}</span>'
-            f"<strong>{html.escape(str(row['title']))}</strong>"
+            f'<span>{_lang_text(str(row["status"]).upper(), str(row.get("status_ko", row["status"])))}</span>'
+            f"<strong>{_lang_text(str(row['title']), str(row.get('title_ko', row['title'])))}</strong>"
             f"<code>{html.escape(str(row['value']))}</code>"
-            f"<p>{html.escape(str(row['detail']))}</p>"
+            f"<p>{_lang_text(str(row['detail']), str(row.get('detail_ko', row['detail'])))}</p>"
             "</div>"
         )
         for row in rows
@@ -1567,13 +1652,13 @@ def _claim_verification_seal(
     return (
         '<div class="claim-seal">'
         '<div class="seal-digest">'
-        "<span>Canonical public claim profile</span>"
+        f"<span>{_lang_text('Canonical public claim profile', '표준 공개 주장 profile')}</span>"
         f"<strong>{html.escape(PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE)}</strong>"
         f"<code>{html.escape(profile_sha256)}</code>"
-        "<p>The verifier requires this active profile name, its digest, and the canonical descriptor to agree.</p>"
-        "<span>Verifier capability set</span>"
+        f"<p>{_lang_text('The verifier requires this active profile name, its digest, and the canonical descriptor to agree.', '검증기는 활성 profile 이름, digest, canonical descriptor가 서로 일치하는지 확인합니다.')}</p>"
+        f"<span>{_lang_text('Verifier capability set', '검증기 기능 집합')}</span>"
         f"<code>{html.escape(verifier_feature_set_sha256)}</code>"
-        "<p>Audit commands pin the advertised verifier feature list as one ordered SHA-256 digest.</p>"
+        f"<p>{_lang_text('Audit commands pin the advertised verifier feature list as one ordered SHA-256 digest.', '감사 명령은 검증기가 광고한 기능 목록을 순서가 있는 SHA-256 digest 하나로 고정합니다.')}</p>"
         "</div>"
         f'<div class="seal-checks">{checks}</div>'
         "</div>"
@@ -1642,56 +1727,72 @@ def _progress_map(
     steps = (
         (
             "Picard contraction",
+            "Picard 수축",
             picard_pass,
             f"max {metrics['picard_max_contraction']:.3e}",
             "scaled Jacobian tuning",
+            "스케일 조정 Jacobian 튜닝",
         ),
         (
             "Hysteresis grammar",
+            "Hysteresis 문법",
             baseline_pass,
             f"CI {promotion_gates['hysteresis_log_likelihood_gain_ci'][0]:.2e}+",
             "held-out phase baseline",
+            "held-out 위상 기준선",
         ),
         (
             "Markov order",
+            "Markov 차수",
             order_pass,
             f"order {promotion_gates['hysteresis_selected_markov_order']}",
             "BIC selects memory",
+            "BIC가 memory를 선택",
         ),
         (
             "Poincare sweep",
+            "Poincare 구간 탐색",
             poincare_pass,
             f"{promotion_gates['poincare_best_coordinate_crossing_count']} crossings",
+            f"held-out {promotion_gates['poincare_best_coordinate']}",
             f"held-out {promotion_gates['poincare_best_coordinate']}",
         ),
         (
             "Permutation control",
+            "Permutation 대조군",
             permutation_pass,
             f"gap {promotion_gates['poincare_permutation_control_gap']:.2e}",
             "symbol order beats shuffle",
+            "기호 순서가 shuffle을 이김",
         ),
         (
             "Section robustness",
+            "Section 강건성",
             robustness_pass,
             f"{promotion_gates['poincare_section_robust_pass_count']} / {section_robustness['evaluated_count']}",
             "nearby sections repeat",
+            "인접 section에서 반복 확인",
         ),
         (
             "Stride robustness",
+            "Stride 강건성",
             bool(promotion_gates["symbolic_passes_stride_robustness"]),
             f"{promotion_gates['symbolic_stride_robust_pass_count']} strides",
             "atlas sampling perturbation",
+            "atlas 표본 간격 perturbation",
         ),
         (
             "Engine API",
+            "엔진 API",
             True,
             "threebody-engine",
             "JSON gates exported",
+            "JSON gate 내보냄",
         ),
     )
     track = "".join(
-        _progress_step(index, title, "pass" if passed else "wait", value, detail)
-        for index, (title, passed, value, detail) in enumerate(steps, start=1)
+        _progress_step(index, title, title_ko, "pass" if passed else "wait", value, detail, detail_ko)
+        for index, (title, title_ko, passed, value, detail, detail_ko) in enumerate(steps, start=1)
     )
     baseline_strength = float(baseline_bootstrap["beats_baseline_fraction"])
     permutation_strength = float(1.0 - permutation["control_exceedance_fraction"])
@@ -1699,12 +1800,12 @@ def _progress_map(
     stride_fraction = float(promotion_gates["symbolic_stride_robust_pass_fraction"])
     evidence = "".join(
         [
-            _evidence_card("Picard maximum", f"{metrics['picard_max_contraction']:.3e}", 1.0 if picard_pass else 0.0),
-            _evidence_card("Baseline confidence", f"{baseline_strength:.2f}", baseline_strength),
-            _evidence_card("Permutation confidence", f"{permutation_strength:.2f}", permutation_strength),
-            _evidence_card("Section robustness", f"{robustness_fraction:.2f}", robustness_fraction),
-            _evidence_card("Stride robustness", f"{stride_fraction:.2f}", stride_fraction),
-            _evidence_card("Poincare crossings", str(promotion_gates["poincare_best_coordinate_crossing_count"]), 1.0),
+            _evidence_card("Picard maximum", f"{metrics['picard_max_contraction']:.3e}", 1.0 if picard_pass else 0.0, label_ko="Picard 최대 수축률"),
+            _evidence_card("Baseline confidence", f"{baseline_strength:.2f}", baseline_strength, label_ko="기준선 대비 신뢰도"),
+            _evidence_card("Permutation confidence", f"{permutation_strength:.2f}", permutation_strength, label_ko="Permutation 대조 신뢰도"),
+            _evidence_card("Section robustness", f"{robustness_fraction:.2f}", robustness_fraction, label_ko="Section 강건성"),
+            _evidence_card("Stride robustness", f"{stride_fraction:.2f}", stride_fraction, label_ko="Stride 강건성"),
+            _evidence_card("Poincare crossings", str(promotion_gates["poincare_best_coordinate_crossing_count"]), 1.0, label_ko="Poincare 교차 수"),
         ]
     )
     return (
@@ -1827,24 +1928,24 @@ def _symbolic_stride_robustness(
     }
 
 
-def _progress_step(index: int, title: str, status: str, value: str, detail: str) -> str:
+def _progress_step(index: int, title: str, title_ko: str, status: str, value: str, detail: str, detail_ko: str) -> str:
     normalized_status = "pass" if status == "pass" else "wait"
     return (
         f'<div class="progress-step {normalized_status}">'
         f'<span class="progress-index">{index}</span>'
-        f"<strong>{html.escape(title)}</strong>"
-        f'<span class="gate-status">{"PASS" if normalized_status == "pass" else "WAIT"}</span>'
+        f"<strong>{_lang_text(title, title_ko)}</strong>"
+        f'<span class="gate-status">{_lang_text("PASS" if normalized_status == "pass" else "WAIT", "통과" if normalized_status == "pass" else "대기")}</span>'
         f'<span class="gate-value">{html.escape(value)}</span>'
-        f"<span>{html.escape(detail)}</span>"
+        f"<span>{_lang_text(detail, detail_ko)}</span>"
         "</div>"
     )
 
 
-def _evidence_card(label: str, value: str, fraction: float) -> str:
+def _evidence_card(label: str, value: str, fraction: float, *, label_ko: str | None = None) -> str:
     width = 100.0 * float(np.clip(fraction, 0.0, 1.0))
     return (
         '<div class="evidence">'
-        f"<label>{html.escape(label)}</label>"
+        f"<label>{_lang_text(label, label_ko or label)}</label>"
         f"<strong>{html.escape(value)}</strong>"
         '<div class="meter">'
         f'<span style="width: {width:.1f}%"></span>'
@@ -1853,41 +1954,61 @@ def _evidence_card(label: str, value: str, fraction: float) -> str:
     )
 
 
-def _metric_card(label: str, value: object) -> str:
+def _lang_text(en: str, ko: str) -> str:
+    return f'<span data-lang="en">{html.escape(en)}</span><span data-lang="ko">{html.escape(ko)}</span>'
+
+
+def _metric_card(label: str, value: object, *, label_ko: str | None = None) -> str:
     if isinstance(value, float):
         rendered = f"{value:.3e}"
     else:
         rendered = html.escape(str(value))
-    return f'<div class="metric"><strong>{rendered}</strong><span>{html.escape(label)}</span></div>'
+    return f'<div class="metric"><strong>{rendered}</strong><span>{_lang_text(label, label_ko or label)}</span></div>'
 
 
-def _upgrade_card(title: str, body: str, badge: str) -> str:
+def _upgrade_card(
+    title: str,
+    body: str,
+    badge: str,
+    *,
+    title_ko: str | None = None,
+    body_ko: str | None = None,
+) -> str:
     return (
         '<div class="metric upgrade">'
-        f"<strong>{html.escape(title)}</strong>"
-        f"<p>{html.escape(body)}</p>"
+        f"<strong>{_lang_text(title, title_ko or title)}</strong>"
+        f"<p>{_lang_text(body, body_ko or body)}</p>"
         f'<span class="badge">{html.escape(badge)}</span>'
         "</div>"
     )
 
 
-def _gate_card(title: str, status: str, value: str, detail: str) -> str:
+def _gate_card(
+    title: str,
+    status: str,
+    value: str,
+    detail: str,
+    *,
+    title_ko: str | None = None,
+    detail_ko: str | None = None,
+) -> str:
     normalized_status = "pass" if status == "pass" else "wait"
     status_text = "PASS" if normalized_status == "pass" else "WAIT"
+    status_text_ko = "통과" if normalized_status == "pass" else "대기"
     return (
         f'<div class="gate {normalized_status}">'
-        f'<span class="gate-label">{html.escape(title)}</span>'
-        f'<span class="gate-status">{status_text}</span>'
+        f'<span class="gate-label">{_lang_text(title, title_ko or title)}</span>'
+        f'<span class="gate-status">{_lang_text(status_text, status_text_ko)}</span>'
         f'<span class="gate-value">{html.escape(value)}</span>'
-        f"<p>{html.escape(detail)}</p>"
+        f"<p>{_lang_text(detail, detail_ko or detail)}</p>"
         "</div>"
     )
 
 
-def _provenance_card(title: str, value: str, detail: str) -> str:
+def _provenance_card(title: str, value: str, detail: str, *, title_ko: str | None = None) -> str:
     return (
         '<div class="gate pass">'
-        f'<span class="gate-label">{html.escape(title)}</span>'
+        f'<span class="gate-label">{_lang_text(title, title_ko or title)}</span>'
         f'<span class="gate-status">{html.escape(value)}</span>'
         f'<span class="gate-value">{html.escape(detail)}</span>'
         "</div>"
@@ -1935,7 +2056,7 @@ def _jacobi_certificate_figure(summary: dict[str, object]) -> go.Figure:
     colors = ["#0b84f3", "#ffa600", "#00a878", "#00a878", "#6c63ff", "#f95d6a", "#00a878"]
     figure = go.Figure(go.Bar(x=labels, y=values, marker={"color": colors}))
     figure.update_layout(
-        title="Escape-cone certificate scalars",
+        title="탈출 원뿔 certificate 스칼라 / Escape-cone certificate scalars",
         yaxis_type="log",
         yaxis_title="value (log scale)",
         template="plotly_white",
@@ -1974,10 +2095,10 @@ def _picard_certificate_figure(summary: dict[str, object]) -> go.Figure:
         y=picard["target_contraction"],
         line_dash="dash",
         line_color="#f95d6a",
-        annotation_text="target contraction",
+        annotation_text="목표 수축률",
     )
     figure.update_layout(
-        title="Picard contraction tuning",
+        title="Picard 수축 튜닝 / Picard contraction tuning",
         yaxis_type="log",
         yaxis_title="value (log scale)",
         template="plotly_white",
@@ -2007,7 +2128,7 @@ def _markov_baseline_figure(summary: dict[str, object]) -> go.Figure:
     colors = ["#0b84f3", "#ffa600", "#6c63ff", "#00a878", "#00a878" if comparison["beats_baseline"] else "#f95d6a"]
     figure = go.Figure(go.Bar(x=labels, y=values, marker={"color": colors}))
     figure.update_layout(
-        title="Markov baseline test",
+        title="Markov 기준선 검정 / Markov baseline test",
         yaxis_type="log",
         yaxis_title="value (log scale)",
         template="plotly_white",
@@ -2115,12 +2236,12 @@ def _animated_orbit_figure_2d(
                 "yanchor": "top",
                 "buttons": [
                     {
-                        "label": "Play",
+                        "label": "재생 / Play",
                         "method": "animate",
                         "args": [None, {"frame": {"duration": 80, "redraw": True}, "transition": {"duration": 40}, "fromcurrent": True}],
                     },
                     {
-                        "label": "Pause",
+                        "label": "일시정지 / Pause",
                         "method": "animate",
                         "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}],
                     },
