@@ -583,6 +583,37 @@ def test_predict_cli_writes_direct_three_body_answer(tmp_path) -> None:
     assert payload["target_solution"]["prediction_type"] == "three-body-target-position-solution"
 
 
+def test_predict_cli_writes_unresolved_answer_for_initial_collision(tmp_path) -> None:
+    input_path = tmp_path / "initial-collision.json"
+    output_path = tmp_path / "answer.json"
+    payload = {
+        "masses": [1.0, 1.0, 1.0],
+        "positions": [[0.0, 0.0], [0.0, 0.0], [1.0, 0.0]],
+        "velocities": [[0.0, 0.1], [0.0, -0.1], [0.0, 0.0]],
+        "target_time": 0.1,
+    }
+    input_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--answer",
+            "--output",
+            str(output_path),
+        ]
+    )
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert result["answer_status"] == "unresolved"
+    assert result["input_admissibility"]["admissible"] is False
+    assert result["input_admissibility"]["no_initial_binary_collision"] is False
+    assert "initial positions contain a binary collision" in result["blocking_reasons"]
+    assert result["body_answer_table"] == []
+
+
 def test_predict_cli_writes_linearized_position_distribution(tmp_path) -> None:
     input_path = tmp_path / "initial-state.json"
     output_path = tmp_path / "linearized-distribution.json"

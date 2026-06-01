@@ -984,6 +984,17 @@ def answer_three_body_problem(
     the pushed-forward target distribution or an unresolved verdict.
     """
 
+    input_certificate = _three_body_input_admissibility_certificate(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+    )
+    if input_certificate.get("admissible") is not True:
+        return _inadmissible_three_body_answer(input_certificate)
+
     target_solution = solve_three_body_target_positions(
         masses,
         positions,
@@ -1115,6 +1126,7 @@ def answer_three_body_problem(
         "recommended_mode": target_solution.get("recommended_mode"),
         "primary_readout": primary_readout,
         "input_admissibility": {
+            **input_certificate,
             "finite_positive_masses": True,
             "finite_positions_and_velocities": True,
             "finite_target_time": bool(math.isfinite(float(target_time))),
@@ -1217,6 +1229,240 @@ def answer_three_body_problem(
         "target_prediction_certificate": target_solution.get("target_prediction_certificate", {}),
         "certificate_validation": certificate_validation,
         "target_solution": target_solution,
+    }
+
+
+def _three_body_input_admissibility_certificate(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    gravitational_constant: float,
+    softening: float,
+) -> dict[str, object]:
+    """Return a non-throwing certificate for the direct three-body question."""
+
+    reasons: list[str] = []
+    reasons_ko: list[str] = []
+    masses_array: np.ndarray | None = None
+    positions_array: np.ndarray | None = None
+    velocities_array: np.ndarray | None = None
+    try:
+        masses_array = np.asarray(masses, dtype=float)
+    except (TypeError, ValueError):
+        reasons.append("masses cannot be converted to a finite numeric array")
+        reasons_ko.append("질량 배열을 유한한 숫자 배열로 변환할 수 없다.")
+    try:
+        positions_array = np.asarray(positions, dtype=float)
+    except (TypeError, ValueError):
+        reasons.append("positions cannot be converted to a finite numeric matrix")
+        reasons_ko.append("위치 배열을 유한한 숫자 행렬로 변환할 수 없다.")
+    try:
+        velocities_array = np.asarray(velocities, dtype=float)
+    except (TypeError, ValueError):
+        reasons.append("velocities cannot be converted to a finite numeric matrix")
+        reasons_ko.append("속도 배열을 유한한 숫자 행렬로 변환할 수 없다.")
+
+    finite_positive_masses = (
+        masses_array is not None
+        and masses_array.shape == (3,)
+        and bool(np.all(np.isfinite(masses_array)))
+        and bool(np.all(masses_array > 0.0))
+    )
+    if not finite_positive_masses:
+        reasons.append("masses must contain exactly three finite positive values")
+        reasons_ko.append("질량은 정확히 세 개의 유한한 양수여야 한다.")
+
+    positions_shape_valid = (
+        positions_array is not None
+        and positions_array.ndim == 2
+        and positions_array.shape[0] == 3
+        and positions_array.shape[1] in (2, 3)
+    )
+    if not positions_shape_valid:
+        reasons.append("positions must have shape (3, 2) or (3, 3)")
+        reasons_ko.append("위치는 (3, 2) 또는 (3, 3) 형태여야 한다.")
+
+    velocities_shape_valid = (
+        velocities_array is not None
+        and positions_array is not None
+        and positions_shape_valid
+        and velocities_array.shape == positions_array.shape
+    )
+    if not velocities_shape_valid:
+        reasons.append("velocities must have the same shape as positions")
+        reasons_ko.append("속도는 위치와 같은 형태여야 한다.")
+
+    finite_positions_and_velocities = (
+        positions_shape_valid
+        and velocities_shape_valid
+        and positions_array is not None
+        and velocities_array is not None
+        and bool(np.all(np.isfinite(positions_array)))
+        and bool(np.all(np.isfinite(velocities_array)))
+    )
+    if not finite_positions_and_velocities:
+        reasons.append("positions and velocities must contain only finite values")
+        reasons_ko.append("위치와 속도에는 유한한 값만 들어 있어야 한다.")
+
+    finite_target_time = False
+    try:
+        finite_target_time = math.isfinite(float(target_time))
+    except (TypeError, ValueError):
+        finite_target_time = False
+    if not finite_target_time:
+        reasons.append("target_time must be finite")
+        reasons_ko.append("목표 시간 target_time은 유한해야 한다.")
+
+    gravitational_constant_positive = False
+    try:
+        gravitational_constant_positive = math.isfinite(float(gravitational_constant)) and float(
+            gravitational_constant
+        ) > 0.0
+    except (TypeError, ValueError):
+        gravitational_constant_positive = False
+    if not gravitational_constant_positive:
+        reasons.append("gravitational_constant must be finite and positive")
+        reasons_ko.append("중력상수는 유한한 양수여야 한다.")
+
+    softening_nonnegative = False
+    try:
+        softening_nonnegative = math.isfinite(float(softening)) and float(softening) >= 0.0
+    except (TypeError, ValueError):
+        softening_nonnegative = False
+    if not softening_nonnegative:
+        reasons.append("softening must be finite and nonnegative")
+        reasons_ko.append("softening은 유한한 0 이상의 값이어야 한다.")
+
+    pair_diagnostics: dict[str, object] = {
+        "collision_distance_atol": 0.0,
+        "minimum_pair_distance": math.nan,
+        "minimum_pair": [],
+        "pairs": [],
+    }
+    no_initial_binary_collision = False
+    if positions_shape_valid and positions_array is not None and np.all(np.isfinite(positions_array)):
+        pair_diagnostics = _initial_pair_distance_diagnostics(positions_array, 0.0)
+        no_initial_binary_collision = bool(pair_diagnostics["minimum_pair_distance"] > 0.0)
+        if not no_initial_binary_collision:
+            reasons.append("initial positions contain a binary collision")
+            reasons_ko.append("초기 위치에 두 물체가 같은 위치에 있는 이중 충돌이 포함되어 있다.")
+
+    exact_newtonian_equations = bool(softening_nonnegative and float(softening) == 0.0)
+    softened_initial_collision_regularized = bool(
+        softening_nonnegative and float(softening) > 0.0 and not no_initial_binary_collision
+    )
+    admissible = bool(
+        finite_positive_masses
+        and positions_shape_valid
+        and velocities_shape_valid
+        and finite_positions_and_velocities
+        and finite_target_time
+        and gravitational_constant_positive
+        and softening_nonnegative
+        and (no_initial_binary_collision or softened_initial_collision_regularized)
+    )
+    if softened_initial_collision_regularized:
+        reasons.append("initial collision is only admissible for the declared softened model")
+        reasons_ko.append("초기 충돌은 선언된 softened 모델에서만 허용된다.")
+    return {
+        "certificate_schema_version": 1,
+        "certificate_type": "three-body-input-admissibility",
+        "admissible": admissible,
+        "newtonian_admissible": bool(admissible and no_initial_binary_collision and exact_newtonian_equations),
+        "finite_positive_masses": finite_positive_masses,
+        "positions_shape_valid": positions_shape_valid,
+        "velocities_shape_valid": velocities_shape_valid,
+        "finite_positions_and_velocities": finite_positions_and_velocities,
+        "finite_target_time": finite_target_time,
+        "gravitational_constant_positive": gravitational_constant_positive,
+        "softening_nonnegative": softening_nonnegative,
+        "no_initial_binary_collision": no_initial_binary_collision,
+        "softened_initial_collision_regularized": softened_initial_collision_regularized,
+        "exact_newtonian_equations": exact_newtonian_equations,
+        "softening_disclosed": bool(softening_nonnegative and float(softening) > 0.0),
+        "initial_pair_distances": pair_diagnostics,
+        "blocking_reasons": [] if admissible else reasons,
+        "blocking_reasons_ko": [] if admissible else reasons_ko,
+        "limitations": (
+            [
+                "The exact Newtonian point-position question is inadmissible at an initial binary collision."
+            ]
+            if not no_initial_binary_collision
+            else []
+        ),
+    }
+
+
+def _inadmissible_three_body_answer(input_certificate: Mapping[str, object]) -> dict[str, object]:
+    reasons = input_certificate.get("blocking_reasons", [])
+    reasons_ko = input_certificate.get("blocking_reasons_ko", [])
+    return {
+        "answer_schema_version": 1,
+        "answer_type": "three-body-problem-answer",
+        "answer_status": "unresolved",
+        "answer_kind": "unresolved",
+        "claim": "unresolved-target-position",
+        "recommended_mode": "unresolved",
+        "primary_readout": "unresolved",
+        "question": {
+            "english": (
+                "Given masses, initial positions, initial velocities, and finite target time t, "
+                "return r_i(t) when defensible or Law(X_t) when uncertainty dominates."
+            ),
+            "korean": (
+                "질량, 초기 위치, 초기 속도, 유한 목표시간 t가 주어졌을 때 "
+                "방어 가능하면 r_i(t)를 반환하고, 불확실성이 지배적이면 Law(X_t)를 반환한다."
+            ),
+        },
+        "unresolved_reason": "input is not admissible for the declared three-body prediction problem",
+        "unresolved_reason_ko": "입력이 선언된 삼체 예측 문제의 허용 조건을 만족하지 않는다.",
+        "blocking_reasons": reasons if isinstance(reasons, Sequence) else [],
+        "blocking_reasons_ko": reasons_ko if isinstance(reasons_ko, Sequence) else [],
+        "input_admissibility": dict(input_certificate),
+        "mathematical_model": {
+            "initial_value_problem": "Newtonian three-body flow on finite non-collisional data",
+            "state_flow": "x(t) = Phi_t(x(0))",
+            "point_position_answer": "r_i(t) = Pi_{r_i} Phi_t(x(0))",
+            "probability_answer": "Law(X_t) = (Phi_t)_# Law(X_0)",
+            "scope": "unresolved because the input failed admissibility gates",
+        },
+        "theorem_answer": {
+            "theorem_name": "Finite-time Newtonian three-body prediction as a flow-map and push-forward law",
+            "statement": (
+                "The theorem-level answer applies only after finite, positive-mass, non-collisional "
+                "initial data and finite target time gates pass."
+            ),
+            "statement_ko": (
+                "정리 수준의 답은 유한한 양의 질량, 비충돌 초기자료, 유한 목표시간 gate를 "
+                "통과한 뒤에만 적용된다."
+            ),
+        },
+        "position_answer": {"defensible": False, "coordinates": [], "body_answer_table": []},
+        "distribution_answer": {"defensible": False, "distribution": {}, "body_answer_table": []},
+        "body_answer_table": [],
+        "target_positions": [],
+        "target_position_distribution": {},
+        "target_position_table": [],
+        "target_readout_decision": {
+            "primary_readout": "unresolved",
+            "blocking_reasons": reasons if isinstance(reasons, Sequence) else [],
+        },
+        "publishability": {
+            "paper_position_claim_defensible": False,
+            "paper_distribution_claim_defensible": False,
+            "certificate_valid": False,
+            "numerical_convergence_passed": False,
+            "limitations": [
+                "input failed admissibility gates",
+                "finite-time answer only",
+                "requires finite non-collisional input data for the exact Newtonian problem",
+            ],
+        },
+        "target_prediction_certificate": {},
+        "certificate_validation": {"valid": False, "checks": {"input_admissible": False}},
+        "target_solution": {},
     }
 
 

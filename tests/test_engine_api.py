@@ -656,6 +656,30 @@ def test_engine_api_answers_original_three_body_problem() -> None:
     assert answer["target_solution"]["prediction_type"] == "three-body-target-position-solution"
 
 
+def test_engine_api_returns_unresolved_for_inadmissible_initial_collision() -> None:
+    answer = answer_three_body_problem(
+        [1.0, 1.0, 1.0],
+        [[0.0, 0.0], [0.0, 0.0], [1.0, 0.0]],
+        [[0.0, 0.1], [0.0, -0.1], [0.0, 0.0]],
+        0.1,
+        count=5,
+        samples=9,
+    )
+
+    assert answer["answer_type"] == "three-body-problem-answer"
+    assert answer["answer_status"] == "unresolved"
+    assert answer["answer_kind"] == "unresolved"
+    assert answer["input_admissibility"]["admissible"] is False
+    assert answer["input_admissibility"]["newtonian_admissible"] is False
+    assert answer["input_admissibility"]["no_initial_binary_collision"] is False
+    assert "initial positions contain a binary collision" in answer["blocking_reasons"]
+    assert "이중 충돌" in answer["blocking_reasons_ko"][0]
+    assert answer["position_answer"]["defensible"] is False
+    assert answer["distribution_answer"]["defensible"] is False
+    assert answer["publishability"]["paper_position_claim_defensible"] is False
+    assert answer["target_solution"] == {}
+
+
 def test_engine_api_builds_linearized_three_body_position_distribution() -> None:
     scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
     positions, velocities = scenario.system.split_state(scenario.initial_state)
