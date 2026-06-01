@@ -148,6 +148,7 @@ def test_engine_api_solves_random_three_body_prediction_demo() -> None:
         "three-body-target-readout-decision"
     )
     assert demo["direct_answer"]["answer_type"] == "three-body-problem-answer"
+    assert demo["direct_answer"]["answer_summary"]["summary_type"] == "three-body-answer-human-summary"
     assert demo["direct_answer"]["input_admissibility"]["admissible"] is True
     assert len(demo["direct_answer"]["body_answer_table"]) == 3
     assert demo["direct_answer"]["numerical_convergence_certificate"]["supports_position_answer"] is True
@@ -651,6 +652,10 @@ def test_engine_api_answers_original_three_body_problem() -> None:
     assert answer["distribution_answer"]["body_answer_table"] == answer["body_answer_table"]
     assert answer["answer_consistency_certificate"]["valid"] is True
     assert answer["answer_consistency_certificate"]["checks"]["body_table_length_matches_target_positions"] is True
+    assert answer["answer_summary"]["summary_type"] == "three-body-answer-human-summary"
+    assert answer["answer_summary"]["answer_kind"] == answer["answer_kind"]
+    assert len(answer["answer_summary"]["body_summaries"]) == 3
+    assert "전역 초등 닫힌 해" in answer["answer_summary"]["one_sentence_ko"]
     assert len(answer["target_positions"]) == 3
     assert len(answer["target_position_distribution"]["mean_positions"]) == 3
     assert len(answer["target_position_table"]) == 3
@@ -686,6 +691,8 @@ def test_engine_api_returns_unresolved_for_inadmissible_initial_collision() -> N
     assert answer["distribution_answer"]["defensible"] is False
     assert answer["answer_consistency_certificate"]["valid"] is True
     assert answer["answer_consistency_certificate"]["checks"]["inadmissible_inputs_are_unresolved"] is True
+    assert answer["answer_summary"]["recommended_readout"] == "unresolved"
+    assert answer["answer_summary"]["blocking_reasons"]
     assert answer["publishability"]["paper_position_claim_defensible"] is False
     assert answer["target_solution"] == {}
 

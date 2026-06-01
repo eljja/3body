@@ -129,6 +129,8 @@ solution into one paper-facing object:
 - `answer_kind`: whether the defensible answer is point positions with
   probability regions, a probability distribution, deterministic positions, or
   unresolved;
+- `answer_summary`: Korean/English one-sentence interpretation and body-wise
+  reading guide for the promoted coordinate or probability answer;
 - `target_positions`: the deterministic `r_i(t)` readout when available;
 - `target_position_distribution`: the pushed-forward `Law(X_t)` summary when
   uncertainty is declared;
@@ -167,6 +169,8 @@ threebody predict --input initial-state.json --answer --count 128 --samples 256 
 답변 계층이다. 방어 가능한 경우 `r_i(t)` 점 위치를 제시하고, 불확실성이
 지배적이면 `Law(X_t)` 분포 요약을 제시하며, 근접조우/진단 gate가 막으면
 `unresolved` 또는 제한된 답변으로 남긴다.
+`answer_summary`는 이 판정을 한국어/영어 한 문장과 물체별 읽기 지침으로
+압축해 웹 페이지나 논문 supplement에서 바로 표시할 수 있게 한다.
 
 수학적으로는 다음 형태를 명시한다. 초기상태 `x0`가 유한하고 비충돌이면
 뉴턴 방정식의 국소 흐름 `Phi_t`가 존재하고, 목표 시각이 진단 horizon 안에

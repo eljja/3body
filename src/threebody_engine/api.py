@@ -1230,6 +1230,7 @@ def answer_three_body_problem(
         "certificate_validation": certificate_validation,
         "target_solution": target_solution,
     }
+    answer["answer_summary"] = _three_body_answer_summary(answer)
     answer["answer_consistency_certificate"] = _three_body_answer_consistency_certificate(answer)
     return answer
 
@@ -1466,8 +1467,97 @@ def _inadmissible_three_body_answer(input_certificate: Mapping[str, object]) -> 
         "certificate_validation": {"valid": False, "checks": {"input_admissible": False}},
         "target_solution": {},
     }
+    answer["answer_summary"] = _three_body_answer_summary(answer)
     answer["answer_consistency_certificate"] = _three_body_answer_consistency_certificate(answer)
     return answer
+
+
+def _three_body_answer_summary(answer: Mapping[str, object]) -> dict[str, object]:
+    """Create a human-readable summary of the direct three-body answer."""
+
+    answer_kind = str(answer.get("answer_kind", "unresolved"))
+    answer_status = str(answer.get("answer_status", "unresolved"))
+    publishability = answer.get("publishability", {})
+    if not isinstance(publishability, Mapping):
+        publishability = {}
+    input_admissibility = answer.get("input_admissibility", {})
+    if not isinstance(input_admissibility, Mapping):
+        input_admissibility = {}
+    body_rows = answer.get("body_answer_table", [])
+    if not isinstance(body_rows, Sequence) or isinstance(body_rows, (str, bytes, bytearray)):
+        body_rows = []
+
+    if answer_kind == "point-position-answer-with-probability-regions":
+        headline_en = "Report target coordinates r_i(t) with probability regions."
+        headline_ko = "목표 좌표 r_i(t)를 제시하되 확률 영역을 함께 보고한다."
+        recommended_readout = "point positions with probability regions"
+    elif answer_kind == "probability-distribution-answer":
+        headline_en = "Report the pushed-forward probability law Law(X_t)."
+        headline_ko = "목표시간의 push-forward 확률법칙 Law(X_t)를 보고한다."
+        recommended_readout = "probability distribution"
+    elif answer_kind == "deterministic-position-answer":
+        headline_en = "Report deterministic target coordinates only."
+        headline_ko = "결정론적 목표 좌표만 제한적으로 보고한다."
+        recommended_readout = "deterministic positions"
+    else:
+        headline_en = "No defensible target-time position or probability claim is promoted."
+        headline_ko = "방어 가능한 목표시간 좌표 또는 확률분포 주장을 승격하지 않는다."
+        recommended_readout = "unresolved"
+
+    body_summaries = []
+    for row in body_rows:
+        if not isinstance(row, Mapping):
+            continue
+        body_index = int(row.get("body_index", len(body_summaries)))
+        body_summaries.append(
+            {
+                "body_index": body_index,
+                "position": row.get("deterministic_position", []),
+                "probability_mean": row.get("probability_mean", []),
+                "central_90_interval": row.get("central_90_interval", {}),
+                "confidence_region_95": row.get("confidence_region_95", {}),
+                "recommended_readout": row.get("recommended_readout", "unresolved"),
+                "numerical_convergence_delta": row.get("numerical_convergence_delta", math.nan),
+                "summary_en": (
+                    f"body {body_index}: r_i(t) is the deterministic_position; use "
+                    "probability_mean and confidence_region_95 for uncertainty."
+                ),
+                "summary_ko": (
+                    f"body {body_index}: r_i(t)는 deterministic_position이며, 불확실성은 "
+                    "probability_mean과 confidence_region_95로 읽는다."
+                ),
+            }
+        )
+
+    blocking_reasons = answer.get("blocking_reasons", [])
+    if not isinstance(blocking_reasons, Sequence) or isinstance(blocking_reasons, (str, bytes, bytearray)):
+        blocking_reasons = []
+    blocking_reasons_ko = answer.get("blocking_reasons_ko", [])
+    if not isinstance(blocking_reasons_ko, Sequence) or isinstance(blocking_reasons_ko, (str, bytes, bytearray)):
+        blocking_reasons_ko = []
+    return {
+        "summary_schema_version": 1,
+        "summary_type": "three-body-answer-human-summary",
+        "answer_status": answer_status,
+        "answer_kind": answer_kind,
+        "recommended_readout": recommended_readout,
+        "headline_en": headline_en,
+        "headline_ko": headline_ko,
+        "one_sentence_en": (
+            f"{headline_en} The answer is finite-time and diagnostic-gated; it does not claim "
+            "a generic elementary global closed form."
+        ),
+        "one_sentence_ko": (
+            f"{headline_ko} 이 답은 유한시간 진단 기반 답변이며, 일반 삼체 문제의 "
+            "전역 초등 닫힌 해를 주장하지 않는다."
+        ),
+        "input_admissible": input_admissibility.get("admissible"),
+        "paper_position_claim_defensible": publishability.get("paper_position_claim_defensible"),
+        "paper_distribution_claim_defensible": publishability.get("paper_distribution_claim_defensible"),
+        "body_summaries": body_summaries,
+        "blocking_reasons": list(blocking_reasons),
+        "blocking_reasons_ko": list(blocking_reasons_ko),
+    }
 
 
 def _three_body_answer_consistency_certificate(answer: Mapping[str, object]) -> dict[str, object]:
@@ -2502,6 +2592,7 @@ def solve_random_three_body_prediction_demo(
             "answer_type": direct_answer["answer_type"],
             "answer_status": direct_answer["answer_status"],
             "answer_kind": direct_answer["answer_kind"],
+            "answer_summary": direct_answer["answer_summary"],
             "theorem_answer": direct_answer["theorem_answer"],
             "body_answer_table": direct_answer["body_answer_table"],
             "input_admissibility": direct_answer["input_admissibility"],
