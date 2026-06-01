@@ -387,6 +387,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     predict.add_argument("--output", type=Path, default=None, help="Optional JSON output path.")
     predict.set_defaults(func=run_predict_command)
+    validate_answer = subparsers.add_parser(
+        "validate-answer",
+        help="Validate an archived threebody predict --answer JSON payload.",
+    )
+    validate_answer.add_argument(
+        "--input",
+        type=Path,
+        required=True,
+        help="JSON file produced by threebody predict --answer.",
+    )
+    validate_answer.add_argument("--output", type=Path, default=None, help="Optional validation JSON output path.")
+    validate_answer.set_defaults(func=run_validate_answer_command)
     closed_form = subparsers.add_parser(
         "closed-form",
         help="Assess whether a general three-body initial state passes the global closed-form series contract.",
@@ -859,6 +871,17 @@ def run_predict_command(args: argparse.Namespace) -> int:
     if args.output is not None:
         print(f"wrote {args.output}")
     return exit_code
+
+
+def run_validate_answer_command(args: argparse.Namespace) -> int:
+    from threebody_engine import validate_three_body_problem_answer
+
+    payload = _read_prediction_input(args.input)
+    result = validate_three_body_problem_answer(payload)
+    _write_json_result(result, args.output)
+    if args.output is not None:
+        print(f"wrote {args.output}")
+    return 0 if result.get("valid") is True else 1
 
 
 def run_closed_form_command(args: argparse.Namespace) -> int:

@@ -592,6 +592,67 @@ def test_predict_cli_writes_direct_three_body_answer(tmp_path) -> None:
     assert payload["target_solution"]["prediction_type"] == "three-body-target-position-solution"
 
 
+def test_validate_answer_cli_checks_archived_direct_answer(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    answer_path = tmp_path / "answer.json"
+    validation_path = tmp_path / "validation.json"
+    tampered_path = tmp_path / "tampered-answer.json"
+    tampered_validation_path = tmp_path / "tampered-validation.json"
+    _write_prediction_input(input_path)
+
+    answer_exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--answer",
+            "--count",
+            "5",
+            "--position-scale",
+            "1e-7",
+            "--velocity-scale",
+            "1e-7",
+            "--samples",
+            "9",
+            "--horizon-samples",
+            "6",
+            "--output",
+            str(answer_path),
+        ]
+    )
+    validation_exit_code = main(
+        [
+            "validate-answer",
+            "--input",
+            str(answer_path),
+            "--output",
+            str(validation_path),
+        ]
+    )
+    validation = json.loads(validation_path.read_text(encoding="utf-8"))
+    tampered = json.loads(answer_path.read_text(encoding="utf-8"))
+    tampered["target_positions"] = []
+    tampered_path.write_text(json.dumps(tampered, indent=2), encoding="utf-8")
+    tampered_exit_code = main(
+        [
+            "validate-answer",
+            "--input",
+            str(tampered_path),
+            "--output",
+            str(tampered_validation_path),
+        ]
+    )
+    tampered_validation = json.loads(tampered_validation_path.read_text(encoding="utf-8"))
+
+    assert answer_exit_code == 0
+    assert validation_exit_code == 0
+    assert validation["validation_type"] == "three-body-problem-answer-validation"
+    assert validation["valid"] is True
+    assert tampered_exit_code == 1
+    assert tampered_validation["valid"] is False
+    assert "computed_consistency_valid" in tampered_validation["blocking_reasons"]
+
+
 def test_predict_cli_writes_unresolved_answer_for_initial_collision(tmp_path) -> None:
     input_path = tmp_path / "initial-collision.json"
     output_path = tmp_path / "answer.json"

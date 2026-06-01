@@ -166,6 +166,7 @@ CLI:
 
 ```powershell
 threebody predict --input initial-state.json --answer --count 128 --samples 256 --output answer.json
+threebody validate-answer --input answer.json --output answer-validation.json
 ```
 
 한국어로는 `answer_three_body_problem(...)`가 원래 질문에 가장 직접적인
