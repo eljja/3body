@@ -147,6 +147,11 @@ def test_engine_api_solves_random_three_body_prediction_demo() -> None:
     assert demo["target_solution"]["target_readout_decision"]["decision_type"] == (
         "three-body-target-readout-decision"
     )
+    assert demo["direct_answer"]["answer_type"] == "three-body-problem-answer"
+    assert demo["direct_answer"]["input_admissibility"]["admissible"] is True
+    assert len(demo["direct_answer"]["body_answer_table"]) == 3
+    assert demo["direct_answer"]["numerical_convergence_certificate"]["supports_position_answer"] is True
+    assert demo["direct_answer"]["publishability"]["numerical_convergence_passed"] is True
 
 
 def test_engine_api_builds_three_body_ephemeris() -> None:

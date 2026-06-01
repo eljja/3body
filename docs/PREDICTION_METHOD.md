@@ -61,6 +61,11 @@ frame, and runs four readouts against a stricter reference integration:
 - compact target-solution deterministic readout;
 - empirical mean of the pushed-forward initial uncertainty.
 
+It also includes the same `direct_answer` summary used by
+`answer_three_body_problem(...)`: theorem statement, input admissibility,
+body-wise answer table, readout decision, numerical convergence certificate,
+and publishability gates.
+
 The result promotes success only when the point forecast agrees with the
 stricter reference within `success_tolerance`, relative energy drift remains
 inside the invariant gate, and close-approach diagnostics do not demand

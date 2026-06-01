@@ -2328,6 +2328,20 @@ def solve_random_three_body_prediction_demo(
         softening=softening,
         preserve_center_of_mass=True,
     )
+    direct_answer = answer_three_body_problem(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        count=count,
+        position_scale=uncertainty_position_scale,
+        velocity_scale=uncertainty_velocity_scale,
+        samples=samples,
+        horizon_samples=min(16, samples),
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        preserve_center_of_mass=True,
+    )
     reference = predict_three_body_positions(
         masses,
         positions,
@@ -2377,6 +2391,17 @@ def solve_random_three_body_prediction_demo(
             "target_readout_decision": target_solution["target_readout_decision"],
             "target_sensitivity_budget": target_solution["target_sensitivity_budget"],
             "target_distribution_quality": target_solution["target_distribution_quality"],
+        },
+        "direct_answer": {
+            "answer_type": direct_answer["answer_type"],
+            "answer_status": direct_answer["answer_status"],
+            "answer_kind": direct_answer["answer_kind"],
+            "theorem_answer": direct_answer["theorem_answer"],
+            "body_answer_table": direct_answer["body_answer_table"],
+            "input_admissibility": direct_answer["input_admissibility"],
+            "target_readout_decision": direct_answer["target_readout_decision"],
+            "numerical_convergence_certificate": direct_answer["numerical_convergence_certificate"],
+            "publishability": direct_answer["publishability"],
         },
         "success_report": {
             "success": success,

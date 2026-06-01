@@ -195,6 +195,10 @@ def test_random_demo_cli_writes_successful_prediction_report(tmp_path) -> None:
         "deterministic-positions",
         "unresolved",
     }
+    assert payload["direct_answer"]["answer_type"] == "three-body-problem-answer"
+    assert payload["direct_answer"]["input_admissibility"]["admissible"] is True
+    assert len(payload["direct_answer"]["body_answer_table"]) == 3
+    assert payload["direct_answer"]["numerical_convergence_certificate"]["supports_position_answer"] is True
 
 
 def test_predict_cli_writes_ephemeris(tmp_path) -> None:
