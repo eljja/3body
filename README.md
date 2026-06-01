@@ -269,6 +269,8 @@ position_score = score_three_body_position_hypothesis(
 The same layer is available from the CLI:
 
 ```powershell
+threebody predict --input examples/figure_eight_answer_input.json --answer --count 64 --samples 128 --horizon-samples 16 --position-scale 1e-7 --velocity-scale 1e-7 --output answer.json
+threebody validate-answer --input answer.json --output answer-validation.json
 threebody predict --input initial-state.json --answer --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output answer.json
 threebody validate-answer --input answer.json --output answer-validation.json
 threebody predict --input initial-state.json --target-solution --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output target-solution.json
@@ -283,6 +285,8 @@ threebody predict --input initial-state.json --linearized-ephemeris --preserve-c
 threebody predict --input initial-state.json --distribution --count 128 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution.json
 threebody predict --input initial-state.json --distribution-ephemeris --count 128 --samples 256 --position-scale 1e-6 --velocity-scale 1e-6 --output distribution-ephemeris.json
 ```
+
+For the shortest end-to-end reproduction, use [docs/THREE_BODY_ANSWER_WORKFLOW.md](docs/THREE_BODY_ANSWER_WORKFLOW.md) with [examples/figure_eight_answer_input.json](examples/figure_eight_answer_input.json).
 
 The hysteresis helpers accept `word_mode="refined"`, `"return"`, or `"poincare"`.
 The default promotion path uses refined chart words; Poincare-section words, section sweeps, multi-coordinate sweeps, held-out binary-phase validation, permutation controls, section-robustness checks, and stride-perturbation checks as stricter diagnostics when a scenario has enough crossings.

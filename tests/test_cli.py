@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 
 import threebody.cli as cli_module
 from threebody.cli import main
@@ -651,6 +652,51 @@ def test_validate_answer_cli_checks_archived_direct_answer(tmp_path) -> None:
     assert tampered_exit_code == 1
     assert tampered_validation["valid"] is False
     assert "computed_consistency_valid" in tampered_validation["blocking_reasons"]
+
+
+def test_documented_figure_eight_answer_example_runs(tmp_path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    input_path = repo_root / "examples" / "figure_eight_answer_input.json"
+    answer_path = tmp_path / "answer.json"
+    validation_path = tmp_path / "answer-validation.json"
+
+    answer_exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--answer",
+            "--count",
+            "5",
+            "--samples",
+            "9",
+            "--horizon-samples",
+            "6",
+            "--position-scale",
+            "1e-7",
+            "--velocity-scale",
+            "1e-7",
+            "--output",
+            str(answer_path),
+        ]
+    )
+    validation_exit_code = main(
+        [
+            "validate-answer",
+            "--input",
+            str(answer_path),
+            "--output",
+            str(validation_path),
+        ]
+    )
+    answer = json.loads(answer_path.read_text(encoding="utf-8"))
+    validation = json.loads(validation_path.read_text(encoding="utf-8"))
+
+    assert answer_exit_code == 0
+    assert validation_exit_code == 0
+    assert answer["answer_type"] == "three-body-problem-answer"
+    assert len(answer["body_answer_table"]) == 3
+    assert validation["valid"] is True
 
 
 def test_predict_cli_writes_unresolved_answer_for_initial_collision(tmp_path) -> None:

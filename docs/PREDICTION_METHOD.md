@@ -165,9 +165,14 @@ solution into one paper-facing object:
 CLI:
 
 ```powershell
+threebody predict --input examples/figure_eight_answer_input.json --answer --count 64 --samples 128 --horizon-samples 16 --position-scale 1e-7 --velocity-scale 1e-7 --output answer.json
+threebody validate-answer --input answer.json --output answer-validation.json
 threebody predict --input initial-state.json --answer --count 128 --samples 256 --output answer.json
 threebody validate-answer --input answer.json --output answer-validation.json
 ```
+
+See `docs/THREE_BODY_ANSWER_WORKFLOW.md` for the shortest complete
+reproduction path.
 
 한국어로는 `answer_three_body_problem(...)`가 원래 질문에 가장 직접적인
 답변 계층이다. 방어 가능한 경우 `r_i(t)` 점 위치를 제시하고, 불확실성이
