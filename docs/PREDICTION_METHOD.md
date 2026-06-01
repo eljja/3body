@@ -117,6 +117,34 @@ Output includes final positions, final velocities, solver metadata, and a Noethe
 
 ## One-Call Solution Bundle
 
+Use `threebody_engine.answer_three_body_problem(...)` when the caller wants the
+most direct answer to the original question. It wraps the compact target
+solution into one paper-facing object:
+
+- `answer_kind`: whether the defensible answer is point positions with
+  probability regions, a probability distribution, deterministic positions, or
+  unresolved;
+- `target_positions`: the deterministic `r_i(t)` readout when available;
+- `target_position_distribution`: the pushed-forward `Law(X_t)` summary when
+  uncertainty is declared;
+- `input_admissibility`: finite input, initial pair-distance, angular momentum,
+  and softening disclosure checks;
+- `publishability`: whether a point-position or distribution claim is defensible
+  under the current gates;
+- `certificate_validation`: a reproducibility check for the embedded target
+  answer certificate.
+
+CLI:
+
+```powershell
+threebody predict --input initial-state.json --answer --count 128 --samples 256 --output answer.json
+```
+
+한국어로는 `answer_three_body_problem(...)`가 원래 질문에 가장 직접적인
+답변 계층이다. 방어 가능한 경우 `r_i(t)` 점 위치를 제시하고, 불확실성이
+지배적이면 `Law(X_t)` 분포 요약을 제시하며, 근접조우/진단 gate가 막으면
+`unresolved` 또는 제한된 답변으로 남긴다.
+
 Use `threebody_engine.solve_three_body_target_positions(...)` when the caller only needs the direct answer: `target_positions`, `target_position_distribution`, `target_position_table`, `center_of_mass_frame`, `target_pair_geometry`, `target_distribution_quality`, `target_sensitivity_budget`, `target_readout_decision`, `target_prediction_certificate`, one row per body's target-time claim, and the core diagnostics. The table includes a relative 95% radius, `position_claim_strength`, and `recommended_readout` so callers can tell whether to publish a point coordinate, a confidence region, or only a distribution summary. The center-of-mass frame reports the same target positions relative to the mass-weighted center, which is the safer readout when inertial translation is not scientifically meaningful. The pair geometry reports pairwise separations, perimeter, area, and conservative distance bounds derived from coordinate quantile boxes. The distribution quality block reports Monte Carlo mean standard errors for the empirical probability answer. The sensitivity budget records the forecast-horizon status, propagated target-position standard deviation, tolerance ratio, amplification factor, Lyapunov exponent, and close-approach gate. The readout decision promotes the defensible answer as point positions with probability regions, probability distribution, deterministic coordinates only, or unresolved, with the diagnostic gates that caused that choice. The certificate pins the input contract and result payload with SHA-256 digests for reproducible auditing, and `validate_three_body_target_prediction_certificate(...)` recomputes those checks. Use `threebody_engine.solve_three_body_prediction_problem(...)` when the full audit bundle is needed, or:
 
 ```powershell

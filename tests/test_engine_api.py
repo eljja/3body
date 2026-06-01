@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from threebody_engine import (
+    answer_three_body_problem,
     audit_public_static_artifact_bytes,
     audit_public_static_artifacts,
     audit_public_static_artifacts_from_url,
@@ -50,6 +51,7 @@ def test_engine_api_integrates_reference_scenario() -> None:
     assert callable(verify_public_static_artifact_bytes)
     assert callable(public_static_artifact_audit_report_payload_sha256)
     assert callable(validate_three_body_target_prediction_certificate)
+    assert callable(answer_three_body_problem)
 
     scenario, trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=30)
 
@@ -583,6 +585,51 @@ def test_engine_api_returns_compact_target_position_solution() -> None:
     assert solution["diagnostics"]["minimum_pair_distance"] > 0.0
     assert solution["mathematical_statement"]["statement_schema_version"] == 1
     assert "solution_bundle" not in solution
+
+
+def test_engine_api_answers_original_three_body_problem() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    answer = answer_three_body_problem(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        count=5,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        samples=9,
+        horizon_samples=6,
+    )
+
+    assert answer["answer_type"] == "three-body-problem-answer"
+    assert answer["answer_status"] == "answered"
+    assert answer["answer_kind"] in {
+        "point-position-answer-with-probability-regions",
+        "probability-distribution-answer",
+        "deterministic-position-answer",
+    }
+    assert "r_i(t)" in answer["question"]["english"]
+    assert "Law(X_t)" in answer["question"]["korean"]
+    assert answer["input_admissibility"]["finite_positive_masses"] is True
+    assert answer["input_admissibility"]["finite_positions_and_velocities"] is True
+    assert answer["input_admissibility"]["finite_target_time"] is True
+    assert answer["input_admissibility"]["no_initial_binary_collision"] is True
+    assert answer["input_admissibility"]["exact_newtonian_equations"] is True
+    assert answer["mathematical_model"]["point_position_answer"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
+    assert answer["mathematical_model"]["probability_answer"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
+    assert len(answer["target_positions"]) == 3
+    assert len(answer["target_position_distribution"]["mean_positions"]) == 3
+    assert len(answer["target_position_table"]) == 3
+    assert answer["deterministic_answer"]["positions"] == answer["target_positions"]
+    assert answer["probability_answer"]["distribution"] == answer["target_position_distribution"]
+    assert answer["target_readout_decision"]["promoted_claim"] == answer["claim"]
+    assert answer["publishability"]["certificate_valid"] is True
+    assert answer["publishability"]["paper_distribution_claim_defensible"] is True
+    assert "does not claim a finite elementary global closed form" in answer["publishability"]["limitations"]
+    assert answer["certificate_validation"]["valid"] is True
+    assert answer["target_solution"]["prediction_type"] == "three-body-target-position-solution"
 
 
 def test_engine_api_builds_linearized_three_body_position_distribution() -> None:

@@ -333,6 +333,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Return the compact target-time position/distribution answer for the original three-body question.",
     )
+    predict.add_argument(
+        "--answer",
+        action="store_true",
+        help="Return the direct mathematical answer: r_i(t), Law(X_t), readout decision, and paper-facing limits.",
+    )
     predict.add_argument("--count", type=int, default=64, help="Distribution ensemble size.")
     predict.add_argument("--position-scale", type=float, default=1.0e-6, help="Initial position uncertainty scale.")
     predict.add_argument("--velocity-scale", type=float, default=1.0e-6, help="Initial velocity uncertainty scale.")
@@ -586,6 +591,7 @@ def run_survey_command(args: argparse.Namespace) -> int:
 
 def run_predict_command(args: argparse.Namespace) -> int:
     from threebody_engine import (
+        answer_three_body_problem,
         predict_three_body_distribution_ephemeris,
         predict_three_body_ephemeris,
         predict_three_body_forecast_horizon,
@@ -613,13 +619,14 @@ def run_predict_command(args: argparse.Namespace) -> int:
             args.ephemeris,
             args.solution,
             args.target_solution,
+            args.answer,
         )
     )
     if selected_modes > 1:
         raise ValueError(
             "Choose only one of --distribution, --distribution-ephemeris, --linearized-distribution, "
             "--linearized-ephemeris, --score-positions, --report, --horizon, --ephemeris, "
-            "--solution, or --target-solution."
+            "--solution, --target-solution, or --answer."
         )
     target_times = payload.get("target_times")
     if args.target_time is not None:
@@ -705,6 +712,27 @@ def run_predict_command(args: argparse.Namespace) -> int:
             **common_kwargs,
         )
         exit_code = 0 if result["recommended_mode"] != "unresolved" else 1
+    elif args.answer:
+        result = answer_three_body_problem(
+            _required_prediction_field(payload, "masses"),
+            _required_prediction_field(payload, "positions"),
+            _required_prediction_field(payload, "velocities"),
+            target_time,
+            count=args.count,
+            initial_state_covariance=payload.get("initial_state_covariance"),
+            position_scale=args.position_scale,
+            velocity_scale=args.velocity_scale,
+            seed=args.seed,
+            samples=args.samples,
+            target_times=target_times,
+            max_step=args.max_step,
+            jacobian_step=args.jacobian_step,
+            position_tolerance=args.position_tolerance,
+            horizon_samples=args.horizon_samples,
+            preserve_center_of_mass=solution_preserve_center_of_mass,
+            **common_kwargs,
+        )
+        exit_code = 0 if result["answer_kind"] != "unresolved" else 1
     elif args.horizon:
         result = predict_three_body_forecast_horizon(
             _required_prediction_field(payload, "masses"),

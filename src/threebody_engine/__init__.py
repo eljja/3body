@@ -1,6 +1,7 @@
 """Public API surface for the ThreeBody verification engine."""
 
 from .api import (
+    answer_three_body_problem,
     audit_public_static_artifact_bytes,
     audit_public_static_artifacts,
     audit_public_static_artifacts_from_url,
@@ -39,6 +40,7 @@ from .api import (
 )
 
 __all__ = [
+    "answer_three_body_problem",
     "audit_public_static_artifact_bytes",
     "audit_public_static_artifacts",
     "audit_public_static_artifacts_from_url",

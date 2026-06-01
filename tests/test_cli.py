@@ -524,6 +524,50 @@ def test_predict_cli_writes_compact_target_solution(tmp_path) -> None:
     assert "solution_bundle" not in payload
 
 
+def test_predict_cli_writes_direct_three_body_answer(tmp_path) -> None:
+    input_path = tmp_path / "initial-state.json"
+    output_path = tmp_path / "answer.json"
+    _write_prediction_input(input_path)
+
+    exit_code = main(
+        [
+            "predict",
+            "--input",
+            str(input_path),
+            "--answer",
+            "--count",
+            "5",
+            "--position-scale",
+            "1e-7",
+            "--velocity-scale",
+            "1e-7",
+            "--samples",
+            "9",
+            "--horizon-samples",
+            "6",
+            "--output",
+            str(output_path),
+        ]
+    )
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["answer_type"] == "three-body-problem-answer"
+    assert payload["answer_kind"] in {
+        "point-position-answer-with-probability-regions",
+        "probability-distribution-answer",
+        "deterministic-position-answer",
+    }
+    assert payload["input_admissibility"]["no_initial_binary_collision"] is True
+    assert payload["mathematical_model"]["state_flow"] == "x(t) = Phi_t(x(0))"
+    assert payload["mathematical_model"]["probability_answer"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
+    assert len(payload["target_positions"]) == 3
+    assert len(payload["target_position_distribution"]["mean_positions"]) == 3
+    assert payload["publishability"]["certificate_valid"] is True
+    assert payload["certificate_validation"]["valid"] is True
+    assert payload["target_solution"]["prediction_type"] == "three-body-target-position-solution"
+
+
 def test_predict_cli_writes_linearized_position_distribution(tmp_path) -> None:
     input_path = tmp_path / "initial-state.json"
     output_path = tmp_path / "linearized-distribution.json"

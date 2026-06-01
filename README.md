@@ -107,6 +107,7 @@ The research implementation remains importable as `threebody`, while the stable 
 
 ```python
 from threebody_engine import (
+    answer_three_body_problem,
     audit_public_static_artifact_bytes,
     audit_public_static_artifacts,
     audit_public_static_artifacts_from_url,
@@ -149,6 +150,7 @@ unresolved forecast, not a paper-level position claim:
 
 ```python
 from threebody_engine import (
+    answer_three_body_problem,
     predict_three_body_distribution_ephemeris,
     predict_three_body_ephemeris,
     predict_three_body_forecast_horizon,
@@ -167,6 +169,15 @@ positions = [[0.97000436, -0.24308753], [-0.97000436, 0.24308753], [0.0, 0.0]]
 velocities = [[0.466203685, 0.43236573], [0.466203685, 0.43236573], [-0.93240737, -0.86473146]]
 
 solution = solve_three_body_prediction_problem(
+    masses,
+    positions,
+    velocities,
+    target_time=0.5,
+    count=64,
+    position_scale=1.0e-6,
+    velocity_scale=1.0e-6,
+)
+direct_answer = answer_three_body_problem(
     masses,
     positions,
     velocities,

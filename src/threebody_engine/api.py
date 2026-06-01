@@ -952,6 +952,174 @@ def solve_three_body_target_positions(
     return compact
 
 
+def answer_three_body_problem(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    count: int = 64,
+    initial_state_covariance: Sequence[Sequence[float]] | None = None,
+    position_scale: float = 1.0e-6,
+    velocity_scale: float = 1.0e-6,
+    seed: int = 0,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    samples: int = 256,
+    target_times: Sequence[float] | None = None,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+    max_step: float = math.inf,
+    jacobian_step: float = 1.0e-6,
+    position_tolerance: float = 1.0e-3,
+    horizon_samples: int = 16,
+    linearized_covariance_relative_tolerance: float = 0.75,
+    preserve_center_of_mass: bool = True,
+    include_solution_bundle: bool = False,
+) -> dict[str, object]:
+    """Return the direct answer to the original three-body prediction question.
+
+    The answer is deliberately finite-time and diagnostic-gated. It reports the
+    deterministic target positions when that readout is defensible, otherwise
+    the pushed-forward target distribution or an unresolved verdict.
+    """
+
+    target_solution = solve_three_body_target_positions(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        count=count,
+        initial_state_covariance=initial_state_covariance,
+        position_scale=position_scale,
+        velocity_scale=velocity_scale,
+        seed=seed,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        target_times=target_times,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+        jacobian_step=jacobian_step,
+        position_tolerance=position_tolerance,
+        horizon_samples=horizon_samples,
+        linearized_covariance_relative_tolerance=linearized_covariance_relative_tolerance,
+        preserve_center_of_mass=preserve_center_of_mass,
+        include_solution_bundle=include_solution_bundle,
+    )
+    system, initial_state = _general_prediction_system(
+        masses,
+        positions,
+        velocities,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+    )
+    initial_positions, initial_velocities = system.split_state(initial_state)
+    initial_pair_diagnostics = _initial_pair_distance_diagnostics(initial_positions, 0.0)
+    angular_momentum = _angular_momentum_vector(system.masses, initial_positions, initial_velocities)
+    readout = target_solution.get("target_readout_decision", {})
+    if not isinstance(readout, Mapping):
+        readout = {}
+    primary_readout = str(readout.get("primary_readout", "unresolved"))
+    answer_kind = _three_body_answer_kind(primary_readout)
+    regularization_recommended = bool(
+        target_solution.get("diagnostics", {}).get("regularization_recommended", False)
+        if isinstance(target_solution.get("diagnostics"), Mapping)
+        else False
+    )
+    target_time_resolved = bool(
+        target_solution.get("target_sensitivity_budget", {}).get("target_time_resolved", False)
+        if isinstance(target_solution.get("target_sensitivity_budget"), Mapping)
+        else False
+    )
+    certificate_validation = validate_three_body_target_prediction_certificate(target_solution)
+    probability_answer = dict(target_solution.get("probability_answer", {})) if isinstance(
+        target_solution.get("probability_answer"), Mapping
+    ) else {}
+    probability_answer["distribution"] = target_solution.get("target_position_distribution", {})
+    answer_status = "answered" if answer_kind != "unresolved" else "unresolved"
+    if regularization_recommended:
+        answer_status = "limited-by-close-approach"
+    return {
+        "answer_schema_version": 1,
+        "answer_type": "three-body-problem-answer",
+        "question": {
+            "english": (
+                "Given masses, initial positions, initial velocities, and finite target time t, "
+                "return r_i(t) when defensible or Law(X_t) when uncertainty dominates."
+            ),
+            "korean": (
+                "질량, 초기 위치, 초기 속도, 유한 목표시간 t가 주어졌을 때 "
+                "방어 가능하면 r_i(t)를 반환하고, 불확실성이 지배적이면 Law(X_t)를 반환한다."
+            ),
+        },
+        "answer_status": answer_status,
+        "answer_kind": answer_kind,
+        "claim": target_solution.get("claim"),
+        "recommended_mode": target_solution.get("recommended_mode"),
+        "primary_readout": primary_readout,
+        "input_admissibility": {
+            "finite_positive_masses": True,
+            "finite_positions_and_velocities": True,
+            "finite_target_time": bool(math.isfinite(float(target_time))),
+            "no_initial_binary_collision": bool(initial_pair_diagnostics["minimum_pair_distance"] > 0.0),
+            "initial_pair_distances": initial_pair_diagnostics,
+            "angular_momentum_vector": angular_momentum.tolist(),
+            "softening": float(softening),
+            "exact_newtonian_equations": bool(float(softening) == 0.0),
+            "softening_disclosed": bool(float(softening) > 0.0),
+        },
+        "mathematical_model": {
+            "initial_value_problem": "Newtonian three-body flow on finite non-collisional data",
+            "state_flow": "x(t) = Phi_t(x(0))",
+            "point_position_answer": "r_i(t) = Pi_{r_i} Phi_t(x(0))",
+            "probability_answer": "Law(X_t) = (Phi_t)_# Law(X_0)",
+            "linearized_covariance_answer": "P_t = D Phi_t(x0) P_0 D Phi_t(x0)^T",
+            "scope": (
+                "finite-time, diagnostic-gated prediction; not a finite elementary closed-form "
+                "solution of the generic three-body problem"
+            ),
+        },
+        "deterministic_answer": target_solution.get("deterministic_flow_answer", {}),
+        "probability_answer": probability_answer,
+        "target_positions": target_solution.get("target_positions", []),
+        "target_position_distribution": target_solution.get("target_position_distribution", {}),
+        "target_position_table": target_solution.get("target_position_table", []),
+        "target_pair_geometry": target_solution.get("target_pair_geometry", {}),
+        "target_sensitivity_budget": target_solution.get("target_sensitivity_budget", {}),
+        "target_readout_decision": readout,
+        "publishability": {
+            "paper_position_claim_defensible": bool(
+                answer_kind in {
+                    "point-position-answer-with-probability-regions",
+                    "deterministic-position-answer",
+                }
+                and target_time_resolved
+                and not regularization_recommended
+            ),
+            "paper_distribution_claim_defensible": bool(
+                answer_kind
+                in {
+                    "point-position-answer-with-probability-regions",
+                    "probability-distribution-answer",
+                }
+                and not regularization_recommended
+            ),
+            "certificate_valid": bool(certificate_validation.get("valid") is True),
+            "limitations": [
+                "finite-time answer only",
+                "requires finite non-collisional input data",
+                "close-approach or regularization gates can downgrade the answer",
+                "does not claim a finite elementary global closed form",
+            ],
+        },
+        "target_prediction_certificate": target_solution.get("target_prediction_certificate", {}),
+        "certificate_validation": certificate_validation,
+        "target_solution": target_solution,
+    }
+
+
 def validate_three_body_target_prediction_certificate(
     target_solution: Mapping[str, object],
 ) -> dict[str, object]:
@@ -2820,6 +2988,16 @@ def _target_readout_decision(compact_solution: Mapping[str, object]) -> dict[str
         "blocking_reasons": blocking_reasons,
         "per_body_readouts": _target_per_body_readout_decisions(table),
     }
+
+
+def _three_body_answer_kind(primary_readout: str) -> str:
+    if primary_readout == "point-positions-with-probability-regions":
+        return "point-position-answer-with-probability-regions"
+    if primary_readout == "probability-distribution":
+        return "probability-distribution-answer"
+    if primary_readout == "deterministic-positions":
+        return "deterministic-position-answer"
+    return "unresolved"
 
 
 def _target_sensitivity_budget_summary(
