@@ -33,6 +33,7 @@ from threebody_engine import (
     solve_three_body_target_positions,
     score_three_body_position_hypothesis,
     tune_jacobi_picard,
+    validate_three_body_problem_answer,
     validate_three_body_target_prediction_certificate,
     validate_hysteresis_markov_chain,
     validate_public_static_artifact_receipt_contract,
@@ -51,6 +52,7 @@ def test_engine_api_integrates_reference_scenario() -> None:
     assert callable(verify_public_static_artifact_bytes)
     assert callable(public_static_artifact_audit_report_payload_sha256)
     assert callable(validate_three_body_target_prediction_certificate)
+    assert callable(validate_three_body_problem_answer)
     assert callable(answer_three_body_problem)
 
     scenario, trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=30)
@@ -652,6 +654,13 @@ def test_engine_api_answers_original_three_body_problem() -> None:
     assert answer["distribution_answer"]["body_answer_table"] == answer["body_answer_table"]
     assert answer["answer_consistency_certificate"]["valid"] is True
     assert answer["answer_consistency_certificate"]["checks"]["body_table_length_matches_target_positions"] is True
+    validation = validate_three_body_problem_answer(answer)
+    assert validation["valid"] is True
+    tampered_answer = dict(answer)
+    tampered_answer["target_positions"] = []
+    tampered_validation = validate_three_body_problem_answer(tampered_answer)
+    assert tampered_validation["valid"] is False
+    assert "computed_consistency_valid" in tampered_validation["blocking_reasons"]
     assert answer["answer_summary"]["summary_type"] == "three-body-answer-human-summary"
     assert answer["answer_summary"]["answer_kind"] == answer["answer_kind"]
     assert len(answer["answer_summary"]["body_summaries"]) == 3
@@ -691,6 +700,7 @@ def test_engine_api_returns_unresolved_for_inadmissible_initial_collision() -> N
     assert answer["distribution_answer"]["defensible"] is False
     assert answer["answer_consistency_certificate"]["valid"] is True
     assert answer["answer_consistency_certificate"]["checks"]["inadmissible_inputs_are_unresolved"] is True
+    assert validate_three_body_problem_answer(answer)["valid"] is True
     assert answer["answer_summary"]["recommended_readout"] == "unresolved"
     assert answer["answer_summary"]["blocking_reasons"]
     assert answer["publishability"]["paper_position_claim_defensible"] is False

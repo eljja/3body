@@ -151,6 +151,9 @@ solution into one paper-facing object:
 - `answer_consistency_certificate`: internal coherence checks tying together
   admissibility, answer kind, body rows, distribution aliases, numerical
   convergence, and publishability flags;
+- `validate_three_body_problem_answer(...)`: a public verifier for archived
+  direct-answer JSON; it recomputes consistency and validates the embedded
+  target prediction certificate when present;
 - `input_admissibility`: finite input, initial pair-distance, angular momentum,
   softening disclosure checks, and explicit blocking reasons when the exact
   Newtonian target-position question is inadmissible;
@@ -186,6 +189,9 @@ threebody predict --input initial-state.json --answer --count 128 --samples 256 
 오차, 권장 판독 방식을 함께 담는다.
 `answer_consistency_certificate`는 이 표, `target_positions`, 확률분포 alias,
 수렴 인증, 출판 가능성 flag가 서로 맞는지 검사한다.
+저장된 JSON 답변은 `validate_three_body_problem_answer(...)`로 다시 검증할 수
+있다. 이 함수는 answer consistency를 재계산하고 내장된 target certificate도
+함께 검증한다.
 초기 이중 충돌, 무한/NaN 입력, 잘못된 차원, 음수 질량처럼 문제 자체가
 허용되지 않는 경우에는 예외 대신 `answer_status="unresolved"`와
 `input_admissibility.blocking_reasons_ko`를 반환한다. 따라서 "어떠한 삼체"는

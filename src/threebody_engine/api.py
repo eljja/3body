@@ -1662,6 +1662,89 @@ def _three_body_answer_consistency_certificate(answer: Mapping[str, object]) -> 
     }
 
 
+def validate_three_body_problem_answer(answer: Mapping[str, object]) -> dict[str, object]:
+    """Validate a direct ``answer_three_body_problem`` JSON object.
+
+    This recomputes the answer-level consistency certificate and, when a compact
+    target solution is embedded, validates that target prediction certificate as
+    well. It is the public verifier for archived direct-answer JSON payloads.
+    """
+
+    if not isinstance(answer, Mapping):
+        return {
+            "validation_schema_version": 1,
+            "validation_type": "three-body-problem-answer-validation",
+            "valid": False,
+            "checks": {"answer_is_mapping": False},
+            "blocking_reasons": ["answer_is_mapping"],
+        }
+
+    computed_consistency = _three_body_answer_consistency_certificate(answer)
+    embedded_consistency = answer.get("answer_consistency_certificate", {})
+    if not isinstance(embedded_consistency, Mapping):
+        embedded_consistency = {}
+
+    target_solution = answer.get("target_solution", {})
+    target_validation: dict[str, object]
+    if isinstance(target_solution, Mapping) and target_solution:
+        target_validation = validate_three_body_target_prediction_certificate(target_solution)
+        target_certificate_requirement = target_validation.get("valid") is True
+    else:
+        target_validation = {
+            "validation_schema_version": 1,
+            "validation_type": "three-body-target-prediction-certificate-validation",
+            "valid": answer.get("answer_kind") == "unresolved",
+            "checks": {"target_solution_absent_only_for_unresolved": answer.get("answer_kind") == "unresolved"},
+        }
+        target_certificate_requirement = answer.get("answer_kind") == "unresolved"
+
+    summary = answer.get("answer_summary", {})
+    if not isinstance(summary, Mapping):
+        summary = {}
+    body_rows = answer.get("body_answer_table", [])
+    if not isinstance(body_rows, Sequence) or isinstance(body_rows, (str, bytes, bytearray)):
+        body_rows = []
+    summary_body_rows = summary.get("body_summaries", [])
+    if not isinstance(summary_body_rows, Sequence) or isinstance(summary_body_rows, (str, bytes, bytearray)):
+        summary_body_rows = []
+
+    checks = {
+        "answer_is_mapping": True,
+        "answer_type_matches": answer.get("answer_type") == "three-body-problem-answer",
+        "computed_consistency_valid": computed_consistency.get("valid") is True,
+        "embedded_consistency_present": bool(embedded_consistency),
+        "embedded_consistency_valid": embedded_consistency.get("valid") is True,
+        "embedded_consistency_matches_computed_checks": (
+            embedded_consistency.get("checks") == computed_consistency.get("checks")
+        ),
+        "target_certificate_requirement_satisfied": target_certificate_requirement,
+        "summary_present": bool(summary),
+        "summary_kind_matches_answer": summary.get("answer_kind") == answer.get("answer_kind"),
+        "summary_body_count_matches_body_table": len(summary_body_rows) == len(body_rows),
+    }
+    valid = all(checks.values())
+    return {
+        "validation_schema_version": 1,
+        "validation_type": "three-body-problem-answer-validation",
+        "valid": valid,
+        "checks": checks,
+        "blocking_reasons": [name for name, passed in checks.items() if not passed],
+        "computed_answer_consistency_certificate": computed_consistency,
+        "embedded_answer_consistency_certificate": dict(embedded_consistency),
+        "target_certificate_validation": target_validation,
+        "interpretation": (
+            "Valid means the archived direct-answer JSON is internally coherent, its embedded "
+            "consistency certificate matches a fresh recomputation, and the embedded target "
+            "prediction certificate is valid when present."
+        ),
+        "interpretation_ko": (
+            "valid=true는 저장된 직접 답변 JSON이 내부적으로 일관되고, 내장 consistency "
+            "certificate가 재계산 결과와 일치하며, target prediction certificate가 존재할 때 "
+            "그 인증서도 유효하다는 뜻이다."
+        ),
+    }
+
+
 def _target_position_numerical_convergence_certificate(
     masses: Sequence[float],
     positions: Sequence[Sequence[float]],
