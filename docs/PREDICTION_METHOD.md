@@ -146,6 +146,9 @@ solution into one paper-facing object:
 - `numerical_convergence_certificate`: a stricter DOP853 reference integration
   that checks whether the promoted `r_i(t)` coordinates remain inside
   `position_tolerance`;
+- `answer_consistency_certificate`: internal coherence checks tying together
+  admissibility, answer kind, body rows, distribution aliases, numerical
+  convergence, and publishability flags;
 - `input_admissibility`: finite input, initial pair-distance, angular momentum,
   softening disclosure checks, and explicit blocking reasons when the exact
   Newtonian target-position question is inadmissible;
@@ -177,6 +180,8 @@ threebody predict --input initial-state.json --answer --count 128 --samples 256 
 실제 읽기용 결과는 `body_answer_table`이 담당한다. 각 행은 한 물체의
 결정론적 위치, 확률 평균, 중앙 90% 구간, 95% confidence region, 재적분
 오차, 권장 판독 방식을 함께 담는다.
+`answer_consistency_certificate`는 이 표, `target_positions`, 확률분포 alias,
+수렴 인증, 출판 가능성 flag가 서로 맞는지 검사한다.
 초기 이중 충돌, 무한/NaN 입력, 잘못된 차원, 음수 질량처럼 문제 자체가
 허용되지 않는 경우에는 예외 대신 `answer_status="unresolved"`와
 `input_admissibility.blocking_reasons_ko`를 반환한다. 따라서 "어떠한 삼체"는

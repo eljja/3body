@@ -199,6 +199,7 @@ def test_random_demo_cli_writes_successful_prediction_report(tmp_path) -> None:
     assert payload["direct_answer"]["input_admissibility"]["admissible"] is True
     assert len(payload["direct_answer"]["body_answer_table"]) == 3
     assert payload["direct_answer"]["numerical_convergence_certificate"]["supports_position_answer"] is True
+    assert payload["direct_answer"]["answer_consistency_certificate"]["valid"] is True
 
 
 def test_predict_cli_writes_ephemeris(tmp_path) -> None:
@@ -580,6 +581,7 @@ def test_predict_cli_writes_direct_three_body_answer(tmp_path) -> None:
     assert payload["body_answer_table"][0]["deterministic_position"] == payload["target_positions"][0]
     assert payload["body_answer_table"][0]["numerical_convergence_passed"] is True
     assert payload["position_answer"]["body_answer_table"] == payload["body_answer_table"]
+    assert payload["answer_consistency_certificate"]["valid"] is True
     assert len(payload["target_positions"]) == 3
     assert len(payload["target_position_distribution"]["mean_positions"]) == 3
     assert payload["publishability"]["certificate_valid"] is True
@@ -615,6 +617,7 @@ def test_predict_cli_writes_unresolved_answer_for_initial_collision(tmp_path) ->
     assert result["input_admissibility"]["admissible"] is False
     assert result["input_admissibility"]["no_initial_binary_collision"] is False
     assert "initial positions contain a binary collision" in result["blocking_reasons"]
+    assert result["answer_consistency_certificate"]["valid"] is True
     assert result["body_answer_table"] == []
 
 

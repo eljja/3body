@@ -151,6 +151,7 @@ def test_engine_api_solves_random_three_body_prediction_demo() -> None:
     assert demo["direct_answer"]["input_admissibility"]["admissible"] is True
     assert len(demo["direct_answer"]["body_answer_table"]) == 3
     assert demo["direct_answer"]["numerical_convergence_certificate"]["supports_position_answer"] is True
+    assert demo["direct_answer"]["answer_consistency_certificate"]["valid"] is True
     assert demo["direct_answer"]["publishability"]["numerical_convergence_passed"] is True
 
 
@@ -648,6 +649,8 @@ def test_engine_api_answers_original_three_body_problem() -> None:
     assert "목표시간 위치" in answer["body_answer_table"][0]["answer_ko"]
     assert answer["position_answer"]["body_answer_table"] == answer["body_answer_table"]
     assert answer["distribution_answer"]["body_answer_table"] == answer["body_answer_table"]
+    assert answer["answer_consistency_certificate"]["valid"] is True
+    assert answer["answer_consistency_certificate"]["checks"]["body_table_length_matches_target_positions"] is True
     assert len(answer["target_positions"]) == 3
     assert len(answer["target_position_distribution"]["mean_positions"]) == 3
     assert len(answer["target_position_table"]) == 3
@@ -681,6 +684,8 @@ def test_engine_api_returns_unresolved_for_inadmissible_initial_collision() -> N
     assert "이중 충돌" in answer["blocking_reasons_ko"][0]
     assert answer["position_answer"]["defensible"] is False
     assert answer["distribution_answer"]["defensible"] is False
+    assert answer["answer_consistency_certificate"]["valid"] is True
+    assert answer["answer_consistency_certificate"]["checks"]["inadmissible_inputs_are_unresolved"] is True
     assert answer["publishability"]["paper_position_claim_defensible"] is False
     assert answer["target_solution"] == {}
 

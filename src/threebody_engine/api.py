@@ -1107,7 +1107,7 @@ def answer_three_body_problem(
         target_solution,
         numerical_convergence_certificate,
     )
-    return {
+    answer = {
         "answer_schema_version": 1,
         "answer_type": "three-body-problem-answer",
         "question": {
@@ -1230,6 +1230,8 @@ def answer_three_body_problem(
         "certificate_validation": certificate_validation,
         "target_solution": target_solution,
     }
+    answer["answer_consistency_certificate"] = _three_body_answer_consistency_certificate(answer)
+    return answer
 
 
 def _three_body_input_admissibility_certificate(
@@ -1398,7 +1400,7 @@ def _three_body_input_admissibility_certificate(
 def _inadmissible_three_body_answer(input_certificate: Mapping[str, object]) -> dict[str, object]:
     reasons = input_certificate.get("blocking_reasons", [])
     reasons_ko = input_certificate.get("blocking_reasons_ko", [])
-    return {
+    answer = {
         "answer_schema_version": 1,
         "answer_type": "three-body-problem-answer",
         "answer_status": "unresolved",
@@ -1463,6 +1465,110 @@ def _inadmissible_three_body_answer(input_certificate: Mapping[str, object]) -> 
         "target_prediction_certificate": {},
         "certificate_validation": {"valid": False, "checks": {"input_admissible": False}},
         "target_solution": {},
+    }
+    answer["answer_consistency_certificate"] = _three_body_answer_consistency_certificate(answer)
+    return answer
+
+
+def _three_body_answer_consistency_certificate(answer: Mapping[str, object]) -> dict[str, object]:
+    """Check that the direct answer object is internally coherent."""
+
+    input_admissibility = answer.get("input_admissibility", {})
+    if not isinstance(input_admissibility, Mapping):
+        input_admissibility = {}
+    position_answer = answer.get("position_answer", {})
+    if not isinstance(position_answer, Mapping):
+        position_answer = {}
+    distribution_answer = answer.get("distribution_answer", {})
+    if not isinstance(distribution_answer, Mapping):
+        distribution_answer = {}
+    publishability = answer.get("publishability", {})
+    if not isinstance(publishability, Mapping):
+        publishability = {}
+    convergence = answer.get("numerical_convergence_certificate", {})
+    if not isinstance(convergence, Mapping):
+        convergence = {}
+    probability_answer = answer.get("probability_answer", {})
+    if not isinstance(probability_answer, Mapping):
+        probability_answer = {}
+    target_solution = answer.get("target_solution", {})
+    if not isinstance(target_solution, Mapping):
+        target_solution = {}
+
+    target_positions = answer.get("target_positions", [])
+    body_answer_table = answer.get("body_answer_table", [])
+    target_distribution = answer.get("target_position_distribution", {})
+    checks = {
+        "answer_type_matches": answer.get("answer_type") == "three-body-problem-answer",
+        "schema_version_matches": answer.get("answer_schema_version") == 1,
+        "answer_kind_status_coherent": (
+            (answer.get("answer_kind") == "unresolved") == (answer.get("answer_status") == "unresolved")
+        )
+        or answer.get("answer_status") == "limited-by-close-approach",
+        "inadmissible_inputs_are_unresolved": (
+            input_admissibility.get("admissible") is not False
+            or (
+                answer.get("answer_kind") == "unresolved"
+                and position_answer.get("defensible") is False
+                and distribution_answer.get("defensible") is False
+            )
+        ),
+        "position_coordinates_match_target_positions": (
+            answer.get("answer_kind") == "unresolved"
+            or position_answer.get("coordinates") == target_positions
+        ),
+        "body_table_length_matches_target_positions": (
+            answer.get("answer_kind") == "unresolved"
+            or (
+                isinstance(body_answer_table, Sequence)
+                and not isinstance(body_answer_table, (str, bytes, bytearray))
+                and isinstance(target_positions, Sequence)
+                and not isinstance(target_positions, (str, bytes, bytearray))
+                and len(body_answer_table) == len(target_positions) == 3
+            )
+        ),
+        "position_and_distribution_share_body_table": (
+            position_answer.get("body_answer_table") == body_answer_table
+            and distribution_answer.get("body_answer_table") == body_answer_table
+        ),
+        "distribution_alias_matches_target_distribution": (
+            answer.get("answer_kind") == "unresolved"
+            or distribution_answer.get("distribution") == target_distribution
+        ),
+        "probability_alias_matches_target_distribution": (
+            answer.get("answer_kind") == "unresolved"
+            or probability_answer.get("distribution") == target_distribution
+        ),
+        "point_claim_requires_convergence": (
+            publishability.get("paper_position_claim_defensible") is not True
+            or convergence.get("supports_position_answer") is True
+        ),
+        "publishability_convergence_flag_matches": (
+            publishability.get("numerical_convergence_passed")
+            == (convergence.get("supports_position_answer") is True)
+        )
+        or answer.get("answer_kind") == "unresolved",
+        "target_certificate_valid_when_present": (
+            not target_solution
+            or answer.get("certificate_validation", {}).get("valid") is True
+        ),
+    }
+    valid = all(checks.values())
+    return {
+        "certificate_schema_version": 1,
+        "certificate_type": "three-body-answer-consistency",
+        "valid": valid,
+        "checks": checks,
+        "blocking_reasons": [name for name, passed in checks.items() if not passed],
+        "interpretation": (
+            "This certificate checks internal consistency between the promoted answer kind, "
+            "input admissibility, position table, probability distribution, convergence certificate, "
+            "and publishability flags."
+        ),
+        "interpretation_ko": (
+            "이 인증서는 답변 종류, 입력 허용성, 물체별 좌표표, 확률분포, 재적분 수렴 인증, "
+            "출판 가능성 판정이 서로 모순되지 않는지 확인한다."
+        ),
     }
 
 
@@ -2401,6 +2507,7 @@ def solve_random_three_body_prediction_demo(
             "input_admissibility": direct_answer["input_admissibility"],
             "target_readout_decision": direct_answer["target_readout_decision"],
             "numerical_convergence_certificate": direct_answer["numerical_convergence_certificate"],
+            "answer_consistency_certificate": direct_answer["answer_consistency_certificate"],
             "publishability": direct_answer["publishability"],
         },
         "success_report": {
