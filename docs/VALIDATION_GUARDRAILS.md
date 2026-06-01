@@ -1,6 +1,10 @@
 # Validation Guardrails
 
 This file defines what the project is not allowed to claim yet.
+It is authoritative for README, docs, GitHub Pages copy, and paper-facing text.
+
+이 문서는 README, docs, GitHub Pages 문구, 논문 제출용 문장에 적용되는
+최상위 claim guardrail입니다.
 
 ## Current Proof Level
 
@@ -14,18 +18,37 @@ same paragraph explicitly states that a validated-flow proof has been completed.
 `threebody theorem-suite` runs quick development checks by default.
 Paper-facing Jacobi parameter-box claims require `threebody theorem-suite --mode paper`.
 
-Allowed claims:
+Allowed claims / 허용되는 주장:
 
 - A benchmark trajectory belongs to a chart under the current classifier.
 - A proposed transition model reduced held-out scatter inside a declared benchmark family.
 - A compact model is provisional unless it survives held-out sweeps, artifact checks, and invariant-drift checks.
+- A finite-time target-position or probability-distribution answer is admissible only for finite input data, declared uncertainty, solver tolerances, and diagnostic gates.
+- A seeded random demo is evidence for that seeded admissible harness, not for universal random-input solvability.
 
-Forbidden claims:
+허용되는 주장의 한국어 기준:
+
+- benchmark trajectory가 현재 classifier 기준으로 특정 chart에 속한다.
+- 제안된 transition model이 선언된 benchmark family 내부의 held-out scatter를 줄였다.
+- compact model은 held-out sweep, artifact check, invariant-drift check를 통과하기 전까지 provisional이다.
+- 유한시간 목표 위치/확률분포 답변은 유한 입력자료, 선언된 불확실성, solver tolerance, diagnostic gate가 함께 있을 때만 허용된다.
+- seed 고정 random demo는 그 seed와 admissible harness에 대한 증거이지 보편 random-input solvability의 증거가 아니다.
+
+Forbidden claims / 금지되는 주장:
 
 - General three-body closed-form solution.
 - Universal transition threshold across all masses, energies, and angular momenta.
 - Close-encounter law without a true regularized integrator or equivalent collision chart.
 - Lagrange-neck transport law before the gateway classifier beats the generic Lagrange-neighborhood classifier.
+- Exact Newtonian theorem statements based on softened or regularized numerical equations unless the softening/regularization is explicitly part of the theorem.
+
+금지되는 주장의 한국어 기준:
+
+- 일반 삼체 문제의 전역 닫힌형 해.
+- 모든 질량, 에너지, 각운동량에 대한 보편 transition threshold.
+- 진짜 regularized integrator 또는 동등한 collision chart 없는 close-encounter law.
+- gateway classifier가 generic Lagrange-neighborhood classifier를 이기기 전의 Lagrange-neck transport law.
+- softening/regularization이 정리의 일부로 명시되지 않은 상태에서 softened/regularized 수치 방정식 결과를 정확한 Newtonian theorem으로 표현하는 것.
 
 ## Required Checks Before Promoting A Law
 

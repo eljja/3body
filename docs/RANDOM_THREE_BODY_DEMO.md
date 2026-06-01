@@ -4,9 +4,17 @@ The project now includes a reproducible random-case demonstration for the
 original operational target:
 
 ```text
-given random masses, positions, velocities, and target time t,
+given reproducible admissible random masses, positions, velocities, and target time t,
 estimate the three target positions r_i(t)
 ```
+
+**Paper status.** This is a demonstration harness for finite-time prediction on
+seeded non-collisional cases. It is not evidence that all random three-body
+inputs are globally predictable, and it is not a closed-form theorem.
+
+**논문용 상태.** 이 문서는 seed가 고정된 비충돌 사례에 대한 유한시간 예측
+데모이다. 모든 랜덤 삼체 입력이 전역적으로 예측 가능하다는 증거가 아니며,
+닫힌형 정리도 아니다.
 
 Run:
 
@@ -32,13 +40,13 @@ The `success_report` promotes success only when:
 
 This is the practical engine demonstration path. It does not solve the general
 three-body problem by a new closed formula; it shows that the system can
-generate an arbitrary test case, run multiple complementary forecast layers,
-and audit whether the target-time coordinates are trustworthy under the stated
-tolerances.
+generate a seeded admissible test case, run multiple complementary forecast
+layers, and audit whether the target-time coordinates are trustworthy under the
+stated tolerances.
 
 ## Korean Summary
 
-이 데모는 임의 seed의 비충돌 삼체 초기조건을 만들고, 목표 시각 `t`의
+이 데모는 seed가 고정된 비충돌 삼체 초기조건을 만들고, 목표 시각 `t`의
 좌표를 여러 방식으로 계산한 뒤 고정밀 reference integration과 비교한다.
 성공은 `success_tolerance`, 상대 에너지 drift, close-approach gate를 모두
 통과할 때만 승격된다. 이것은 유한시간 예측 데모이며, 일반 삼체 문제의

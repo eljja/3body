@@ -19,6 +19,33 @@ continuity.
 | Computer-assisted proof claim | Allowed only after interval ODE propagation or an independently validated backend encloses the relevant flow and parameter region. | 관련 흐름과 매개변수 영역이 구간 ODE 또는 독립 검증 백엔드로 포획된 뒤에만 허용됩니다. |
 | Forbidden global claim | No document may claim a finite elementary closed-form solution of the generic Newtonian three-body problem. | 어떤 문서도 일반 뉴턴 삼체 문제의 유한 초등함수 전역해를 주장할 수 없습니다. |
 
+## Logical Consistency Rules / 논리 일관성 규칙
+
+Every document in this repository must satisfy the following rules before being
+used in a paper submission:
+
+- "arbitrary", "general", or "random" initial data must be qualified by finite
+  data, non-collision/admissibility, target-time horizon, and diagnostic gates;
+- exact Newtonian statements must not silently use softened or regularized
+  numerical equations;
+- a certificate is an audit artifact unless the same paragraph states the
+  validated-flow proof backend and enclosed parameter region;
+- a public GitHub Pages artifact is visual evidence plus a machine-readable
+  receipt, not a live solver and not an independent proof;
+- theorem-candidate language must include open proof obligations.
+
+논문 제출에 사용되는 저장소 문서는 모두 다음 규칙을 만족해야 합니다.
+
+- "임의", "일반", "랜덤" 초기조건은 유한 데이터, 비충돌/admissibility,
+  목표시간 horizon, diagnostic gate와 함께 제한해서 써야 합니다.
+- 정확한 Newtonian 명제는 softened/regularized 수치 방정식을 암묵적으로
+  사용하면 안 됩니다.
+- 같은 문단에서 validated-flow proof backend와 포획된 parameter region을
+  명시하지 않으면 certificate는 감사 산출물입니다.
+- 공개 GitHub Pages 산출물은 시각 증거와 기계판독 receipt이지 live solver나
+  독립 증명이 아닙니다.
+- theorem-candidate 문장은 남은 proof obligation을 포함해야 합니다.
+
 ## Repository-Wide Conclusions / 전체 결론
 
 1. The project has a defensible operational solver layer for finite-time
@@ -44,7 +71,7 @@ continuity.
 
 | Document | Paper-facing status | Required interpretation |
 | --- | --- | --- |
-| `README.md` | usable after claim-standard link | Entry point; do not cite as a proof document. |
+| `README.md` | usable after claim-standard link and admissibility wording | Entry point; do not cite as a proof document. |
 | `docs/PROJECT_SCOPE.md` | consistent | Defines boundaries and non-claims. |
 | `docs/SCIENCE_FOUNDATION.md` | consistent | Background only; no novelty claim. |
 | `docs/ARCHITECTURE.md` | consistent | Software architecture and verification flow. |
@@ -55,15 +82,15 @@ continuity.
 | `docs/THEOREM_CANDIDATES.md` | scoped | Theorem candidates with open obligations. |
 | `docs/JACOBI_ESCAPE_CONE_THEOREM.md` | scoped | Conditional theorem note; still needs validated ODE backend. |
 | `docs/INTERPRETATION_METHOD.md` | scoped | Local interpretation certificates, not global theory. |
-| `docs/PREDICTION_METHOD.md` | consistent | Operational finite-time prediction method. |
-| `docs/RANDOM_THREE_BODY_DEMO.md` | consistent | Demonstration harness, not a proof of global solvability. |
+| `docs/PREDICTION_METHOD.md` | consistent after Newtonian/softening distinction | Operational finite-time prediction method for admissible finite data. |
+| `docs/RANDOM_THREE_BODY_DEMO.md` | consistent after seeded-admissible wording | Demonstration harness, not a proof of global solvability. |
 | `docs/GLOBAL_CLOSED_FORM_PROGRAM.md` | consistent | Sundman-style contract; explicitly not an elementary formula. |
 | `docs/LITERATURE_COMPARISON.md` | consistent | Overclaim-prevention comparison. |
-| `docs/SOLUTION_SPACE.md` | consistent | Alternative research directions and operational APIs. |
+| `docs/SOLUTION_SPACE.md` | consistent after finite-admissible API wording | Alternative research directions and operational APIs. |
 | `docs/VALIDATION_GUARDRAILS.md` | authoritative | Main anti-overclaim policy. |
 | `docs/STRATEGIC_REVIEW.md` | advisory | Strategy memo; commercial/journal claims are conditional. |
 | `docs/LOCAL_CHANGES_AUDIT.md` | historical | Change log; superseded entries require current follow-up context. |
-| `docs/GITHUB_PAGES.md` | consistent after numbering fix | Public evidence-bundle generation and verifier use. |
+| `docs/GITHUB_PAGES.md` | consistent | Public evidence-bundle generation and verifier use. |
 | `docs/ROADMAP.md` | planning | Milestones; not evidence by itself. |
 
 ## Citation Guidance / 인용 지침

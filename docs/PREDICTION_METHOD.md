@@ -6,26 +6,42 @@ Sundman-style convergent-series route. That contract is intentionally separate
 from the finite-time prediction API because it does not claim a finite
 elementary formula for the generic problem.
 
-한국어 요약: 이 문서는 주어진 초기조건과 목표 시간에 대해 `r_i(t)` 또는
-`Law(X_t)`를 계산하는 운영적 예측 계층을 설명한다. 이는 유한시간 flow-map
-평가와 불확실성 push-forward이며, 일반 삼체 문제의 전역 닫힌형 해 주장이
-아니다.
+**Paper status.** This is an operational finite-time method for admissible input
+states, not a theorem that every three-body forecast is globally predictable.
+Any paper claim must include the target time, solver tolerances, invariant
+drift, close-approach diagnostics, and the promoted readout decision.
 
-For a general Newtonian three-body initial condition
+**논문용 상태.** 이 문서는 허용 가능한 입력 상태에 대한 유한시간 운영
+방법을 설명하며, 모든 삼체 예측이 전역적으로 가능하다는 정리가 아니다.
+논문에 인용할 때는 목표시간, solver tolerance, 보존량 drift, 근접조우
+진단, 승격된 판독 결정을 함께 제시해야 한다.
+
+한국어 요약: 이 문서는 유한하고 비충돌이며 진단 gate를 통과한 초기조건과
+목표 시간에 대해 `r_i(t)` 또는 `Law(X_t)`를 계산하는 운영적 예측 계층을
+설명한다. 이는 유한시간 flow-map 평가와 불확실성 push-forward이며, 일반
+삼체 문제의 전역 닫힌형 해 주장이 아니다.
+
+For a finite admissible Newtonian three-body initial condition
 
 ```text
 m_i > 0
 r_i(0), v_i(0) in R^2 or R^3
+min_{i != j} |r_i(0)-r_j(0)| > 0
 ```
 
-the engine solves
+the mathematical model is the Newtonian initial-value problem
 
 ```text
 d r_i / dt = v_i
-d v_i / dt = G sum_{j != i} m_j (r_j - r_i) / (|r_j - r_i|^2 + eps^2)^(3/2)
+d v_i / dt = G sum_{j != i} m_j (r_j - r_i) / |r_j - r_i|^3
 ```
 
-and returns the positions `r_i(t)` at the requested target time. This is not a global closed-form solution claim. It is a reproducible numerical evaluation of the Newtonian flow map with conservation diagnostics.
+and the engine returns the positions `r_i(t)` at the requested target time when
+the finite-time diagnostics permit that readout. Numerical regularization or
+softening parameters, if used in a specific experiment, must be disclosed as
+part of the solver contract and must not be described as an exact Newtonian
+theorem. This is not a global closed-form solution claim. It is a reproducible
+numerical evaluation of the flow map with conservation diagnostics.
 
 ## Random-Case Success Demo
 
@@ -49,8 +65,9 @@ The result promotes success only when the point forecast agrees with the
 stricter reference within `success_tolerance`, relative energy drift remains
 inside the invariant gate, and close-approach diagnostics do not demand
 collision regularization. This is the concrete operational demonstration for
-the original question "given a random three-body initial state, estimate
-`r_i(t)`"; it remains separate from any global closed-form theorem claim.
+the original question "given a reproducible admissible random three-body
+initial state, estimate `r_i(t)`"; it remains separate from any global
+closed-form theorem claim.
 
 ## Global Closed-Form Route
 

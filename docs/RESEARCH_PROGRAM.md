@@ -2,6 +2,12 @@
 
 ## Thesis
 
+**Paper status / 논문용 상태:** Research agenda and thesis statement. It frames
+why an atlas approach is appropriate, but theorem-level claims must be taken
+from `THEOREM_CANDIDATES.md`, `JACOBI_ESCAPE_CONE_THEOREM.md`, and the current
+guardrails. 이 문서는 연구 agenda이며 atlas 접근의 이유를 설명한다. 정리
+수준 주장은 별도 정리 후보 문서와 guardrail을 따라야 한다.
+
 The three-body problem should be attacked as an atlas construction problem.
 
 There may be no single global closed-form solution for the general Newtonian three-body problem, but that does not mean the system is only numerically observable.

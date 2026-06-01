@@ -9,6 +9,10 @@ the text explicitly says that a validated-flow proof is complete.
 `certificate`는 기본적으로 구현된 검사/감사 산출물을 뜻하며, 독립 validated
 ODE proof가 완료되었다고 명시하지 않는 한 수학적 증명을 뜻하지 않는다.
 
+Paper submission rule / 논문 제출 규칙: theorem-candidate paragraphs must be
+cited together with their open proof obligations. 정리 후보 문단은 반드시 남은
+proof obligation과 함께 인용해야 한다.
+
 ## Candidate 1: Jacobi Escape Cone Theorem Candidate
 
 Claim:

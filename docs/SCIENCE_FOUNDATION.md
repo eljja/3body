@@ -1,5 +1,10 @@
 # Science Foundation
 
+**Paper status / 논문용 상태:** Background and framing only. This document may
+support notation and motivation, but it does not assert project novelty or a
+new proof. 이 문서는 배경과 문제 설정을 위한 문서이며, 프로젝트의 새 증명
+또는 독창성 주장을 단독으로 뒷받침하지 않는다.
+
 ## Two-Body Problem
 
 The two-body problem is solvable in closed form because it can be reduced to:

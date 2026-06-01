@@ -4,6 +4,12 @@ This file records falsifiable hypotheses produced by the current analysis machin
 These are not final laws.
 They are research targets that must survive wider sweeps, tighter tolerances, and held-out validation.
 
+**Paper status / 논문용 상태:** Hypothesis register only. A hypothesis becomes
+paper-facing only after the matching validation run, negative controls, and
+open proof obligations are reported. 이 문서는 가설 목록이며, 해당 검증 실행,
+negative control, 미해결 proof obligation이 함께 제시되기 전까지 논문용
+주장이 아니다.
+
 ## H1: Hierarchical Flyby Boundary
 
 Scenario:

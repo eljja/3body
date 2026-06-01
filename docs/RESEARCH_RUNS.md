@@ -2,6 +2,13 @@
 
 This project treats each numerical experiment as a research artifact, not just a rendered orbit.
 
+**Paper status / 논문용 상태:** Commands in this file define reproducible runs.
+They do not by themselves prove the associated hypotheses; paper use requires
+the recorded commit, parameters, diagnostics, and guardrail interpretation.
+이 문서의 명령은 재현 가능한 실행을 정의하지만, 그 자체로 가설을 증명하지
+않는다. 논문에는 commit, parameter, diagnostics, guardrail 해석을 함께
+제시해야 한다.
+
 The command-line survey runner executes a perturbation ensemble, integrates each member, classifies the trajectory through the analysis atlas, builds the empirical transition graph, and exports candidate transition laws.
 
 ```powershell

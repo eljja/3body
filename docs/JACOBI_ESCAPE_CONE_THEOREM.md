@@ -2,7 +2,9 @@
 
 This note records the strongest theorem candidate currently implemented in the project.
 It is not a proof of the general three-body problem.
-It is a local escape theorem candidate for a large hierarchical regime.
+It is a local escape theorem candidate for a declared hierarchical benchmark
+regime, with open proof obligations before any journal-level computer-assisted
+proof claim.
 
 Korean summary: 이 문서는 일반 삼체 문제의 증명이 아니라, 계층적 escape
 tail에서 성립할 수 있는 조건부 정리 후보를 기록한다. 현재 구현은 sampled

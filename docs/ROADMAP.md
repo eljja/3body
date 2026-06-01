@@ -1,5 +1,11 @@
 # Roadmap
 
+**Paper status / 논문용 상태:** Planning document only. Milestones listed here
+are engineering/research targets, not evidence unless backed by the relevant
+verification command, artifact receipt, or theorem-candidate document. 이 문서는
+계획 문서이며, milestone은 관련 검증 명령, artifact receipt, 정리 후보
+문서가 붙기 전까지 증거가 아니다.
+
 ## Phase 1: Baseline Complete
 
 - package structure created

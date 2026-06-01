@@ -1,5 +1,10 @@
 # Development Guide
 
+**Paper status / 논문용 상태:** Developer procedure only. It is not scientific
+evidence unless a documented command produces a committed artifact or verifier
+receipt. 이 문서는 개발 절차이며, 명령이 commit된 artifact 또는 verifier
+receipt를 생성하기 전까지 과학적 증거가 아니다.
+
 ## Environment
 
 This project currently targets Python 3.11+.

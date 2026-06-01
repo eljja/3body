@@ -3,6 +3,11 @@
 This project does not claim a universal closed-form solution.
 The working claim is stricter and more useful:
 
+**Paper status / 논문용 상태:** Method document for chart-local interpretation.
+It supports local certificates and unresolved obligations, not a global
+three-body theorem. 이 문서는 chart-local 해석 방법 문서이며, 지역 certificate와
+미해결 의무를 다룬다. 전역 삼체 정리를 주장하지 않는다.
+
 > A three-body trajectory can be interpreted by decomposing it into local dynamical charts, assigning each chart a valid model family, and proving or falsifying the transition laws between charts.
 
 ## Core Algorithm

@@ -5,6 +5,14 @@ generic Newtonian three-body problem. The defensible global direction is a
 regularized, globally convergent series representation in the spirit of
 Sundman's theorem.
 
+**Paper status.** This document is a research-contract statement. It may be
+cited to explain why a Sundman-style route is being studied, but not as a claim
+that the project has implemented an effective global series solver.
+
+**논문용 상태.** 이 문서는 연구 계약을 정의한다. Sundman식 경로를 연구하는
+이유를 설명하는 근거로는 인용할 수 있지만, 유효한 전역 급수 solver 구현이
+완료되었다는 주장으로 인용하면 안 된다.
+
 This distinction matters:
 
 - practical answer: compute `r_i(t)` and `Law(X_t)` with the existing prediction

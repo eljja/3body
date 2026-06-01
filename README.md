@@ -18,6 +18,17 @@ The project is built around five ideas:
 - Decompose state space into interpretive charts and track transitions between them.
 - Build compact models only inside explicitly identified charts.
 
+**Paper-status note.** This repository is a research evidence package, not a
+claim that the generic Newtonian three-body problem has been solved. Paper-facing
+claims must be read through
+[Paper-Readiness Review](docs/PAPER_READINESS_REVIEW.md) and
+[Validation Guardrails](docs/VALIDATION_GUARDRAILS.md).
+
+**논문용 상태 메모.** 이 저장소는 연구 증거 패키지이며, 일반 뉴턴 삼체
+문제가 해결되었다는 주장이 아니다. 논문 제출용 주장은 반드시
+[Paper-Readiness Review](docs/PAPER_READINESS_REVIEW.md)와
+[Validation Guardrails](docs/VALIDATION_GUARDRAILS.md)의 기준으로 읽어야 한다.
+
 ## Korean Summary
 
 <a id="korean-summary"></a>
@@ -29,7 +40,8 @@ atlas를 구축한다.
 
 현재 공개적으로 주장할 수 있는 범위는 다음과 같다.
 
-- 특정 초기조건과 목표시간에 대해 `r_i(t)` 또는 `Law(X_t)`를 계산하는 유한시간 예측 API.
+- 유한하고 비충돌이며 진단 gate를 통과한 특정 초기조건/목표시간에 대해
+  `r_i(t)` 또는 `Law(X_t)`를 계산하는 유한시간 예측 API.
 - 랜덤 삼체 초기조건을 생성하고 여러 readout을 고정밀 reference integration과 비교하는 데모.
 - Jacobi escape cone, hysteresis symbolic dynamics, static artifact verifier 같은 정리 후보/감사 산출물.
 - Sundman식 정규화 수렴급수 연구 계약. 단, 일반 삼체 문제의 유한 초등함수 전역해는 주장하지 않는다.
@@ -130,7 +142,10 @@ from threebody_engine import (
 )
 ```
 
-For an arbitrary Newtonian three-body initial state, use the prediction API rather than a claimed global closed-form solution:
+For a finite admissible Newtonian three-body initial state and a declared finite target time,
+use the prediction API rather than a claimed global closed-form solution. If the trajectory
+approaches a collision or fails the diagnostic gates, the correct output is a limited or
+unresolved forecast, not a paper-level position claim:
 
 ```python
 from threebody_engine import (

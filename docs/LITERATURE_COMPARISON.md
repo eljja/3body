@@ -2,6 +2,11 @@
 
 This project must be compared against known three-body results before making any novelty claim.
 
+**Paper status / 논문용 상태:** Anti-overclaim comparison. It identifies prior
+work that must not be repackaged as novelty; it is not a literature review
+complete enough for submission by itself. 이 문서는 과장 주장을 막기 위한
+비교 문서이며, 단독으로 제출 가능한 완전한 문헌조사는 아니다.
+
 ## Established Results We Must Not Repackage
 
 - Sundman, 1912: convergent series representation for the three-body problem after regularization, but not a practical closed-form solution.

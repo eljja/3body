@@ -3,6 +3,12 @@
 The Streamlit application remains the local research UI because it runs Python and SciPy on demand.
 GitHub Pages cannot run that server-side Python process, so the public `github.io` version is a static build.
 
+**Paper status / 논문용 상태:** Public evidence-bundle documentation. The Pages
+site is useful for visual audit and artifact discovery, but the citable object
+is the commit-pinned verifier receipt and linked JSON artifacts. GitHub Pages는
+시각 감사와 artifact 발견을 돕지만, 논문 인용 대상은 commit으로 고정된
+verifier receipt와 연결된 JSON artifact이다.
+
 The static build performs these steps during GitHub Actions deployment:
 
 1. Install the Python package.

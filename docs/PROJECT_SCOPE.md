@@ -2,6 +2,12 @@
 
 ## Purpose
 
+**Paper status / 논문용 상태:** Scope-control document. It defines what the
+project is and is not allowed to claim; it should be cited together with
+`PAPER_READINESS_REVIEW.md` for paper submissions. 이 문서는 project scope를
+제한하는 문서이며, 논문 제출 시 `PAPER_READINESS_REVIEW.md`와 함께 읽어야
+한다.
+
 This project tries to build an analysis method for the three-body problem through code.
 The visualizer exists only to support intuition while developing that method.
 

@@ -1,5 +1,11 @@
 # Architecture
 
+**Paper status / 논문용 상태:** Software-architecture document. It explains
+module boundaries and verification flow; scientific claims must cite the
+generated artifacts and guardrail documents, not architecture alone. 이 문서는
+소프트웨어 구조를 설명하며, 과학적 주장은 생성 artifact와 guardrail 문서를
+함께 인용해야 한다.
+
 ## Package Layout
 
 ### `src/threebody/systems`
