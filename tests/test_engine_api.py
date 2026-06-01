@@ -629,6 +629,12 @@ def test_engine_api_answers_original_three_body_problem() -> None:
     assert answer["distribution_answer"]["law_notation"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
     assert answer["distribution_answer"]["distribution"] == answer["target_position_distribution"]
     assert answer["decision_protocol"]["selected_answer_kind"] == answer["answer_kind"]
+    assert answer["numerical_convergence_certificate"]["certificate_type"] == (
+        "target-position-numerical-convergence"
+    )
+    assert answer["numerical_convergence_certificate"]["supports_position_answer"] is True
+    assert answer["numerical_convergence_certificate"]["maximum_body_position_delta"] < 1.0e-8
+    assert answer["publishability"]["numerical_convergence_passed"] is True
     assert len(answer["target_positions"]) == 3
     assert len(answer["target_position_distribution"]["mean_positions"]) == 3
     assert len(answer["target_position_table"]) == 3

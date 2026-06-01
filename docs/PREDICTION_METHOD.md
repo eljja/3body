@@ -135,6 +135,9 @@ solution into one paper-facing object:
   flags;
 - `decision_protocol`: the ordered rule for choosing point coordinates,
   probability regions, deterministic-only output, or unresolved output;
+- `numerical_convergence_certificate`: a stricter DOP853 reference integration
+  that checks whether the promoted `r_i(t)` coordinates remain inside
+  `position_tolerance`;
 - `input_admissibility`: finite input, initial pair-distance, angular momentum,
   and softening disclosure checks;
 - `publishability`: whether a point-position or distribution claim is defensible
@@ -159,6 +162,9 @@ threebody predict --input initial-state.json --answer --count 128 --samples 256 
 확률법칙 `mu_0`로 모델링하면 목표시간의 법칙은 `mu_t = (Phi_t)_# mu_0`이다.
 따라서 이 API는 "전역 초등 닫힌 해"를 주장하지 않고, 주어진 입력과 유한한
 시간에 대해 점 위치 또는 확률분포 중 논문에 방어 가능한 판독값을 고른다.
+또한 `numerical_convergence_certificate`가 같은 입력을 더 엄격한 적분 허용오차로
+다시 풀어 목표 좌표 차이를 `position_tolerance`와 비교한다. 좌표 논문 주장은
+이 재적분 검사가 통과할 때만 승격된다.
 
 Use `threebody_engine.solve_three_body_target_positions(...)` when the caller only needs the direct answer: `target_positions`, `target_position_distribution`, `target_position_table`, `center_of_mass_frame`, `target_pair_geometry`, `target_distribution_quality`, `target_sensitivity_budget`, `target_readout_decision`, `target_prediction_certificate`, one row per body's target-time claim, and the core diagnostics. The table includes a relative 95% radius, `position_claim_strength`, and `recommended_readout` so callers can tell whether to publish a point coordinate, a confidence region, or only a distribution summary. The center-of-mass frame reports the same target positions relative to the mass-weighted center, which is the safer readout when inertial translation is not scientifically meaningful. The pair geometry reports pairwise separations, perimeter, area, and conservative distance bounds derived from coordinate quantile boxes. The distribution quality block reports Monte Carlo mean standard errors for the empirical probability answer. The sensitivity budget records the forecast-horizon status, propagated target-position standard deviation, tolerance ratio, amplification factor, Lyapunov exponent, and close-approach gate. The readout decision promotes the defensible answer as point positions with probability regions, probability distribution, deterministic coordinates only, or unresolved, with the diagnostic gates that caused that choice. The certificate pins the input contract and result payload with SHA-256 digests for reproducible auditing, and `validate_three_body_target_prediction_certificate(...)` recomputes those checks. Use `threebody_engine.solve_three_body_prediction_problem(...)` when the full audit bundle is needed, or:
 

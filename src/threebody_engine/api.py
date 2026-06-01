@@ -1008,6 +1008,20 @@ def answer_three_body_problem(
         preserve_center_of_mass=preserve_center_of_mass,
         include_solution_bundle=include_solution_bundle,
     )
+    numerical_convergence_certificate = _target_position_numerical_convergence_certificate(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        target_positions=target_solution.get("target_positions", []),
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+        position_tolerance=position_tolerance,
+    )
     system, initial_state = _general_prediction_system(
         masses,
         positions,
@@ -1075,6 +1089,9 @@ def answer_three_body_problem(
     answer_status = "answered" if answer_kind != "unresolved" else "unresolved"
     if regularization_recommended:
         answer_status = "limited-by-close-approach"
+    numerical_convergence_passed = (
+        numerical_convergence_certificate.get("supports_position_answer") is True
+    )
     return {
         "answer_schema_version": 1,
         "answer_type": "three-body-problem-answer",
@@ -1127,6 +1144,7 @@ def answer_three_body_problem(
                 }
                 and target_time_resolved
                 and not regularization_recommended
+                and numerical_convergence_passed
             ),
         },
         "distribution_answer": {
@@ -1152,6 +1170,7 @@ def answer_three_body_problem(
             "selected_readout": primary_readout,
             "selected_answer_kind": answer_kind,
         },
+        "numerical_convergence_certificate": numerical_convergence_certificate,
         "deterministic_answer": target_solution.get("deterministic_flow_answer", {}),
         "probability_answer": probability_answer,
         "target_positions": target_solution.get("target_positions", []),
@@ -1168,6 +1187,7 @@ def answer_three_body_problem(
                 }
                 and target_time_resolved
                 and not regularization_recommended
+                and numerical_convergence_passed
             ),
             "paper_distribution_claim_defensible": bool(
                 answer_kind
@@ -1178,9 +1198,11 @@ def answer_three_body_problem(
                 and not regularization_recommended
             ),
             "certificate_valid": bool(certificate_validation.get("valid") is True),
+            "numerical_convergence_passed": bool(numerical_convergence_passed),
             "limitations": [
                 "finite-time answer only",
                 "requires finite non-collisional input data",
+                "point-position publication requires agreement with a stricter reference integration",
                 "close-approach or regularization gates can downgrade the answer",
                 "does not claim a finite elementary global closed form",
             ],
@@ -1189,6 +1211,96 @@ def answer_three_body_problem(
         "certificate_validation": certificate_validation,
         "target_solution": target_solution,
     }
+
+
+def _target_position_numerical_convergence_certificate(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    target_positions: object,
+    gravitational_constant: float,
+    softening: float,
+    samples: int,
+    rtol: float,
+    atol: float,
+    max_step: float,
+    position_tolerance: float,
+) -> dict[str, object]:
+    """Compare the promoted target coordinates with a stricter integration."""
+
+    reference_rtol = min(float(rtol) * 1.0e-2, 1.0e-12)
+    reference_atol = min(float(atol) * 1.0e-2, 1.0e-14)
+    reference_samples = max(int(samples) * 2, 8)
+    try:
+        promoted_positions = np.asarray(target_positions, dtype=float)
+        reference = predict_three_body_positions(
+            masses,
+            positions,
+            velocities,
+            target_time,
+            gravitational_constant=gravitational_constant,
+            softening=softening,
+            samples=reference_samples,
+            rtol=reference_rtol,
+            atol=reference_atol,
+            max_step=max_step,
+        )
+        reference_positions = np.asarray(reference.get("positions", []), dtype=float)
+        if promoted_positions.shape != reference_positions.shape or promoted_positions.size == 0:
+            raise ValueError("promoted and reference target positions have incompatible shapes")
+        body_position_deltas = np.linalg.norm(promoted_positions - reference_positions, axis=1)
+        max_delta = float(np.max(body_position_deltas))
+        rms_delta = float(np.sqrt(np.mean(body_position_deltas**2)))
+        reference_scale = float(max(np.max(np.linalg.norm(reference_positions, axis=1)), 1.0))
+        tolerance = _positive_float(position_tolerance, "position_tolerance")
+        supports_position_answer = bool(
+            reference.get("success") is True
+            and np.all(np.isfinite(body_position_deltas))
+            and max_delta <= tolerance
+        )
+        return {
+            "certificate_schema_version": 1,
+            "certificate_type": "target-position-numerical-convergence",
+            "method": "stricter-adaptive-DOP853-reference",
+            "base_rtol": float(rtol),
+            "base_atol": float(atol),
+            "reference_rtol": reference_rtol,
+            "reference_atol": reference_atol,
+            "base_samples": int(samples),
+            "reference_samples": reference_samples,
+            "position_tolerance": tolerance,
+            "body_position_deltas": body_position_deltas.tolist(),
+            "maximum_body_position_delta": max_delta,
+            "rms_body_position_delta": rms_delta,
+            "relative_maximum_body_position_delta": float(max_delta / reference_scale),
+            "tolerance_ratio": float(max_delta / tolerance),
+            "supports_position_answer": supports_position_answer,
+            "reference_success": bool(reference.get("success") is True),
+            "reference_invariant_certificate": reference.get("invariant_certificate", {}),
+            "interpretation": (
+                "The promoted target coordinates are compared with a stricter integration. "
+                "A point-position publication requires the maximum body-position delta to stay "
+                "inside position_tolerance."
+            ),
+        }
+    except Exception as exc:
+        return {
+            "certificate_schema_version": 1,
+            "certificate_type": "target-position-numerical-convergence",
+            "method": "stricter-adaptive-DOP853-reference",
+            "base_rtol": float(rtol),
+            "base_atol": float(atol),
+            "reference_rtol": reference_rtol,
+            "reference_atol": reference_atol,
+            "base_samples": int(samples),
+            "reference_samples": reference_samples,
+            "position_tolerance": float(position_tolerance),
+            "supports_position_answer": False,
+            "reference_success": False,
+            "error": str(exc),
+        }
 
 
 def validate_three_body_target_prediction_certificate(

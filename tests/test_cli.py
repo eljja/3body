@@ -567,6 +567,11 @@ def test_predict_cli_writes_direct_three_body_answer(tmp_path) -> None:
     assert payload["position_answer"]["formula"] == "r_i(t) = Pi_{r_i} Phi_t(x0)"
     assert payload["distribution_answer"]["law_notation"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
     assert payload["decision_protocol"]["selected_answer_kind"] == payload["answer_kind"]
+    assert payload["numerical_convergence_certificate"]["certificate_type"] == (
+        "target-position-numerical-convergence"
+    )
+    assert payload["numerical_convergence_certificate"]["supports_position_answer"] is True
+    assert payload["publishability"]["numerical_convergence_passed"] is True
     assert len(payload["target_positions"]) == 3
     assert len(payload["target_position_distribution"]["mean_positions"]) == 3
     assert payload["publishability"]["certificate_valid"] is True
