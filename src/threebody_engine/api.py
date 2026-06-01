@@ -1038,6 +1038,40 @@ def answer_three_body_problem(
         target_solution.get("probability_answer"), Mapping
     ) else {}
     probability_answer["distribution"] = target_solution.get("target_position_distribution", {})
+    theorem_answer = {
+        "theorem_name": "Finite-time Newtonian three-body prediction as a flow-map and push-forward law",
+        "statement": (
+            "For positive masses and finite non-collisional initial data, the Newtonian initial-value "
+            "problem defines a unique local flow Phi_t up to collision or loss of numerical admissibility. "
+            "At a finite target time inside the certified diagnostic horizon, the target positions are "
+            "r_i(t) = Pi_{r_i} Phi_t(x0). If the initial state is modeled as a probability law mu_0, "
+            "the target uncertainty law is mu_t = (Phi_t)_# mu_0."
+        ),
+        "statement_ko": (
+            "양의 질량과 유한한 비충돌 초기자료가 주어지면 뉴턴 초기값 문제는 충돌 또는 "
+            "수치적 허용성 상실 전까지 유일한 국소 흐름 Phi_t를 정의한다. 목표시간이 "
+            "진단으로 인증된 범위 안에 있으면 각 위치는 r_i(t) = Pi_{r_i} Phi_t(x0)로 읽고, "
+            "초기상태를 확률법칙 mu_0로 두면 목표시간의 불확실성 법칙은 mu_t = (Phi_t)_# mu_0이다."
+        ),
+        "assumptions": [
+            "all masses are finite and strictly positive",
+            "initial positions and velocities are finite",
+            "no two bodies occupy the same initial position",
+            "the requested target time is finite",
+            "diagnostics do not promote an unresolved close-approach state",
+        ],
+        "outputs": [
+            "deterministic target coordinates r_i(t)",
+            "empirical pushed-forward target distribution Law(X_t)",
+            "linearized covariance reference P_t = D Phi_t P_0 D Phi_t^T",
+            "readout decision explaining whether to publish point coordinates, probability regions, or unresolved",
+        ],
+        "non_claims": [
+            "no finite elementary closed form is claimed for all generic three-body inputs",
+            "no prediction is promoted across collision, regularization, or failed diagnostic gates",
+            "the empirical law is a reproducible numerical approximation to the push-forward law",
+        ],
+    }
     answer_status = "answered" if answer_kind != "unresolved" else "unresolved"
     if regularization_recommended:
         answer_status = "limited-by-close-approach"
@@ -1080,6 +1114,43 @@ def answer_three_body_problem(
                 "finite-time, diagnostic-gated prediction; not a finite elementary closed-form "
                 "solution of the generic three-body problem"
             ),
+        },
+        "theorem_answer": theorem_answer,
+        "position_answer": {
+            "formula": "r_i(t) = Pi_{r_i} Phi_t(x0)",
+            "coordinates": target_solution.get("target_positions", []),
+            "coordinate_table": target_solution.get("target_position_table", []),
+            "defensible": bool(
+                answer_kind in {
+                    "point-position-answer-with-probability-regions",
+                    "deterministic-position-answer",
+                }
+                and target_time_resolved
+                and not regularization_recommended
+            ),
+        },
+        "distribution_answer": {
+            "formula": "mu_t = (Phi_t)_# mu_0",
+            "law_notation": "Law(X_t) = (Phi_t)_# Law(X_0)",
+            "distribution": target_solution.get("target_position_distribution", {}),
+            "defensible": bool(
+                answer_kind
+                in {
+                    "point-position-answer-with-probability-regions",
+                    "probability-distribution-answer",
+                }
+                and not regularization_recommended
+            ),
+        },
+        "decision_protocol": {
+            "ordered_readout": [
+                "publish point positions with probability regions when target time is tolerance-resolved",
+                "publish only Law(X_t) when uncertainty dominates but diagnostics remain admissible",
+                "publish deterministic coordinates only when uncertainty inputs are absent or not promoted",
+                "return unresolved when close-approach or diagnostic gates fail",
+            ],
+            "selected_readout": primary_readout,
+            "selected_answer_kind": answer_kind,
         },
         "deterministic_answer": target_solution.get("deterministic_flow_answer", {}),
         "probability_answer": probability_answer,

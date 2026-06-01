@@ -561,6 +561,12 @@ def test_predict_cli_writes_direct_three_body_answer(tmp_path) -> None:
     assert payload["input_admissibility"]["no_initial_binary_collision"] is True
     assert payload["mathematical_model"]["state_flow"] == "x(t) = Phi_t(x(0))"
     assert payload["mathematical_model"]["probability_answer"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
+    assert payload["theorem_answer"]["theorem_name"] == (
+        "Finite-time Newtonian three-body prediction as a flow-map and push-forward law"
+    )
+    assert payload["position_answer"]["formula"] == "r_i(t) = Pi_{r_i} Phi_t(x0)"
+    assert payload["distribution_answer"]["law_notation"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
+    assert payload["decision_protocol"]["selected_answer_kind"] == payload["answer_kind"]
     assert len(payload["target_positions"]) == 3
     assert len(payload["target_position_distribution"]["mean_positions"]) == 3
     assert payload["publishability"]["certificate_valid"] is True

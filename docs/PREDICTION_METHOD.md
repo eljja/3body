@@ -127,6 +127,14 @@ solution into one paper-facing object:
 - `target_positions`: the deterministic `r_i(t)` readout when available;
 - `target_position_distribution`: the pushed-forward `Law(X_t)` summary when
   uncertainty is declared;
+- `theorem_answer`: the finite-time theorem-level statement tying the result to
+  the Newtonian flow map `Phi_t`, the point readout `r_i(t)`, and the
+  push-forward probability law `(Phi_t)_# mu_0`;
+- `position_answer` and `distribution_answer`: direct sub-objects for the two
+  original project targets, with formulas, data payloads, and defensibility
+  flags;
+- `decision_protocol`: the ordered rule for choosing point coordinates,
+  probability regions, deterministic-only output, or unresolved output;
 - `input_admissibility`: finite input, initial pair-distance, angular momentum,
   and softening disclosure checks;
 - `publishability`: whether a point-position or distribution claim is defensible
@@ -144,6 +152,13 @@ threebody predict --input initial-state.json --answer --count 128 --samples 256 
 답변 계층이다. 방어 가능한 경우 `r_i(t)` 점 위치를 제시하고, 불확실성이
 지배적이면 `Law(X_t)` 분포 요약을 제시하며, 근접조우/진단 gate가 막으면
 `unresolved` 또는 제한된 답변으로 남긴다.
+
+수학적으로는 다음 형태를 명시한다. 초기상태 `x0`가 유한하고 비충돌이면
+뉴턴 방정식의 국소 흐름 `Phi_t`가 존재하고, 목표 시각이 진단 horizon 안에
+있을 때 각 물체의 위치는 `r_i(t) = Pi_{r_i} Phi_t(x0)`이다. 초기조건 자체를
+확률법칙 `mu_0`로 모델링하면 목표시간의 법칙은 `mu_t = (Phi_t)_# mu_0`이다.
+따라서 이 API는 "전역 초등 닫힌 해"를 주장하지 않고, 주어진 입력과 유한한
+시간에 대해 점 위치 또는 확률분포 중 논문에 방어 가능한 판독값을 고른다.
 
 Use `threebody_engine.solve_three_body_target_positions(...)` when the caller only needs the direct answer: `target_positions`, `target_position_distribution`, `target_position_table`, `center_of_mass_frame`, `target_pair_geometry`, `target_distribution_quality`, `target_sensitivity_budget`, `target_readout_decision`, `target_prediction_certificate`, one row per body's target-time claim, and the core diagnostics. The table includes a relative 95% radius, `position_claim_strength`, and `recommended_readout` so callers can tell whether to publish a point coordinate, a confidence region, or only a distribution summary. The center-of-mass frame reports the same target positions relative to the mass-weighted center, which is the safer readout when inertial translation is not scientifically meaningful. The pair geometry reports pairwise separations, perimeter, area, and conservative distance bounds derived from coordinate quantile boxes. The distribution quality block reports Monte Carlo mean standard errors for the empirical probability answer. The sensitivity budget records the forecast-horizon status, propagated target-position standard deviation, tolerance ratio, amplification factor, Lyapunov exponent, and close-approach gate. The readout decision promotes the defensible answer as point positions with probability regions, probability distribution, deterministic coordinates only, or unresolved, with the diagnostic gates that caused that choice. The certificate pins the input contract and result payload with SHA-256 digests for reproducible auditing, and `validate_three_body_target_prediction_certificate(...)` recomputes those checks. Use `threebody_engine.solve_three_body_prediction_problem(...)` when the full audit bundle is needed, or:
 

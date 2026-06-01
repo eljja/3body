@@ -619,6 +619,16 @@ def test_engine_api_answers_original_three_body_problem() -> None:
     assert answer["input_admissibility"]["exact_newtonian_equations"] is True
     assert answer["mathematical_model"]["point_position_answer"] == "r_i(t) = Pi_{r_i} Phi_t(x(0))"
     assert answer["mathematical_model"]["probability_answer"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
+    assert answer["theorem_answer"]["theorem_name"] == (
+        "Finite-time Newtonian three-body prediction as a flow-map and push-forward law"
+    )
+    assert "mu_t = (Phi_t)_# mu_0" in answer["theorem_answer"]["statement"]
+    assert "초기상태를 확률법칙" in answer["theorem_answer"]["statement_ko"]
+    assert answer["position_answer"]["formula"] == "r_i(t) = Pi_{r_i} Phi_t(x0)"
+    assert answer["position_answer"]["coordinates"] == answer["target_positions"]
+    assert answer["distribution_answer"]["law_notation"] == "Law(X_t) = (Phi_t)_# Law(X_0)"
+    assert answer["distribution_answer"]["distribution"] == answer["target_position_distribution"]
+    assert answer["decision_protocol"]["selected_answer_kind"] == answer["answer_kind"]
     assert len(answer["target_positions"]) == 3
     assert len(answer["target_position_distribution"]["mean_positions"]) == 3
     assert len(answer["target_position_table"]) == 3
