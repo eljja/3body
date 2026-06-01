@@ -1092,6 +1092,10 @@ def answer_three_body_problem(
     numerical_convergence_passed = (
         numerical_convergence_certificate.get("supports_position_answer") is True
     )
+    body_answer_table = _direct_three_body_answer_table(
+        target_solution,
+        numerical_convergence_certificate,
+    )
     return {
         "answer_schema_version": 1,
         "answer_type": "three-body-problem-answer",
@@ -1137,6 +1141,7 @@ def answer_three_body_problem(
             "formula": "r_i(t) = Pi_{r_i} Phi_t(x0)",
             "coordinates": target_solution.get("target_positions", []),
             "coordinate_table": target_solution.get("target_position_table", []),
+            "body_answer_table": body_answer_table,
             "defensible": bool(
                 answer_kind in {
                     "point-position-answer-with-probability-regions",
@@ -1151,6 +1156,7 @@ def answer_three_body_problem(
             "formula": "mu_t = (Phi_t)_# mu_0",
             "law_notation": "Law(X_t) = (Phi_t)_# Law(X_0)",
             "distribution": target_solution.get("target_position_distribution", {}),
+            "body_answer_table": body_answer_table,
             "defensible": bool(
                 answer_kind
                 in {
@@ -1176,6 +1182,7 @@ def answer_three_body_problem(
         "target_positions": target_solution.get("target_positions", []),
         "target_position_distribution": target_solution.get("target_position_distribution", {}),
         "target_position_table": target_solution.get("target_position_table", []),
+        "body_answer_table": body_answer_table,
         "target_pair_geometry": target_solution.get("target_pair_geometry", {}),
         "target_sensitivity_budget": target_solution.get("target_sensitivity_budget", {}),
         "target_readout_decision": readout,
@@ -1301,6 +1308,98 @@ def _target_position_numerical_convergence_certificate(
             "reference_success": False,
             "error": str(exc),
         }
+
+
+def _direct_three_body_answer_table(
+    target_solution: Mapping[str, object],
+    numerical_convergence_certificate: Mapping[str, object],
+) -> list[dict[str, object]]:
+    """Build one direct target-time answer row per body."""
+
+    table = target_solution.get("target_position_table", [])
+    if not isinstance(table, Sequence) or isinstance(table, (str, bytes, bytearray)):
+        return []
+    readout = target_solution.get("target_readout_decision", {})
+    if not isinstance(readout, Mapping):
+        readout = {}
+    per_body_readout = readout.get("per_body_readouts", [])
+    if not isinstance(per_body_readout, Sequence) or isinstance(per_body_readout, (str, bytes, bytearray)):
+        per_body_readout = []
+    convergence_deltas = numerical_convergence_certificate.get("body_position_deltas", [])
+    if not isinstance(convergence_deltas, Sequence) or isinstance(
+        convergence_deltas,
+        (str, bytes, bytearray),
+    ):
+        convergence_deltas = []
+    convergence_tolerance = float(numerical_convergence_certificate.get("position_tolerance", math.nan))
+    convergence_passed = numerical_convergence_certificate.get("supports_position_answer") is True
+    rows: list[dict[str, object]] = []
+    for index, row in enumerate(table):
+        if not isinstance(row, Mapping):
+            continue
+        body_index = int(row.get("body_index", index))
+        body_readout = per_body_readout[body_index] if body_index < len(per_body_readout) else {}
+        if not isinstance(body_readout, Mapping):
+            body_readout = {}
+        confidence_region = row.get("confidence_region_95", {})
+        if not isinstance(confidence_region, Mapping):
+            confidence_region = {}
+        convergence_delta = (
+            float(convergence_deltas[body_index])
+            if body_index < len(convergence_deltas)
+            else math.nan
+        )
+        recommended_readout = str(
+            body_readout.get("recommended_readout", row.get("recommended_readout", "unresolved"))
+        )
+        publishable_as_position = bool(
+            convergence_passed
+            and recommended_readout
+            in {
+                "point-position-with-confidence-region",
+                "probability-region",
+            }
+        )
+        direct_row = {
+            "body_index": body_index,
+            "answer_formula": "r_i(t) = Pi_{r_i} Phi_t(x0)",
+            "probability_formula": "mu_t = (Phi_t)_# mu_0",
+            "deterministic_position": row.get("deterministic_position", []),
+            "probability_mean": row.get("probability_mean", []),
+            "probability_median": row.get("probability_median", []),
+            "central_90_interval": row.get("central_90_interval", {}),
+            "confidence_region_95": confidence_region,
+            "deterministic_to_mean_distance": row.get("deterministic_to_mean_distance", math.nan),
+            "relative_95_radius": float(confidence_region.get("relative_95_radius", math.nan)),
+            "position_claim_strength": row.get("position_claim_strength", "unresolved"),
+            "recommended_readout": recommended_readout,
+            "publishable_as_position": publishable_as_position,
+            "publishable_as_distribution": recommended_readout
+            in {
+                "point-position-with-confidence-region",
+                "probability-region",
+                "distribution-summary-only",
+            },
+            "numerical_convergence_delta": convergence_delta,
+            "numerical_convergence_tolerance": convergence_tolerance,
+            "numerical_convergence_passed": bool(
+                convergence_passed
+                and math.isfinite(convergence_delta)
+                and math.isfinite(convergence_tolerance)
+                and convergence_delta <= convergence_tolerance
+            ),
+            "answer_ko": (
+                f"body {body_index}: 목표시간 위치는 deterministic_position으로 제시하고, "
+                "초기 불확실성을 고려한 확률적 위치는 probability_mean 및 central_90_interval/"
+                "confidence_region_95로 제시한다."
+            ),
+            "answer_en": (
+                f"body {body_index}: use deterministic_position for r_i(t), and probability_mean plus "
+                "central_90_interval/confidence_region_95 for the pushed-forward uncertainty law."
+            ),
+        }
+        rows.append(direct_row)
+    return rows
 
 
 def validate_three_body_target_prediction_certificate(

@@ -572,6 +572,10 @@ def test_predict_cli_writes_direct_three_body_answer(tmp_path) -> None:
     )
     assert payload["numerical_convergence_certificate"]["supports_position_answer"] is True
     assert payload["publishability"]["numerical_convergence_passed"] is True
+    assert len(payload["body_answer_table"]) == 3
+    assert payload["body_answer_table"][0]["deterministic_position"] == payload["target_positions"][0]
+    assert payload["body_answer_table"][0]["numerical_convergence_passed"] is True
+    assert payload["position_answer"]["body_answer_table"] == payload["body_answer_table"]
     assert len(payload["target_positions"]) == 3
     assert len(payload["target_position_distribution"]["mean_positions"]) == 3
     assert payload["publishability"]["certificate_valid"] is True
