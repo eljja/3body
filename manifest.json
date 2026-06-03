@@ -1,0 +1,35 @@
+{
+  "artifact": "threebody-static-site-manifest",
+  "artifacts": {
+    ".gitattributes": {
+      "bytes": 14,
+      "sha256": "a79691a93b46e49ce460c26ef22afcc03d6eca1e63bf2edbc20e96159510f6c9"
+    },
+    "certificate.json": {
+      "bytes": 222391,
+      "sha256": "2330a018601534fcf15b47caaf046a7ebc2af4659365f7417936e003f791143b"
+    },
+    "favicon.svg": {
+      "bytes": 659,
+      "sha256": "cf41e5288198b848a325822693bc7ebaae6f732b98a0d574099c1c8e23c9a45b"
+    },
+    "index.html": {
+      "bytes": 6014575,
+      "sha256": "94014c5cc0b1998daa8f12e2d5e8b115bdabeea157f0a6c094b3e4c36dc65dfc"
+    }
+  },
+  "build_provenance": {
+    "commit_sha": "1fa62458cb7a0dc46da022a4c725124eec0a6681",
+    "commit_sha_short": "1fa6245",
+    "generated_at_utc": "2026-06-03T12:48:39Z",
+    "generator": "threebody.ui.static_site",
+    "python_version": "3.11.15",
+    "ref_name": "main",
+    "run_attempt": "1",
+    "run_id": "26885757165",
+    "schema_version": 1,
+    "workflow": "Build GitHub Pages Branch"
+  },
+  "hash_algorithm": "sha256",
+  "manifest_schema_version": 1
+}
