@@ -23,11 +23,16 @@ claim that the generic Newtonian three-body problem has been solved. Paper-facin
 claims must be read through
 [Paper-Readiness Review](docs/PAPER_READINESS_REVIEW.md) and
 [Validation Guardrails](docs/VALIDATION_GUARDRAILS.md).
+If another LLM or research agent continues this work, start from
+[LLM Handoff: Three-Body Challenge](docs/LLM_HANDOFF_THREE_BODY_CHALLENGE.md).
 
 **논문용 상태 메모.** 이 저장소는 연구 증거 패키지이며, 일반 뉴턴 삼체
 문제가 해결되었다는 주장이 아니다. 논문 제출용 주장은 반드시
 [Paper-Readiness Review](docs/PAPER_READINESS_REVIEW.md)와
 [Validation Guardrails](docs/VALIDATION_GUARDRAILS.md)의 기준으로 읽어야 한다.
+다른 LLM이나 연구 에이전트가 이 작업을 이어갈 때는
+[LLM Handoff: Three-Body Challenge](docs/LLM_HANDOFF_THREE_BODY_CHALLENGE.md)를
+먼저 읽어야 한다.
 
 ## Korean Summary
 
