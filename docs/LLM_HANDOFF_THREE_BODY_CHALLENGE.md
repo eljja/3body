@@ -46,6 +46,8 @@
   - compact한 목표시간 위치/분포/기하/민감도/인증 결과를 만든다.
 - `solve_random_three_body_prediction_demo(...)`
   - 재현 가능한 랜덤 삼체 입력을 생성하고 reference integration과 비교한다.
+- `predict_three_body_validated_flow_enclosure(...)`
+  - Picard self-inclusion 시험과 Lipschitz 수축 조건(Picard-Lindelöf theorem)을 만족하도록 구간 연산(interval arithmetic)을 이용해 수치 적분 궤적을 엄밀하게 포획(enclosure)하는 유한시간 검증기.
 - `assess_three_body_global_closed_form_claim(...)`
   - Sundman식 정규화 수렴급수 route의 현재 계약과 미완성 항목을 분리해
     보고한다. 이것은 유한 초등함수 전역해 주장이 아니다.

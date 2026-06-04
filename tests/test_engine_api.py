@@ -23,6 +23,8 @@ from threebody_engine import (
     predict_three_body_linearized_ephemeris,
     predict_three_body_position_distribution,
     predict_three_body_positions,
+    predict_three_body_a_posteriori_defect_bound,
+    predict_three_body_validated_flow_enclosure,
     global_closed_form_solution_contract,
     public_static_artifact_audit_report_payload_sha256,
     public_static_artifact_claim_contract,
@@ -1037,3 +1039,89 @@ def test_engine_api_runs_integrated_verification_report() -> None:
     assert "poincare_passes_section_robustness" in report["promotion_gates"]
     assert "symbolic_stride_robust_pass_count" in report["promotion_gates"]
     assert "symbolic_passes_stride_robustness" in report["promotion_gates"]
+
+
+def test_engine_api_a_posteriori_defect_bounds() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    # 1. Test direct call
+    certificate = predict_three_body_a_posteriori_defect_bound(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        samples=16,
+    )
+    assert certificate["certificate_schema_version"] == 1
+    assert certificate["certificate_type"] == "a-posteriori-defect-bounds"
+    assert certificate["method"] == "piecewise-hermite-cubic-spline-gronwall"
+    assert certificate["target_time"] == 0.05
+    assert certificate["success"] is True
+    assert isinstance(certificate["accumulated_error_bound"], float)
+    assert certificate["accumulated_error_bound"] >= 0.0
+    assert certificate["max_local_defect"] >= 0.0
+    assert certificate["max_local_lipschitz"] >= 0.0
+
+    # 2. Test integration in answer_three_body_problem
+    answer = answer_three_body_problem(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        count=5,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        samples=9,
+        horizon_samples=6,
+    )
+    assert "defect_bounds_certificate" in answer
+    defect_cert = answer["defect_bounds_certificate"]
+    assert defect_cert["certificate_type"] == "a-posteriori-defect-bounds"
+    assert defect_cert["success"] is True
+    assert answer["answer_consistency_certificate"]["valid"] is True
+
+
+def test_engine_api_validated_flow_enclosures() -> None:
+    scenario, _trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=8)
+    positions, velocities = scenario.system.split_state(scenario.initial_state)
+
+    # 1. Test direct verifier call
+    certificate = predict_three_body_validated_flow_enclosure(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        samples=16,
+        initial_state_radius=1.0e-12,
+    )
+    assert certificate["certificate_schema_version"] == 1
+    assert certificate["certificate_type"] == "validated-flow-enclosure"
+    assert certificate["method"] == "segment-wise-interval-picard-lindelof-contraction"
+    assert certificate["target_time"] == 0.05
+    assert certificate["success"] is True
+    assert certificate["validated_flow_certified"] is True
+    assert certificate["final_enclosure_radius"] > 0.0
+    assert len(certificate["final_enclosure_lower"]) == 12
+    assert len(certificate["final_enclosure_upper"]) == 12
+
+    # 2. Test integration in answer_three_body_problem
+    answer = answer_three_body_problem(
+        scenario.system.masses,
+        positions,
+        velocities,
+        0.05,
+        count=5,
+        position_scale=1.0e-7,
+        velocity_scale=1.0e-7,
+        samples=9,
+        horizon_samples=6,
+        initial_state_radius=1.0e-12,
+    )
+    assert "validated_flow_enclosure_certificate" in answer
+    flow_cert = answer["validated_flow_enclosure_certificate"]
+    assert flow_cert["certificate_type"] == "validated-flow-enclosure"
+    assert flow_cert["validated_flow_certified"] is True
+    assert answer["answer_consistency_certificate"]["valid"] is True
+
+

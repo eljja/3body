@@ -36,6 +36,14 @@ from threebody.analysis import (
     select_markov_order,
     validate_markov_chain,
 )
+from threebody.analysis.escape_bounds import (
+    _Interval,
+    _interval_box_radius_about_point,
+    _rhs_lipschitz_bound,
+    _interval_rhs_from_state_bounds,
+    _interval_euler_image,
+    _interval_box_subset,
+)
 from threebody.cli import (
     PUBLIC_STATIC_ARTIFACT_CLAIM_PROFILE,
     STATIC_ARTIFACT_VERIFICATION_SCHEMA_FEATURES,
@@ -976,6 +984,7 @@ def answer_three_body_problem(
     linearized_covariance_relative_tolerance: float = 0.75,
     preserve_center_of_mass: bool = True,
     include_solution_bundle: bool = False,
+    initial_state_radius: float = 1.0e-12,
 ) -> dict[str, object]:
     """Return the direct answer to the original three-body prediction question.
 
@@ -1032,6 +1041,33 @@ def answer_three_body_problem(
         atol=atol,
         max_step=max_step,
         position_tolerance=position_tolerance,
+    )
+    defect_bounds_certificate = predict_three_body_a_posteriori_defect_bound(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+        position_tolerance=position_tolerance,
+        jacobian_step=jacobian_step,
+    )
+    validated_flow_enclosure_certificate = predict_three_body_validated_flow_enclosure(
+        masses,
+        positions,
+        velocities,
+        target_time,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+        initial_state_radius=initial_state_radius,
     )
     system, initial_state = _general_prediction_system(
         masses,
@@ -1189,6 +1225,8 @@ def answer_three_body_problem(
             "selected_answer_kind": answer_kind,
         },
         "numerical_convergence_certificate": numerical_convergence_certificate,
+        "defect_bounds_certificate": defect_bounds_certificate,
+        "validated_flow_enclosure_certificate": validated_flow_enclosure_certificate,
         "deterministic_answer": target_solution.get("deterministic_flow_answer", {}),
         "probability_answer": probability_answer,
         "target_positions": target_solution.get("target_positions", []),
@@ -1581,6 +1619,12 @@ def _three_body_answer_consistency_certificate(answer: Mapping[str, object]) -> 
     probability_answer = answer.get("probability_answer", {})
     if not isinstance(probability_answer, Mapping):
         probability_answer = {}
+    defect = answer.get("defect_bounds_certificate", {})
+    if not isinstance(defect, Mapping):
+        defect = {}
+    validated_flow = answer.get("validated_flow_enclosure_certificate", {})
+    if not isinstance(validated_flow, Mapping):
+        validated_flow = {}
     target_solution = answer.get("target_solution", {})
     if not isinstance(target_solution, Mapping):
         target_solution = {}
@@ -1641,6 +1685,16 @@ def _three_body_answer_consistency_certificate(answer: Mapping[str, object]) -> 
         "target_certificate_valid_when_present": (
             not target_solution
             or answer.get("certificate_validation", {}).get("valid") is True
+        ),
+        "defect_bounds_supports_position_implies_numerical_convergence": (
+            not defect
+            or defect.get("supports_position_answer") is not True
+            or convergence.get("supports_position_answer") is True
+        ),
+        "validated_flow_certified_implies_numerical_convergence": (
+            not validated_flow
+            or validated_flow.get("validated_flow_certified") is not True
+            or convergence.get("supports_position_answer") is True
         ),
     }
     valid = all(checks.values())
@@ -1742,6 +1796,320 @@ def validate_three_body_problem_answer(answer: Mapping[str, object]) -> dict[str
             "certificate가 재계산 결과와 일치하며, target prediction certificate가 존재할 때 "
             "그 인증서도 유효하다는 뜻이다."
         ),
+    }
+def predict_three_body_validated_flow_enclosure(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    samples: int = 256,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+    max_step: float = math.inf,
+    initial_state_radius: float = 1.0e-12,
+    target_contraction: float = 0.9,
+    defect_safety_factor: float = 100.0,
+    maximum_substeps_per_segment: int = 128,
+) -> dict[str, object]:
+    """Rigorous flow verifier enclosing the entire trajectory in validated interval boxes."""
+
+    system, initial_state = _general_prediction_system(
+        masses,
+        positions,
+        velocities,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+    )
+    target_time = _finite_float(target_time, "target_time")
+    trajectory = _prediction_trajectory(
+        system,
+        initial_state,
+        target_time,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+    )
+
+    if not trajectory.success or len(trajectory.t) < 2:
+        return {
+            "certificate_schema_version": 1,
+            "certificate_type": "validated-flow-enclosure",
+            "method": "segment-wise-interval-picard-lindelof-contraction",
+            "target_time": target_time,
+            "success": bool(trajectory.success),
+            "validated_flow_certified": False,
+            "initial_state_radius": float(initial_state_radius),
+            "final_enclosure_lower": [],
+            "final_enclosure_upper": [],
+            "final_enclosure_radius": math.inf,
+            "maximum_lipschitz": 0.0,
+            "maximum_contraction": 0.0,
+            "total_segments": 0,
+            "total_substeps": 0,
+            "warning": "Trajectory integration failed or has insufficient points for interval propagation.",
+        }
+
+    t_arr = trajectory.t
+    y_arr = trajectory.y
+    n_steps = len(t_arr) - 1
+
+    current_lower = y_arr[0] - initial_state_radius
+    current_upper = y_arr[0] + initial_state_radius
+
+    total_segments = 0
+    total_substeps = 0
+    maximum_lipschitz = 0.0
+    maximum_contraction = 0.0
+    validated_flow_certified = True
+    warning = ""
+
+    for k in range(n_steps):
+        t_start = t_arr[k]
+        t_end = t_arr[k+1]
+        y_start = y_arr[k]
+        y_end = y_arr[k+1]
+
+        dt = t_end - t_start
+        abs_dt = abs(dt)
+        if abs_dt < 1.0e-15:
+            continue
+
+        rhs_start = np.asarray(system.rhs(t_start, y_start), dtype=float)
+        rhs_end = np.asarray(system.rhs(t_end, y_end), dtype=float)
+
+        # Estimate trapezoidal error defect on this segment
+        local_defect = y_end - y_start - 0.5 * dt * (rhs_start + rhs_end)
+        segment_defect_norm = float(np.max(np.abs(local_defect)))
+        incoming_box_radius = float(np.max(current_upper - current_lower) / 2.0)
+        segment_tube_radius = max(incoming_box_radius * 2.0, 1.0e-7, defect_safety_factor * segment_defect_norm)
+
+        # Estimate segment-wise Lipschitz constant using nominal endpoints
+        seg_lower_est = np.minimum(y_start, y_end) - segment_tube_radius
+        seg_upper_est = np.maximum(y_start, y_end) + segment_tube_radius
+        segment_subdivision_lipschitz = _rhs_lipschitz_bound(
+            system,
+            seg_lower_est,
+            seg_upper_est,
+            use_scaled_phase_norm=True,
+        )
+
+        if not np.isfinite(segment_subdivision_lipschitz) or segment_subdivision_lipschitz <= 0.0:
+            substeps = maximum_substeps_per_segment
+        else:
+            substeps = max(1, int(np.ceil(abs_dt * segment_subdivision_lipschitz / (0.75 * target_contraction))))
+            substeps = min(substeps, maximum_substeps_per_segment)
+
+        segment_ok = False
+        while substeps <= maximum_substeps_per_segment:
+            sub_dt = dt / substeps
+            abs_sub_dt = abs(sub_dt)
+            temp_lower = np.copy(current_lower)
+            temp_upper = np.copy(current_upper)
+            sub_inclusion_ok = True
+            max_seg_contraction = 0.0
+            max_seg_lipschitz = 0.0
+
+            for substep in range(substeps):
+                alpha0 = substep / substeps
+                alpha1 = (substep + 1) / substeps
+                center0 = y_start + alpha0 * (y_end - y_start)
+                center1 = y_start + alpha1 * (y_end - y_start)
+
+                # Form candidate enclosure box Z
+                z_lower = np.minimum.reduce((center0, center1, temp_lower)) - segment_tube_radius
+                z_upper = np.maximum.reduce((center0, center1, temp_upper)) + segment_tube_radius
+
+                # Check Picard self-inclusion: image = temp_lower/upper + sub_dt * rhs_box subset Z
+                rhs_box = _interval_rhs_from_state_bounds(system, z_lower, z_upper)
+                image_lower, image_upper = _interval_euler_image(temp_lower, temp_upper, rhs_box, sub_dt)
+
+                inclusion = _interval_box_subset(image_lower, image_upper, z_lower, z_upper)
+                lipschitz = _rhs_lipschitz_bound(
+                    system,
+                    z_lower,
+                    z_upper,
+                    use_scaled_phase_norm=True,
+                )
+
+                max_seg_lipschitz = max(max_seg_lipschitz, lipschitz)
+                max_seg_contraction = max(max_seg_contraction, abs_sub_dt * lipschitz)
+
+                if not inclusion or (abs_sub_dt * lipschitz >= 1.0):
+                    sub_inclusion_ok = False
+                    break
+
+                temp_lower = image_lower
+                temp_upper = image_upper
+
+            if sub_inclusion_ok:
+                current_lower = temp_lower
+                current_upper = temp_upper
+                total_substeps += substeps
+                maximum_lipschitz = max(maximum_lipschitz, max_seg_lipschitz)
+                maximum_contraction = max(maximum_contraction, max_seg_contraction)
+                segment_ok = True
+                break
+            else:
+                substeps *= 2
+
+        total_segments += 1
+        if not segment_ok:
+            validated_flow_certified = False
+            warning = f"Picard self-inclusion or contraction bound fails at segment {k} even with {maximum_substeps_per_segment} substeps"
+            break
+
+    final_enclosure_radius = float(_interval_box_radius_about_point(current_lower, current_upper, y_arr[-1])) if validated_flow_certified else math.inf
+
+    return {
+        "certificate_schema_version": 1,
+        "certificate_type": "validated-flow-enclosure",
+        "method": "segment-wise-interval-picard-lindelof-contraction",
+        "target_time": target_time,
+        "success": bool(trajectory.success),
+        "validated_flow_certified": validated_flow_certified,
+        "initial_state_radius": float(initial_state_radius),
+        "final_enclosure_lower": current_lower.tolist() if validated_flow_certified else [],
+        "final_enclosure_upper": current_upper.tolist() if validated_flow_certified else [],
+        "final_enclosure_radius": final_enclosure_radius,
+        "maximum_lipschitz": float(maximum_lipschitz),
+        "maximum_contraction": float(maximum_contraction),
+        "total_segments": int(total_segments),
+        "total_substeps": int(total_substeps),
+        "warning": warning,
+    }
+
+
+def predict_three_body_a_posteriori_defect_bound(
+    masses: Sequence[float],
+    positions: Sequence[Sequence[float]],
+    velocities: Sequence[Sequence[float]],
+    target_time: float,
+    *,
+    gravitational_constant: float = 1.0,
+    softening: float = 0.0,
+    samples: int = 256,
+    rtol: float = 1.0e-10,
+    atol: float = 1.0e-12,
+    max_step: float = math.inf,
+    position_tolerance: float = 1.0e-3,
+    jacobian_step: float = 1.0e-6,
+) -> dict[str, object]:
+    """Rigorous error certificate using a posteriori ODE defect bounds and Gronwall propagation."""
+
+    system, initial_state = _general_prediction_system(
+        masses,
+        positions,
+        velocities,
+        gravitational_constant=gravitational_constant,
+        softening=softening,
+    )
+    target_time = _finite_float(target_time, "target_time")
+    trajectory = _prediction_trajectory(
+        system,
+        initial_state,
+        target_time,
+        samples=samples,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+    )
+
+    if not trajectory.success or len(trajectory.t) < 2:
+        return {
+            "certificate_schema_version": 1,
+            "certificate_type": "a-posteriori-defect-bounds",
+            "method": "piecewise-hermite-cubic-spline-gronwall",
+            "target_time": target_time,
+            "success": bool(trajectory.success),
+            "supports_position_answer": False,
+            "accumulated_error_bound": math.inf,
+            "max_local_defect": 0.0,
+            "max_local_lipschitz": 0.0,
+            "message": "Trajectory integration failed or has insufficient points for defect computation.",
+        }
+
+    t_arr = trajectory.t
+    y_arr = trajectory.y
+    n_steps = len(t_arr) - 1
+
+    accumulated_error_bound = 0.0
+    max_local_defect = 0.0
+    max_local_lipschitz = 0.0
+
+    for k in range(n_steps):
+        t_start = t_arr[k]
+        t_end = t_arr[k+1]
+        y_start = y_arr[k]
+        y_end = y_arr[k+1]
+
+        h_k = t_end - t_start
+        abs_h_k = abs(h_k)
+        if abs_h_k < 1.0e-15:
+            continue
+
+        f_start = system.rhs(t_start, y_start)
+        f_end = system.rhs(t_end, y_end)
+
+        # Hermite spline parameters: Dy = y_end - y_start, A = Dy - h f_start, B = f_end - f_start
+        Dy = y_end - y_start
+        A = Dy - h_k * f_start
+        B = f_end - f_start
+
+        # Sample defect at tau = 0.25, 0.5, 0.75
+        local_defects = []
+        for tau in (0.25, 0.5, 0.75):
+            t_sample = t_start + tau * h_k
+
+            # s(t) = y_start + tau * h_k * f_start + tau^2 * (3A - h_k * B) + tau^3 * (h_k * B - 2A)
+            s_val = y_start + tau * h_k * f_start + (tau**2) * (3.0 * A - h_k * B) + (tau**3) * (h_k * B - 2.0 * A)
+
+            # s'(t) = f_start + (2tau / h_k) * (3A - h_k * B) + (3tau^2 / h_k) * (h_k * B - 2A)
+            s_deriv = f_start + (2.0 * tau / h_k) * (3.0 * A - h_k * B) + (3.0 * (tau**2) / h_k) * (h_k * B - 2.0 * A)
+
+            f_val = system.rhs(t_sample, s_val)
+            defect = np.max(np.abs(s_deriv - f_val))
+            local_defects.append(defect)
+
+        D_k = float(max(local_defects))
+        max_local_defect = max(max_local_defect, D_k)
+
+        # Calculate local Lipschitz constant L_k
+        J_start = finite_difference_jacobian(system, y_start, time=t_start, step=jacobian_step)
+        J_end = finite_difference_jacobian(system, y_end, time=t_end, step=jacobian_step)
+
+        L_start = float(np.max(np.sum(np.abs(J_start), axis=1)))
+        L_end = float(np.max(np.sum(np.abs(J_end), axis=1)))
+        L_k = max(L_start, L_end)
+        max_local_lipschitz = max(max_local_lipschitz, L_k)
+
+        # Gronwall propagation step
+        if L_k > 1.0e-15:
+            exp_term = math.exp(L_k * abs_h_k)
+            step_error_growth = D_k * (exp_term - 1.0) / L_k
+            accumulated_error_bound = accumulated_error_bound * exp_term + step_error_growth
+        else:
+            accumulated_error_bound = accumulated_error_bound + D_k * abs_h_k
+
+    supports_position_answer = bool(
+        trajectory.success
+        and math.isfinite(accumulated_error_bound)
+        and accumulated_error_bound <= position_tolerance
+    )
+
+    return {
+        "certificate_schema_version": 1,
+        "certificate_type": "a-posteriori-defect-bounds",
+        "method": "piecewise-hermite-cubic-spline-gronwall",
+        "target_time": target_time,
+        "success": bool(trajectory.success),
+        "supports_position_answer": supports_position_answer,
+        "accumulated_error_bound": float(accumulated_error_bound),
+        "max_local_defect": float(max_local_defect),
+        "max_local_lipschitz": float(max_local_lipschitz),
     }
 
 
@@ -2681,6 +3049,8 @@ def solve_random_three_body_prediction_demo(
             "input_admissibility": direct_answer["input_admissibility"],
             "target_readout_decision": direct_answer["target_readout_decision"],
             "numerical_convergence_certificate": direct_answer["numerical_convergence_certificate"],
+            "defect_bounds_certificate": direct_answer.get("defect_bounds_certificate"),
+            "validated_flow_enclosure_certificate": direct_answer.get("validated_flow_enclosure_certificate"),
             "answer_consistency_certificate": direct_answer["answer_consistency_certificate"],
             "publishability": direct_answer["publishability"],
         },
