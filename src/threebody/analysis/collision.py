@@ -239,6 +239,13 @@ class CollisionRegularizationCertificate:
     levi_civita_flow_residual: float | None
     levi_civita_equivalence_resolved: bool
     levi_civita_equivalence_acceleration_residual: float | None
+    kustaanheimo_stiefel_pair: tuple[int, int] | None
+    kustaanheimo_stiefel_chart_resolved: bool
+    kustaanheimo_stiefel_max_reconstruction_error: float | None
+    kustaanheimo_stiefel_flow_defined: bool
+    kustaanheimo_stiefel_flow_residual: float | None
+    kustaanheimo_stiefel_equivalence_resolved: bool
+    kustaanheimo_stiefel_equivalence_acceleration_residual: float | None
     warning: str
 
     def as_dict(self) -> dict[str, float | int | bool | str | tuple[int, int] | None]:
@@ -257,6 +264,13 @@ class CollisionRegularizationCertificate:
             "levi_civita_flow_residual": self.levi_civita_flow_residual,
             "levi_civita_equivalence_resolved": self.levi_civita_equivalence_resolved,
             "levi_civita_equivalence_acceleration_residual": self.levi_civita_equivalence_acceleration_residual,
+            "kustaanheimo_stiefel_pair": self.kustaanheimo_stiefel_pair,
+            "kustaanheimo_stiefel_chart_resolved": self.kustaanheimo_stiefel_chart_resolved,
+            "kustaanheimo_stiefel_max_reconstruction_error": self.kustaanheimo_stiefel_max_reconstruction_error,
+            "kustaanheimo_stiefel_flow_defined": self.kustaanheimo_stiefel_flow_defined,
+            "kustaanheimo_stiefel_flow_residual": self.kustaanheimo_stiefel_flow_residual,
+            "kustaanheimo_stiefel_equivalence_resolved": self.kustaanheimo_stiefel_equivalence_resolved,
+            "kustaanheimo_stiefel_equivalence_acceleration_residual": self.kustaanheimo_stiefel_equivalence_acceleration_residual,
             "warning": self.warning,
         }
 
@@ -665,9 +679,15 @@ def collision_regularization_certificate(
     maximum_inward_speed = float(max(max(-diagnostic.radial_velocity, 0.0) for diagnostic in diagnostics))
     collision_types = tuple(dict.fromkeys(diagnostic.collision_type for diagnostic in diagnostics))
     regularization_required = any(diagnostic.regularization_required for diagnostic in diagnostics)
+    
     levi_civita: LeviCivitaChartCertificate | None = None
     flow: LeviCivitaFlowCertificate | None = None
     equivalence: LeviCivitaEquivalenceCertificate | None = None
+    
+    ks: KustaanheimoStiefelChartCertificate | None = None
+    ks_flow: KustaanheimoStiefelFlowCertificate | None = None
+    ks_equivalence: KustaanheimoStiefelEquivalenceCertificate | None = None
+    
     if regularization_required and getattr(system, "dimension", None) == 2:
         levi_civita = levi_civita_chart_certificate(system, trajectory, start_index=start, end_index=end)
         flow = levi_civita_flow_certificate(
@@ -684,16 +704,44 @@ def collision_regularization_certificate(
             end_index=end,
             pair=levi_civita.pair,
         )
+    elif regularization_required and getattr(system, "dimension", None) == 3:
+        ks = kustaanheimo_stiefel_chart_certificate(system, trajectory, start_index=start, end_index=end)
+        ks_flow = kustaanheimo_stiefel_flow_certificate(
+            system,
+            trajectory,
+            start_index=start,
+            end_index=end,
+            pair=ks.pair,
+        )
+        ks_equivalence = kustaanheimo_stiefel_equivalence_certificate(
+            system,
+            trajectory,
+            start_index=start,
+            end_index=end,
+            pair=ks.pair,
+        )
+        
     warning = ""
     if regularization_required:
-        if equivalence is not None and equivalence.equivalence_resolved:
-            warning = "Levi-Civita local equivalence residual is resolved; near-collision analytic theorem remains unproved"
-        elif flow is not None and flow.flow_defined:
-            warning = "Levi-Civita regularized RHS is defined; inertial equivalence certificate remains unresolved"
-        elif levi_civita is not None and levi_civita.chart_resolved:
-            warning = "Levi-Civita chart is resolved; regularized time-flow construction remains incomplete"
-        else:
-            warning = "regularized collision coordinates are required before promoting a close-encounter law"
+        if getattr(system, "dimension", None) == 2:
+            if equivalence is not None and equivalence.equivalence_resolved:
+                warning = "Levi-Civita local equivalence residual is resolved; near-collision analytic theorem remains unproved"
+            elif flow is not None and flow.flow_defined:
+                warning = "Levi-Civita regularized RHS is defined; inertial equivalence certificate remains unresolved"
+            elif levi_civita is not None and levi_civita.chart_resolved:
+                warning = "Levi-Civita chart is resolved; regularized time-flow construction remains incomplete"
+            else:
+                warning = "regularized collision coordinates are required before promoting a close-encounter law"
+        elif getattr(system, "dimension", None) == 3:
+            if ks_equivalence is not None and ks_equivalence.equivalence_resolved:
+                warning = "Kustaanheimo-Stiefel local equivalence residual is resolved; near-collision analytic theorem remains unproved"
+            elif ks_flow is not None and ks_flow.flow_defined:
+                warning = "Kustaanheimo-Stiefel regularized RHS is defined; inertial equivalence certificate remains unresolved"
+            elif ks is not None and ks.chart_resolved:
+                warning = "Kustaanheimo-Stiefel chart is resolved; regularized time-flow construction remains incomplete"
+            else:
+                warning = "regularized collision coordinates are required before promoting a close-encounter law"
+                
     return CollisionRegularizationCertificate(
         sample_count=len(diagnostics),
         minimum_hyperradius=minimum_hyperradius,
@@ -710,6 +758,15 @@ def collision_regularization_certificate(
         levi_civita_equivalence_resolved=False if equivalence is None else equivalence.equivalence_resolved,
         levi_civita_equivalence_acceleration_residual=(
             None if equivalence is None else equivalence.maximum_acceleration_residual
+        ),
+        kustaanheimo_stiefel_pair=None if ks is None else ks.pair,
+        kustaanheimo_stiefel_chart_resolved=False if ks is None else ks.chart_resolved,
+        kustaanheimo_stiefel_max_reconstruction_error=None if ks is None else ks.maximum_reconstruction_error,
+        kustaanheimo_stiefel_flow_defined=False if ks_flow is None else ks_flow.flow_defined,
+        kustaanheimo_stiefel_flow_residual=None if ks_flow is None else ks_flow.maximum_finite_difference_residual,
+        kustaanheimo_stiefel_equivalence_resolved=False if ks_equivalence is None else ks_equivalence.equivalence_resolved,
+        kustaanheimo_stiefel_equivalence_acceleration_residual=(
+            None if ks_equivalence is None else ks_equivalence.maximum_acceleration_residual
         ),
         warning=warning,
     )
@@ -841,3 +898,472 @@ def _levi_civita_square_root(position: np.ndarray) -> np.ndarray:
 
 def _levi_civita_square(u: np.ndarray) -> np.ndarray:
     return np.array([u[0] ** 2 - u[1] ** 2, 2.0 * u[0] * u[1]], dtype=float)
+
+
+# ==========================================
+# Kustaanheimo-Stiefel (KS) 3D Regularization
+# ==========================================
+
+@dataclass(frozen=True, slots=True)
+class KustaanheimoStiefelBinaryChart:
+    """3D Kustaanheimo-Stiefel lift for one binary relative coordinate."""
+
+    pair: tuple[int, int]
+    relative_position: np.ndarray
+    relative_velocity: np.ndarray
+    u: np.ndarray
+    u_prime: np.ndarray
+    radius: float
+    regularized_radius: float
+    reconstruction_error: float
+
+    def as_dict(self) -> dict[str, float | tuple[int, int]]:
+        return {
+            "pair": self.pair,
+            "radius": self.radius,
+            "regularized_radius": self.regularized_radius,
+            "u0": float(self.u[0]),
+            "u1": float(self.u[1]),
+            "u2": float(self.u[2]),
+            "u3": float(self.u[3]),
+            "u_prime0": float(self.u_prime[0]),
+            "u_prime1": float(self.u_prime[1]),
+            "u_prime2": float(self.u_prime[2]),
+            "u_prime3": float(self.u_prime[3]),
+            "reconstruction_error": self.reconstruction_error,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class KustaanheimoStiefelChartCertificate:
+    """Check that the 3D binary collision chart is numerically well-defined."""
+
+    sample_count: int
+    pair: tuple[int, int]
+    minimum_radius: float
+    minimum_regularized_radius: float
+    maximum_regularized_speed: float
+    maximum_branch_jump: float
+    maximum_reconstruction_error: float
+    chart_resolved: bool
+
+    def as_dict(self) -> dict[str, float | int | bool | tuple[int, int]]:
+        return {
+            "sample_count": self.sample_count,
+            "pair": self.pair,
+            "minimum_radius": self.minimum_radius,
+            "minimum_regularized_radius": self.minimum_regularized_radius,
+            "maximum_regularized_speed": self.maximum_regularized_speed,
+            "maximum_branch_jump": self.maximum_branch_jump,
+            "maximum_reconstruction_error": self.maximum_reconstruction_error,
+            "chart_resolved": self.chart_resolved,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class KustaanheimoStiefelRegularizedFlowState:
+    """Regularized-time second-order state for one binary pair (3D KS)."""
+
+    pair: tuple[int, int]
+    u: np.ndarray
+    u_prime: np.ndarray
+    u_double_prime: np.ndarray
+    radius: float
+    perturbation_acceleration_norm: float
+    relative_acceleration_norm: float
+
+    def as_dict(self) -> dict[str, float | tuple[int, int]]:
+        return {
+            "pair": self.pair,
+            "u0": float(self.u[0]),
+            "u1": float(self.u[1]),
+            "u2": float(self.u[2]),
+            "u3": float(self.u[3]),
+            "u_prime0": float(self.u_prime[0]),
+            "u_prime1": float(self.u_prime[1]),
+            "u_prime2": float(self.u_prime[2]),
+            "u_prime3": float(self.u_prime[3]),
+            "u_double_prime0": float(self.u_double_prime[0]),
+            "u_double_prime1": float(self.u_double_prime[1]),
+            "u_double_prime2": float(self.u_double_prime[2]),
+            "u_double_prime3": float(self.u_double_prime[3]),
+            "radius": self.radius,
+            "perturbation_acceleration_norm": self.perturbation_acceleration_norm,
+            "relative_acceleration_norm": self.relative_acceleration_norm,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class KustaanheimoStiefelFlowCertificate:
+    """Check that the 3D regularized binary RHS is defined and optionally residual-tested."""
+
+    sample_count: int
+    pair: tuple[int, int]
+    flow_defined: bool
+    minimum_radius: float
+    maximum_rhs_norm: float
+    maximum_perturbation_acceleration_norm: float
+    maximum_finite_difference_residual: float | None
+    residual_resolved: bool
+
+    def as_dict(self) -> dict[str, float | int | bool | tuple[int, int] | None]:
+        return {
+            "sample_count": self.sample_count,
+            "pair": self.pair,
+            "flow_defined": self.flow_defined,
+            "minimum_radius": self.minimum_radius,
+            "maximum_rhs_norm": self.maximum_rhs_norm,
+            "maximum_perturbation_acceleration_norm": self.maximum_perturbation_acceleration_norm,
+            "maximum_finite_difference_residual": self.maximum_finite_difference_residual,
+            "residual_resolved": self.residual_resolved,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class KustaanheimoStiefelEquivalenceCertificate:
+    """Local equivalence check between regularized 3D dynamics and relative inertial dynamics."""
+
+    sample_count: int
+    pair: tuple[int, int]
+    maximum_position_residual: float
+    maximum_velocity_residual: float
+    maximum_acceleration_residual: float
+    equivalence_resolved: bool
+
+    def as_dict(self) -> dict[str, float | int | bool | tuple[int, int]]:
+        return {
+            "sample_count": self.sample_count,
+            "pair": self.pair,
+            "maximum_position_residual": self.maximum_position_residual,
+            "maximum_velocity_residual": self.maximum_velocity_residual,
+            "maximum_acceleration_residual": self.maximum_acceleration_residual,
+            "equivalence_resolved": self.equivalence_resolved,
+        }
+
+
+def _kustaanheimo_stiefel_square_root(position: np.ndarray) -> np.ndarray:
+    x = float(position[0])
+    y = float(position[1])
+    z = float(position[2])
+    r = float(np.linalg.norm(position))
+    if x >= 0.0:
+        u0 = np.sqrt(max(0.5 * (r + x), 0.0))
+        if u0 > 0.0:
+            u1 = y / (2.0 * u0)
+            u2 = z / (2.0 * u0)
+        else:
+            u1 = 0.0
+            u2 = 0.0
+        u3 = 0.0
+    else:
+        u3 = np.sqrt(max(0.5 * (r - x), 0.0))
+        if u3 > 0.0:
+            u0 = y / (2.0 * u3)
+            u1 = z / (2.0 * u3)
+        else:
+            u0 = 0.0
+            u1 = 0.0
+        u2 = 0.0
+    return np.array([u0, u1, u2, u3], dtype=float)
+
+
+def _kustaanheimo_stiefel_square(u: np.ndarray) -> np.ndarray:
+    x = u[0]**2 - u[1]**2 - u[2]**2 + u[3]**2
+    y = 2.0 * (u[0]*u[1] - u[2]*u[3])
+    z = 2.0 * (u[0]*u[2] + u[1]*u[3])
+    return np.array([x, y, z], dtype=float)
+
+
+def _kustaanheimo_stiefel_matrix(u: np.ndarray) -> np.ndarray:
+    return np.array([
+        [u[0], -u[1], -u[2], u[3]],
+        [u[1],  u[0], -u[3], -u[2]],
+        [u[2],  u[3],  u[0],  u[1]]
+    ], dtype=float)
+
+
+def _kustaanheimo_stiefel_matrix_transpose_mult(u: np.ndarray, v: np.ndarray) -> np.ndarray:
+    u0_p = 0.5 * (u[0] * v[0] + u[1] * v[1] + u[2] * v[2])
+    u1_p = 0.5 * (-u[1] * v[0] + u[0] * v[1] + u[3] * v[2])
+    u2_p = 0.5 * (-u[2] * v[0] - u[3] * v[1] + u[0] * v[2])
+    u3_p = 0.5 * (u[3] * v[0] - u[2] * v[1] + u[1] * v[2])
+    return np.array([u0_p, u1_p, u2_p, u3_p], dtype=float)
+
+
+def _kustaanheimo_stiefel_u_double_prime(
+    u: np.ndarray,
+    u_prime: np.ndarray,
+    relative_acceleration: np.ndarray,
+    mu: float,
+) -> np.ndarray:
+    radius = float(np.dot(u, u))
+    u_prime_norm_sq = float(np.dot(u_prime, u_prime))
+    H = (2.0 * u_prime_norm_sq - mu) / max(radius, 1.0e-18)
+    r_vec = _kustaanheimo_stiefel_square(u)
+    kepler_acc = -mu * r_vec / max(radius**3, 1.0e-18)
+    perturbation = relative_acceleration - kepler_acc
+    pert_term = 0.5 * radius * _kustaanheimo_stiefel_matrix_transpose_mult(u, perturbation)
+    return 0.5 * H * u + pert_term
+
+
+def kustaanheimo_stiefel_binary_chart(system: object, state: np.ndarray, pair: tuple[int, int]) -> KustaanheimoStiefelBinaryChart:
+    if getattr(system, "dimension", None) != 3:
+        raise ValueError("Kustaanheimo-Stiefel binary chart is only implemented for 3D systems.")
+    positions, velocities = system.split_state(state)
+    i, j = pair
+    relative_position = np.asarray(positions[j] - positions[i], dtype=float)
+    relative_velocity = np.asarray(velocities[j] - velocities[i], dtype=float)
+    radius = float(np.linalg.norm(relative_position))
+    if radius <= 0.0:
+        raise ValueError("Kustaanheimo-Stiefel chart cannot choose a square-root branch at exact collision.")
+    u = _kustaanheimo_stiefel_square_root(relative_position)
+    u_prime = _kustaanheimo_stiefel_matrix_transpose_mult(u, relative_velocity)
+    reconstructed_position = _kustaanheimo_stiefel_square(u)
+    reconstruction_error = float(np.linalg.norm(reconstructed_position - relative_position))
+    return KustaanheimoStiefelBinaryChart(
+        pair=pair,
+        relative_position=relative_position,
+        relative_velocity=relative_velocity,
+        u=u,
+        u_prime=u_prime,
+        radius=radius,
+        regularized_radius=float(np.linalg.norm(u)),
+        reconstruction_error=reconstruction_error,
+    )
+
+
+def _continuous_kustaanheimo_stiefel_charts(charts: tuple[KustaanheimoStiefelBinaryChart, ...]) -> tuple[KustaanheimoStiefelBinaryChart, ...]:
+    if not charts:
+        return ()
+    continuous = [charts[0]]
+    for chart in charts[1:]:
+        previous = continuous[-1]
+        if np.linalg.norm(-chart.u - previous.u) < np.linalg.norm(chart.u - previous.u):
+            chart = _flip_kustaanheimo_stiefel_branch(chart)
+        continuous.append(chart)
+    return tuple(continuous)
+
+
+def _flip_kustaanheimo_stiefel_branch(chart: KustaanheimoStiefelBinaryChart) -> KustaanheimoStiefelBinaryChart:
+    return KustaanheimoStiefelBinaryChart(
+        pair=chart.pair,
+        relative_position=chart.relative_position,
+        relative_velocity=chart.relative_velocity,
+        u=-chart.u,
+        u_prime=-chart.u_prime,
+        radius=chart.radius,
+        regularized_radius=chart.regularized_radius,
+        reconstruction_error=chart.reconstruction_error,
+    )
+
+
+def kustaanheimo_stiefel_chart_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    start_index: int = 0,
+    end_index: int | None = None,
+    pair: tuple[int, int] | None = None,
+    reconstruction_tolerance: float = 1.0e-8,
+) -> KustaanheimoStiefelChartCertificate:
+    if getattr(system, "body_count", None) != 3:
+        raise TypeError("kustaanheimo_stiefel_chart_certificate requires a general three-body system.")
+    if getattr(system, "dimension", None) != 3:
+        raise ValueError("kustaanheimo_stiefel_chart_certificate is only implemented for 3D systems.")
+    end = len(trajectory.t) - 1 if end_index is None else min(end_index, len(trajectory.t) - 1)
+    start = max(0, min(start_index, end))
+    if pair is None:
+        pair = _dominant_close_pair(system, trajectory, start, end)
+    charts = _continuous_kustaanheimo_stiefel_charts(
+        tuple(kustaanheimo_stiefel_binary_chart(system, state, pair) for state in trajectory.y[start : end + 1])
+    )
+    maximum_reconstruction_error = float(max(chart.reconstruction_error for chart in charts))
+    branch_jumps = [
+        float(np.linalg.norm(charts[index].u - charts[index - 1].u))
+        for index in range(1, len(charts))
+    ]
+    chart_resolved = bool(np.isfinite(maximum_reconstruction_error) and maximum_reconstruction_error <= reconstruction_tolerance)
+    return KustaanheimoStiefelChartCertificate(
+        sample_count=len(charts),
+        pair=pair,
+        minimum_radius=float(min(chart.radius for chart in charts)),
+        minimum_regularized_radius=float(min(chart.regularized_radius for chart in charts)),
+        maximum_regularized_speed=float(max(np.linalg.norm(chart.u_prime) for chart in charts)),
+        maximum_branch_jump=0.0 if not branch_jumps else float(max(branch_jumps)),
+        maximum_reconstruction_error=maximum_reconstruction_error,
+        chart_resolved=chart_resolved,
+    )
+
+
+def kustaanheimo_stiefel_regularized_flow_state(
+    system: object,
+    state: np.ndarray,
+    pair: tuple[int, int],
+) -> KustaanheimoStiefelRegularizedFlowState:
+    chart = kustaanheimo_stiefel_binary_chart(system, state, pair)
+    return _kustaanheimo_stiefel_regularized_flow_state_from_chart(system, state, chart)
+
+
+def _kustaanheimo_stiefel_regularized_flow_state_from_chart(
+    system: object,
+    state: np.ndarray,
+    chart: KustaanheimoStiefelBinaryChart,
+) -> KustaanheimoStiefelRegularizedFlowState:
+    positions, _velocities = system.split_state(state)
+    i, j = chart.pair
+    masses = np.asarray(system.masses, dtype=float)
+    accelerations = system.acceleration_field(positions)
+    relative_acceleration = np.asarray(accelerations[j] - accelerations[i], dtype=float)
+    mu = float(system.gravitational_constant * (masses[i] + masses[j]))
+    kepler_acceleration = -mu * chart.relative_position / max(chart.radius**3, 1.0e-18)
+    perturbation = relative_acceleration - kepler_acceleration
+    u_double_prime = _kustaanheimo_stiefel_u_double_prime(
+        chart.u,
+        chart.u_prime,
+        relative_acceleration,
+        mu,
+    )
+    return KustaanheimoStiefelRegularizedFlowState(
+        pair=chart.pair,
+        u=chart.u,
+        u_prime=chart.u_prime,
+        u_double_prime=u_double_prime,
+        radius=chart.radius,
+        perturbation_acceleration_norm=float(np.linalg.norm(perturbation)),
+        relative_acceleration_norm=float(np.linalg.norm(relative_acceleration)),
+    )
+
+
+def kustaanheimo_stiefel_flow_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    start_index: int = 0,
+    end_index: int | None = None,
+    pair: tuple[int, int] | None = None,
+    residual_tolerance: float = 1.0e-4,
+) -> KustaanheimoStiefelFlowCertificate:
+    if getattr(system, "body_count", None) != 3:
+        raise TypeError("kustaanheimo_stiefel_flow_certificate requires a general three-body system.")
+    if getattr(system, "dimension", None) != 3:
+        raise ValueError("kustaanheimo_stiefel_flow_certificate is only implemented for 3D systems.")
+    end = len(trajectory.t) - 1 if end_index is None else min(end_index, len(trajectory.t) - 1)
+    start = max(0, min(start_index, end))
+    if pair is None:
+        pair = _dominant_close_pair(system, trajectory, start, end)
+    charts = _continuous_kustaanheimo_stiefel_charts(
+        tuple(kustaanheimo_stiefel_binary_chart(system, state, pair) for state in trajectory.y[start : end + 1])
+    )
+    flow_states = tuple(
+        _kustaanheimo_stiefel_regularized_flow_state_from_chart(system, state, chart)
+        for state, chart in zip(trajectory.y[start : end + 1], charts, strict=True)
+    )
+    flow_defined = all(
+        np.all(np.isfinite(flow.u_double_prime)) and np.all(np.isfinite(flow.u_prime))
+        for flow in flow_states
+    )
+    residual = _regularized_ks_flow_residual(system, trajectory, start, end, pair, flow_states)
+    residual_resolved = residual is not None and residual <= residual_tolerance
+    return KustaanheimoStiefelFlowCertificate(
+        sample_count=len(flow_states),
+        pair=pair,
+        flow_defined=flow_defined,
+        minimum_radius=float(min(flow.radius for flow in flow_states)),
+        maximum_rhs_norm=float(max(np.linalg.norm(flow.u_double_prime) for flow in flow_states)),
+        maximum_perturbation_acceleration_norm=float(
+            max(flow.perturbation_acceleration_norm for flow in flow_states)
+        ),
+        maximum_finite_difference_residual=residual,
+        residual_resolved=residual_resolved,
+    )
+
+
+def kustaanheimo_stiefel_equivalence_certificate(
+    system: object,
+    trajectory: TrajectoryResult,
+    start_index: int = 0,
+    end_index: int | None = None,
+    pair: tuple[int, int] | None = None,
+    position_tolerance: float = 1.0e-8,
+    velocity_tolerance: float = 1.0e-8,
+    acceleration_tolerance: float = 1.0e-7,
+) -> KustaanheimoStiefelEquivalenceCertificate:
+    if getattr(system, "body_count", None) != 3:
+        raise TypeError("kustaanheimo_stiefel_equivalence_certificate requires a general three-body system.")
+    if getattr(system, "dimension", None) != 3:
+        raise ValueError("kustaanheimo_stiefel_equivalence_certificate is only implemented for 3D systems.")
+    end = len(trajectory.t) - 1 if end_index is None else min(end_index, len(trajectory.t) - 1)
+    start = max(0, min(start_index, end))
+    if pair is None:
+        pair = _dominant_close_pair(system, trajectory, start, end)
+    charts = _continuous_kustaanheimo_stiefel_charts(
+        tuple(kustaanheimo_stiefel_binary_chart(system, state, pair) for state in trajectory.y[start : end + 1])
+    )
+    position_residuals = []
+    velocity_residuals = []
+    acceleration_residuals = []
+    relative_acceleration_norms = []
+    for state, chart in zip(trajectory.y[start : end + 1], charts, strict=True):
+        flow = _kustaanheimo_stiefel_regularized_flow_state_from_chart(system, state, chart)
+        positions, _velocities = system.split_state(state)
+        i, j = pair
+        relative_acceleration = system.acceleration_field(positions)[j] - system.acceleration_field(positions)[i]
+        relative_acceleration_norms.append(float(np.linalg.norm(relative_acceleration)))
+        position_residuals.append(float(np.linalg.norm(_kustaanheimo_stiefel_square(chart.u) - chart.relative_position)))
+        recon_vel = 2.0 / chart.radius * _kustaanheimo_stiefel_matrix(chart.u) @ chart.u_prime
+        velocity_residuals.append(float(np.linalg.norm(recon_vel - chart.relative_velocity)))
+        u = chart.u
+        up = chart.u_prime
+        upp = flow.u_double_prime
+        r = chart.radius
+        lu_upp = _kustaanheimo_stiefel_matrix(u) @ upp
+        lup_up = _kustaanheimo_stiefel_matrix(up) @ up
+        u_dot_up = float(np.dot(u, up))
+        recon_acc = (2.0 / r**2) * (lu_upp + lup_up) - (4.0 / r**3) * u_dot_up * (_kustaanheimo_stiefel_matrix(u) @ up)
+        acceleration_residuals.append(float(np.linalg.norm(recon_acc - relative_acceleration)))
+    max_position = float(max(position_residuals))
+    max_velocity = float(max(velocity_residuals))
+    max_acceleration = float(max(acceleration_residuals))
+    max_acc_norm = float(max(relative_acceleration_norms)) if relative_acceleration_norms else 1.0
+    acc_resolved = (max_acceleration <= acceleration_tolerance) or (max_acceleration / max(max_acc_norm, 1.0e-12) <= 1.0e-5)
+    return KustaanheimoStiefelEquivalenceCertificate(
+        sample_count=len(charts),
+        pair=pair,
+        maximum_position_residual=max_position,
+        maximum_velocity_residual=max_velocity,
+        maximum_acceleration_residual=max_acceleration,
+        equivalence_resolved=(
+            max_position <= position_tolerance
+            and max_velocity <= velocity_tolerance
+            and acc_resolved
+        ),
+    )
+
+
+def _regularized_ks_flow_residual(
+    system: object,
+    trajectory: TrajectoryResult,
+    start: int,
+    end: int,
+    pair: tuple[int, int],
+    flow_states: tuple[KustaanheimoStiefelRegularizedFlowState, ...],
+) -> float | None:
+    if len(flow_states) < 3:
+        return None
+    times = trajectory.t[start : end + 1]
+    radii = np.asarray([flow.radius for flow in flow_states], dtype=float)
+    s = np.zeros(len(times), dtype=float)
+    for index in range(1, len(times)):
+        dt = float(times[index] - times[index - 1])
+        mean_radius = max(0.5 * (radii[index] + radii[index - 1]), 1.0e-18)
+        s[index] = s[index - 1] + dt / mean_radius
+    residuals = []
+    charts = _continuous_kustaanheimo_stiefel_charts(
+        tuple(kustaanheimo_stiefel_binary_chart(system, state, pair) for state in trajectory.y[start : end + 1])
+    )
+    u_primes = np.asarray([chart.u_prime for chart in charts], dtype=float)
+    for index in range(1, len(flow_states) - 1):
+        denominator = float(s[index + 1] - s[index - 1])
+        if denominator <= 0.0:
+            continue
+        finite_difference = (u_primes[index + 1] - u_primes[index - 1]) / denominator
+        residuals.append(float(np.linalg.norm(finite_difference - flow_states[index].u_double_prime)))
+    return None if not residuals else float(max(residuals))

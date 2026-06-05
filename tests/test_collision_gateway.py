@@ -14,6 +14,11 @@ from threebody.analysis import (
     levi_civita_regularized_flow_state,
     levi_civita_step_control_certificate,
     levi_civita_tidal_bound_certificate,
+    kustaanheimo_stiefel_binary_chart,
+    kustaanheimo_stiefel_chart_certificate,
+    kustaanheimo_stiefel_equivalence_certificate,
+    kustaanheimo_stiefel_flow_certificate,
+    kustaanheimo_stiefel_regularized_flow_state,
     mcgehee_collision_diagnostic,
     restricted_chart_certificate,
 )
@@ -292,3 +297,121 @@ def test_restricted_chart_certificate_reports_gateway_transit() -> None:
     assert certificate.nearest_lagrange == "L1"
     assert certificate.certificate_kind == "gateway_neck"
     assert certificate.max_transit_likelihood >= 0.0
+
+
+def test_kustaanheimo_stiefel_binary_chart_reconstructs_relative_position() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 1.0, 1.0), dimension=3)
+    state = system.flatten_state(
+        np.array([[0.0, 0.0, 0.0], [0.003, 0.004, 0.012], [1.0, 0.0, 0.0]], dtype=float),
+        np.array([[0.0, 0.0, 0.0], [0.1, -0.2, 0.3], [0.0, 0.0, 0.0]], dtype=float),
+    )
+
+    chart = kustaanheimo_stiefel_binary_chart(system, state, (0, 1))
+
+    assert chart.radius == np.linalg.norm(chart.relative_position)
+    assert chart.regularized_radius == np.sqrt(chart.radius)
+    assert chart.reconstruction_error < 1.0e-14
+
+
+def test_kustaanheimo_stiefel_chart_certificate_resolves_interval_chart() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 1.0, 1.0), dimension=3)
+    state = system.flatten_state(
+        np.array([[0.0, 0.0, 0.0], [0.005, 0.0, 0.0], [1.0, 0.0, 0.0]], dtype=float),
+        np.zeros((3, 3), dtype=float),
+    )
+    trajectory = TrajectoryResult(
+        t=np.array([0.0, 1.0]),
+        y=np.vstack([state, state]),
+        success=True,
+        message="synthetic 3d",
+    )
+
+    certificate = kustaanheimo_stiefel_chart_certificate(system, trajectory)
+
+    assert certificate.pair == (0, 1)
+    assert certificate.chart_resolved is True
+    assert certificate.maximum_reconstruction_error < 1.0e-14
+
+
+def test_kustaanheimo_stiefel_regularized_flow_state_is_finite() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 2.0, 0.5), dimension=3)
+    state = system.flatten_state(
+        np.array([[0.0, 0.0, 0.0], [0.005, 0.0, 0.0], [1.0, 0.1, 0.2]], dtype=float),
+        np.array([[0.0, 0.0, 0.0], [0.0, 0.2, -0.3], [0.0, -0.1, 0.1]], dtype=float),
+    )
+
+    flow = kustaanheimo_stiefel_regularized_flow_state(system, state, (0, 1))
+
+    assert np.all(np.isfinite(flow.u_double_prime))
+    assert flow.relative_acceleration_norm > 0.0
+    assert flow.perturbation_acceleration_norm > 0.0
+
+
+def test_kustaanheimo_stiefel_flow_certificate_reports_defined_rhs() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 1.0, 1.0), dimension=3)
+    states = []
+    for offset in (0.0, 1.0e-4, 2.0e-4):
+        states.append(
+            system.flatten_state(
+                np.array([[0.0, 0.0, 0.0], [0.005 + offset, 0.0, 0.0], [1.0, 0.0, 0.0]], dtype=float),
+                np.zeros((3, 3), dtype=float),
+            )
+        )
+    trajectory = TrajectoryResult(
+        t=np.array([0.0, 0.5, 1.0]),
+        y=np.vstack(states),
+        success=True,
+        message="synthetic flow 3d",
+    )
+
+    certificate = kustaanheimo_stiefel_flow_certificate(system, trajectory, pair=(0, 1))
+
+    assert certificate.flow_defined is True
+    assert certificate.maximum_rhs_norm > 0.0
+    assert certificate.maximum_perturbation_acceleration_norm > 0.0
+    assert certificate.maximum_finite_difference_residual is not None
+
+
+def test_kustaanheimo_stiefel_equivalence_certificate_reconstructs_inertial_dynamics() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 2.0, 0.5), dimension=3)
+    state = system.flatten_state(
+        np.array([[0.0, 0.0, 0.0], [0.006, 0.004, 0.012], [1.0, -0.2, 0.1]], dtype=float),
+        np.array([[0.0, 0.0, 0.0], [0.1, -0.2, 0.3], [0.0, 0.05, -0.05]], dtype=float),
+    )
+    trajectory = TrajectoryResult(
+        t=np.array([0.0, 1.0]),
+        y=np.vstack([state, state]),
+        success=True,
+        message="synthetic equivalence 3d",
+    )
+
+    certificate = kustaanheimo_stiefel_equivalence_certificate(system, trajectory, pair=(0, 1))
+
+    assert certificate.equivalence_resolved is True
+    assert certificate.maximum_position_residual < 1.0e-10
+    assert certificate.maximum_velocity_residual < 1.0e-10
+    assert certificate.maximum_acceleration_residual < 1.0e-2
+
+
+def test_collision_regularization_certificate_aggregates_interval_3d() -> None:
+    system = GeneralThreeBodySystem(masses=(1.0, 1.0, 1.0), dimension=3)
+    state = system.flatten_state(
+        np.array([[0.0, 0.0, 0.0], [0.005, 0.0, 0.0], [1.0, 0.0, 0.0]], dtype=float),
+        np.zeros((3, 3), dtype=float),
+    )
+    trajectory = TrajectoryResult(
+        t=np.array([0.0, 1.0]),
+        y=np.vstack([state, state]),
+        success=True,
+        message="synthetic 3d regularization",
+    )
+
+    certificate = collision_regularization_certificate(system, trajectory)
+
+    assert certificate.regularization_required is True
+    assert certificate.kustaanheimo_stiefel_chart_resolved is True
+    assert certificate.kustaanheimo_stiefel_pair == (0, 1)
+    assert certificate.kustaanheimo_stiefel_flow_defined is True
+    assert certificate.kustaanheimo_stiefel_equivalence_resolved is True
+    assert certificate.minimum_pair_distance > 0.0
+    assert "binary_collision_candidate" in certificate.collision_types
