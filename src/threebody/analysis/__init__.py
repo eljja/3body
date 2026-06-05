@@ -32,6 +32,22 @@ from .collision import (
     kustaanheimo_stiefel_regularized_flow_state,
     mcgehee_collision_diagnostic,
 )
+from .primes import (
+    PrimalityCertificate,
+    GoldbachWitness,
+    GoldbachRangeCertificate,
+    TwinPrimeWitness,
+    LegendreWitness,
+    NSquaredPlusOneWitness,
+    is_prime_deterministic,
+    verify_goldbach_decomposition,
+    assess_goldbach_conjecture_range,
+    verify_twin_prime_witness,
+    verify_legendre_conjecture,
+    assess_legendre_conjecture_range,
+    verify_n_squared_plus_one_prime,
+    find_n_squared_plus_one_primes,
+)
 from .coordinates import GeneralThreeBodyFeatures, RestrictedThreeBodyFeatures
 from .ensembles import PerturbationEnsemble, PerturbationMember
 from .events import TransitionEventEvidence, transition_event_evidence, transition_event_rows
@@ -340,4 +356,18 @@ __all__ = [
     "validate_markov_chain",
     "word_distance",
     "word_signature_rows",
+    "PrimalityCertificate",
+    "GoldbachWitness",
+    "GoldbachRangeCertificate",
+    "TwinPrimeWitness",
+    "LegendreWitness",
+    "NSquaredPlusOneWitness",
+    "is_prime_deterministic",
+    "verify_goldbach_decomposition",
+    "assess_goldbach_conjecture_range",
+    "verify_twin_prime_witness",
+    "verify_legendre_conjecture",
+    "assess_legendre_conjecture_range",
+    "verify_n_squared_plus_one_prime",
+    "find_n_squared_plus_one_primes",
 ]

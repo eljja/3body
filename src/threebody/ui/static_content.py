@@ -178,8 +178,8 @@ CONTENT_PANELS: tuple[ContentPanel, ...] = (
             "유한 범위 검증과 해석적 밀도 추정을 분리한다.",
             "큰 계산 범위를 공개할 때 hashed witness table을 사용한다.",
         ),
-        status="research-outline",
-        status_ko="연구 개요",
+        status="implemented",
+        status_ko="구현됨",
     ),
     ContentPanel(
         panel_id="twin-prime",
@@ -204,8 +204,8 @@ CONTENT_PANELS: tuple[ContentPanel, ...] = (
             "공개 witness data에 소수성 certificate와 search-range digest를 붙인다.",
             "각 주장이 휴리스틱, 계산, 정리 기반 중 무엇인지 명시한다.",
         ),
-        status="research-outline",
-        status_ko="연구 개요",
+        status="implemented",
+        status_ko="구현됨",
     ),
 )
 
