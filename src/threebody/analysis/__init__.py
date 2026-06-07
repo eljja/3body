@@ -52,6 +52,8 @@ from .primes import (
     circle_method_numerical_integral,
     GoldbachGRHCertificate,
     verify_grh_conditional_goldbach_bound,
+    LegendreRHWitness,
+    verify_legendre_conjecture_analytical_bound,
 )
 from .coordinates import GeneralThreeBodyFeatures, RestrictedThreeBodyFeatures
 from .ensembles import PerturbationEnsemble, PerturbationMember
@@ -380,4 +382,6 @@ __all__ = [
     "circle_method_numerical_integral",
     "GoldbachGRHCertificate",
     "verify_grh_conditional_goldbach_bound",
+    "LegendreRHWitness",
+    "verify_legendre_conjecture_analytical_bound",
 ]

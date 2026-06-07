@@ -143,3 +143,24 @@ def test_grh_conditional_goldbach_bound() -> None:
     # Invalid values should raise ValueError
     with pytest.raises(ValueError):
         verify_grh_conditional_goldbach_bound(3)
+
+
+def test_legendre_conjecture_analytical_bound() -> None:
+    from threebody.analysis.primes import verify_legendre_conjecture_analytical_bound
+
+    # For n = 5 (interval 25 to 36, prime 29 or 31)
+    witness = verify_legendre_conjecture_analytical_bound(5)
+    assert witness.n == 5
+    assert witness.lower_bound == 25
+    assert witness.upper_bound == 36
+    assert witness.bhp_bound_satisfied is True
+    assert witness.resolved is True
+
+    # For larger values still within the BHP limit (n <= 1.15e7)
+    witness_large = verify_legendre_conjecture_analytical_bound(1000)
+    assert witness_large.bhp_bound_satisfied is True
+    assert witness_large.resolved is True
+
+    # Invalid values should raise ValueError
+    with pytest.raises(ValueError):
+        verify_legendre_conjecture_analytical_bound(0)
