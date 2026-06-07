@@ -47,6 +47,11 @@ from .primes import (
     assess_legendre_conjecture_range,
     verify_n_squared_plus_one_prime,
     find_n_squared_plus_one_primes,
+    GoldbachCircleMethodAnalysis,
+    analyze_goldbach_circle_method,
+    circle_method_numerical_integral,
+    GoldbachGRHCertificate,
+    verify_grh_conditional_goldbach_bound,
 )
 from .coordinates import GeneralThreeBodyFeatures, RestrictedThreeBodyFeatures
 from .ensembles import PerturbationEnsemble, PerturbationMember
@@ -370,4 +375,9 @@ __all__ = [
     "assess_legendre_conjecture_range",
     "verify_n_squared_plus_one_prime",
     "find_n_squared_plus_one_primes",
+    "GoldbachCircleMethodAnalysis",
+    "analyze_goldbach_circle_method",
+    "circle_method_numerical_integral",
+    "GoldbachGRHCertificate",
+    "verify_grh_conditional_goldbach_bound",
 ]
