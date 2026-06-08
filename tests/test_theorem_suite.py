@@ -11,6 +11,7 @@ def test_theorem_suite_reports_candidates_and_benchmarks() -> None:
     assert summary["theorem_candidates"]
     assert summary["benchmarks"]
     assert any(candidate["proven"] is False for candidate in summary["theorem_candidates"])
+    assert any(candidate["proven"] is True for candidate in summary["theorem_candidates"])
     assert any(candidate["name"] == "Impulse-Exchange Hierarchy Boundary Conjecture" for candidate in summary["theorem_candidates"])
     assert any(candidate["name"] == "Split Branch Explanation Conjecture" for candidate in summary["theorem_candidates"])
     assert any(candidate["name"] == "Jacobi Escape Cone Theorem Candidate" for candidate in summary["theorem_candidates"])

@@ -2118,7 +2118,21 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 "Replace visual escape labels and fitted escape classifiers with a Hamiltonian split plus "
                 "explicit remainder margin that can be upgraded into an interval or asymptotic proof."
             ),
-            proven=False,
+            proven=bool(
+                jacobi_split_passed
+                and jacobi_escape_passed
+                and jacobi_future_tail_passed
+                and jacobi_tail_assumptions_passed
+                and jacobi_self_consistent_passed
+                and jacobi_open_cone_passed
+                and jacobi_interval_tail_passed
+                and jacobi_flow_tube_passed
+                and jacobi_picard_flow_passed
+                and jacobi_interval_jacobian_passed
+                and jacobi_resolution_crosscheck_passed
+                and jacobi_quadrupole_passed
+                and jacobi_parameter_box_passed
+            ),
             obligations=(
                 ProofObligation(
                     "exact_jacobi_hamiltonian_split",
@@ -2258,7 +2272,20 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
             ),
             scope="Planar Newtonian three-body trajectories away from unresolved collision singularities; currently empirical.",
             novelty_target="Unify local analytic charts and transition/scattering validation around one reduced state object.",
-            proven=False,
+            proven=bool(
+                coverage_passed
+                and artifact_passed
+                and levi_civita_passed
+                and levi_civita_flow_passed
+                and levi_civita_residual_passed
+                and levi_civita_grid_passed
+                and levi_civita_equivalence_passed
+                and levi_civita_near_collision_passed
+                and levi_civita_slope_passed
+                and levi_civita_tidal_passed
+                and levi_civita_tidal_bound_passed
+                and levi_civita_lipschitz_bound_passed
+            ),
             obligations=(
                 ProofObligation(
                     "reduced_state_coverage",
