@@ -52,3 +52,26 @@ def test_escape_asymptotic_certificate_detects_outgoing_escape_tail() -> None:
     assert certificate.outgoing_energy > 0.0
     assert certificate.radius_growth_fraction >= 0.8
     assert certificate.escape_speed_at_infinity > 0.0
+
+
+def test_verify_scattering_analytic_bounds_certifies_theoretical_quadrupole() -> None:
+    from threebody.analysis import verify_scattering_analytic_bounds
+
+    scenario = OrbitLibrary().general_hierarchical_flyby(duration=8.0, samples=260)
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+
+    certificate = verify_scattering_analytic_bounds(scenario.system, trajectory)
+
+    assert certificate.inner_pair == (0, 1)
+    assert certificate.outer_body == 2
+    assert certificate.observed_energy_exchange >= 0.0
+    assert certificate.theoretical_quadrupole_bound > 0.0
+    assert certificate.observed_deflection_angle >= 0.0
+    assert certificate.theoretical_deflection_bound > 0.0
+    assert certificate.bounds_satisfied is True
+

@@ -105,7 +105,7 @@ from .hierarchy import (
 from .hysteresis import TransitionHysteresisLoop, detect_hysteresis_loops, hysteresis_loop_rows
 from .interpretation import InterpretationSegment, ThreeBodyInterpreter, TrajectoryInterpretation
 from .rule_miner import CandidateTransitionLaw, TransitionRuleMiner
-from .scattering import EscapeAsymptoticCertificate, PeriapsisScatteringMap, escape_asymptotic_certificate, periapsis_scattering_map
+from .scattering import EscapeAsymptoticCertificate, PeriapsisScatteringMap, escape_asymptotic_certificate, periapsis_scattering_map, AnalyticScatteringBoundCertificate, verify_scattering_analytic_bounds
 from .pipeline import ResearchPipeline, ResearchRunResult, ResearchValidationResult
 from .reduced_state import (
     CenterOfMassReductionCertificate,
@@ -218,6 +218,7 @@ __all__ = [
     "CandidateTransitionLaw",
     "EncounterExchangeMetrics",
     "EscapeAsymptoticCertificate",
+    "AnalyticScatteringBoundCertificate",
     "FeatureConditionedTransitionModel",
     "GatewayTransitEstimate",
     "GatewayManifoldTubeCertificate",
@@ -336,6 +337,7 @@ __all__ = [
     "restricted_chart_certificate",
     "mcgehee_collision_diagnostic",
     "periapsis_scattering_map",
+    "verify_scattering_analytic_bounds",
     "poincare_coordinate_sweep_from_reports",
     "poincare_coordinate_sweep_rows",
     "poincare_markov_section_robustness",

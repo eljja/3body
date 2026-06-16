@@ -127,7 +127,17 @@ def fit_power_law_boundary_collapse(
         )
 
     design = np.column_stack([np.ones(target.size), np.log(features)])
-    coefficients, *_unused = np.linalg.lstsq(design, np.log(target), rcond=None)
+    
+    # Implement Ridge regression with lambda = 0.2 on coefficients (excluding intercept)
+    lambda_ridge = 0.2
+    p = features.shape[1]
+    reg_block = np.zeros((p, p + 1))
+    reg_block[:, 1:] = np.eye(p) * np.sqrt(lambda_ridge)
+    
+    design_augmented = np.vstack([design, reg_block])
+    log_target_augmented = np.concatenate([np.log(target), np.zeros(p)])
+    
+    coefficients, *_unused = np.linalg.lstsq(design_augmented, log_target_augmented, rcond=None)
     intercept = float(coefficients[0])
     exponents = tuple(float(value) for value in coefficients[1:])
     predicted = np.exp(design @ coefficients)

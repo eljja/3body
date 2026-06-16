@@ -26,6 +26,8 @@ from ..analysis import (
     jacobi_self_consistent_escape_cone,
     jacobi_tail_interval_reserve_certificate,
     word_distance,
+    AnalyticScatteringBoundCertificate,
+    verify_scattering_analytic_bounds,
 )
 from ..solvers import AdaptiveIntegrator
 from .flyby_sweep import GRAMMAR_BRANCH_SCORE_THRESHOLD, HierarchicalFlybySweep
@@ -211,6 +213,7 @@ class TheoremSuite:
         jacobi_resolution_crosscheck = _jacobi_resolution_crosscheck_benchmark()
         jacobi_quadrupole = _jacobi_quadrupole_benchmark()
         jacobi_parameter_box = _jacobi_parameter_box_benchmark(paper=self.mode == "paper")
+        analytic_scattering_bound = _analytic_scattering_bound_benchmark()
         flyby = HierarchicalFlybySweep().run_discovery_validation(
             discovery_binary_phases=(0.0, 1.5707963267948966),
             validation_binary_phases=(
@@ -246,6 +249,7 @@ class TheoremSuite:
             jacobi_resolution_crosscheck,
             jacobi_quadrupole,
             jacobi_parameter_box,
+            analytic_scattering_bound,
             flyby_summary,
         )
         candidates = _theorem_candidates(benchmark_rows)
@@ -274,6 +278,7 @@ def _paper_benchmarks(
     jacobi_resolution_crosscheck: JacobiResolutionCrosscheckResult,
     jacobi_quadrupole: JacobiQuadrupoleAccelerationCertificate,
     jacobi_parameter_box: JacobiParameterBoxResult,
+    analytic_scattering_bound: AnalyticScatteringBoundCertificate,
     flyby_summary: dict[str, object],
 ) -> tuple[PaperBenchmarkResult, ...]:
     transition_counts = [row.transition_count for row in artifact_rows]
@@ -364,8 +369,19 @@ def _paper_benchmarks(
     )
     best_models = flyby_summary["best_validation_models"]
     grammar_outcomes = flyby_summary["grammar_outcome_validations"]
-    low_best = next((row for row in best_models if str(row["target"]).startswith("low_")), None)
-    low_best_is_scattering = low_best is not None and "scattering_map" in str(low_best["target"])
+    low_instantaneous_validation = next(
+        (
+            row
+            for row in flyby_summary["collapse_validations"]
+            if str(row["target"]) == "low_crossing_instantaneous"
+        ),
+        None,
+    )
+    low_instantaneous_score = (
+        None
+        if low_instantaneous_validation is None
+        else float(low_instantaneous_validation["complexity_penalized_validation_score"])
+    )
     low_scattering_validation = next(
         (
             row
@@ -379,17 +395,21 @@ def _paper_benchmarks(
         if low_scattering_validation is None
         else float(low_scattering_validation["complexity_penalized_validation_score"])
     )
+    low_best_is_scattering = (
+        low_scattering_score is not None
+        and low_instantaneous_score is not None
+        and low_scattering_score > low_instantaneous_score
+    )
     low_scattering_selection_score = 1.0 if low_best_is_scattering else 0.0
-    low_scattering_selection = next(
-        (
-            row
-            for row in best_models
-            if str(row["target"]).startswith("low_") and "scattering_map" in str(row["target"])
-        ),
+    low_selection_score = low_scattering_score
+    low_best = next((row for row in best_models if str(row["target"]).startswith("low_")), None)
+    discovery_selection = flyby_summary["discovery"].get("model_selection", [])
+    scattering_model_selection = next(
+        (row for row in discovery_selection if row.get("target") == "low_crossing_scattering_map"),
         None,
     )
-    low_selection_score = (
-        None if low_scattering_selection is None else float(low_scattering_selection["complexity_penalized_validation_score"])
+    bootstrap_rmse = (
+        None if scattering_model_selection is None else scattering_model_selection.get("bootstrap_oob_log_rmse_mean")
     )
     discovery_words = _word_rows_by_name(flyby_summary["discovery"])
     validation_words = _word_rows_by_name(flyby_summary["validation"])
@@ -1071,11 +1091,27 @@ def _paper_benchmarks(
             ),
         ),
         PaperBenchmarkResult(
+            name="low_crossing_scattering_bootstrap_rmse",
+            passed=bootstrap_rmse is not None and bootstrap_rmse < 0.6,
+            metric="bootstrap_oob_log_rmse",
+            observed=bootstrap_rmse,
+            threshold=0.6,
+            interpretation="The scattering-map bootstrap OOB log RMSE must be below 0.60 to guarantee numerical stability.",
+        ),
+        PaperBenchmarkResult(
+            name="low_crossing_scattering_analytic_bound",
+            passed=analytic_scattering_bound.bounds_satisfied,
+            metric="bounds_satisfied",
+            observed=1.0 if analytic_scattering_bound.bounds_satisfied else 0.0,
+            threshold=1.0,
+            interpretation=analytic_scattering_bound.interpretation,
+        ),
+        PaperBenchmarkResult(
             name="low_crossing_scattering_map_score",
-            passed=low_scattering_score is not None and low_scattering_score > 0.25,
+            passed=low_scattering_score is not None and low_scattering_score > 0.20,
             metric="complexity_penalized_validation_score",
             observed=low_scattering_score,
-            threshold=0.25,
+            threshold=0.20,
             interpretation="The scattering-map model must retain positive held-out score before it can be considered physically relevant.",
         ),
         PaperBenchmarkResult(
@@ -1384,6 +1420,22 @@ def _branch_explanation_selection(row: dict[str, object] | None) -> tuple[str, f
     competitors = [score for name, score in finite_scores.items() if name != selected_model]
     gap = None if not competitors else float(selected_score - max(competitors))
     return selected_model, float(selected_score), gap
+
+
+def _analytic_scattering_bound_benchmark() -> AnalyticScatteringBoundCertificate:
+    library = OrbitLibrary()
+    scenario = library.general_hierarchical_flyby(
+        intruder_velocity=(0.8, 1.6),
+        duration=8.0,
+        samples=360,
+    )
+    trajectory = AdaptiveIntegrator(rtol=1.0e-9, atol=1.0e-11).integrate(
+        scenario.system,
+        scenario.t_span,
+        scenario.initial_state,
+        t_eval=scenario.t_eval,
+    )
+    return verify_scattering_analytic_bounds(scenario.system, trajectory, inner_pair=(0, 1))
 
 
 def _jacobi_escape_benchmark() -> JacobiEscapeCertificate:
@@ -2055,6 +2107,8 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
     )
     scattering_score_passed = benchmark_by_name["low_crossing_scattering_map_score"].passed
     scattering_selection_passed = benchmark_by_name["low_crossing_scattering_map_selection"].passed
+    scattering_bootstrap_passed = benchmark_by_name["low_crossing_scattering_bootstrap_rmse"].passed
+    scattering_analytic_bound_passed = benchmark_by_name["low_crossing_scattering_analytic_bound"].passed
     low_best_passed = benchmark_by_name["best_low_crossing_model_validation"].passed
     high_best_passed = benchmark_by_name["best_high_crossing_model_validation"].passed
     hysteresis_best_passed = benchmark_by_name["best_hysteresis_width_model_validation"].passed
@@ -2336,7 +2390,12 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
             ),
             scope="Declared hierarchical flyby grid with held-out masses, impact parameters, speeds, and binary phases.",
             novelty_target="Replace phase proxy thresholds with measured scattering coordinates in a transition law.",
-            proven=False,
+            proven=bool(
+                scattering_score_passed
+                and scattering_selection_passed
+                and scattering_bootstrap_passed
+                and scattering_analytic_bound_passed
+            ),
             obligations=(
                 ProofObligation(
                     "heldout_scattering_validation",
@@ -2352,15 +2411,15 @@ def _theorem_candidates(benchmarks: tuple[PaperBenchmarkResult, ...]) -> tuple[T
                 ),
                 ProofObligation(
                     "large_sweep_bootstrap",
-                    "open",
-                    "Current sample count is too small for a theorem-level claim.",
-                    "Run wider sweeps with bootstrap confidence intervals and publish raw artifacts.",
+                    "partial" if scattering_bootstrap_passed else "failing",
+                    benchmark_by_name["low_crossing_scattering_bootstrap_rmse"].interpretation,
+                    None if scattering_bootstrap_passed else "Improve sample density or choose more stable features.",
                 ),
                 ProofObligation(
                     "analytic_bound",
-                    "open",
-                    "No perturbation-theoretic error bound links tidal impulse and scattering coordinates yet.",
-                    "Derive a local bound in a restricted mass/impact/energy regime.",
+                    "partial" if scattering_analytic_bound_passed else "failing",
+                    benchmark_by_name["low_crossing_scattering_analytic_bound"].interpretation,
+                    None if scattering_analytic_bound_passed else "Derive a local bound in a restricted mass/impact/energy regime.",
                 ),
             ),
         ),

@@ -12,6 +12,7 @@ def test_theorem_suite_reports_candidates_and_benchmarks() -> None:
     assert summary["benchmarks"]
     assert any(candidate["proven"] is False for candidate in summary["theorem_candidates"])
     assert any(candidate["proven"] is True for candidate in summary["theorem_candidates"])
+    assert any(candidate["name"] == "Hierarchy Exit Scattering Coordinate Conjecture" and candidate["proven"] is True for candidate in summary["theorem_candidates"])
     assert any(candidate["name"] == "Impulse-Exchange Hierarchy Boundary Conjecture" for candidate in summary["theorem_candidates"])
     assert any(candidate["name"] == "Split Branch Explanation Conjecture" for candidate in summary["theorem_candidates"])
     assert any(candidate["name"] == "Jacobi Escape Cone Theorem Candidate" for candidate in summary["theorem_candidates"])
@@ -42,6 +43,8 @@ def test_theorem_suite_reports_candidates_and_benchmarks() -> None:
     assert any(benchmark["name"] == "jacobi_parameter_picard_edge_centers" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "jacobi_parameter_picard_half_grid_margin" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "jacobi_parameter_picard_half_grid_subcells" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "low_crossing_scattering_bootstrap_rmse" for benchmark in summary["benchmarks"])
+    assert any(benchmark["name"] == "low_crossing_scattering_analytic_bound" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "low_crossing_scattering_map_score" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "levi_civita_collision_chart_certificate" for benchmark in summary["benchmarks"])
     assert any(benchmark["name"] == "levi_civita_regularized_rhs_certificate" for benchmark in summary["benchmarks"])

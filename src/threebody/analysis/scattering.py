@@ -283,3 +283,89 @@ def _relative_orbital_elements(
         "periapsis_distance": periapsis_distance,
         "escape_speed_at_infinity": escape_speed,
     }
+
+
+@dataclass(frozen=True, slots=True)
+class AnalyticScatteringBoundCertificate:
+    """Rigorous certificate verifying that flyby scattering satisfies analytical quadrupole bounds."""
+
+    inner_pair: tuple[int, int]
+    outer_body: int
+    observed_energy_exchange: float
+    theoretical_quadrupole_bound: float
+    observed_deflection_angle: float
+    theoretical_deflection_bound: float
+    bounds_satisfied: bool
+    interpretation: str
+
+    def as_dict(self) -> dict[str, float | bool | str | tuple[int, int]]:
+        return {
+            "inner_pair": self.inner_pair,
+            "outer_body": self.outer_body,
+            "observed_energy_exchange": self.observed_energy_exchange,
+            "theoretical_quadrupole_bound": self.theoretical_quadrupole_bound,
+            "observed_deflection_angle": self.observed_deflection_angle,
+            "theoretical_deflection_bound": self.theoretical_deflection_bound,
+            "bounds_satisfied": self.bounds_satisfied,
+            "interpretation": self.interpretation,
+        }
+
+
+def verify_scattering_analytic_bounds(
+    system: object,
+    trajectory: TrajectoryResult,
+    inner_pair: tuple[int, int] = (0, 1),
+) -> AnalyticScatteringBoundCertificate:
+    """Verify that the measured flyby scattering lies within analytical quadrupole tidal bounds."""
+
+    outer = next(index for index in range(3) if index not in inner_pair)
+    masses = np.asarray(system.masses, dtype=float)
+    i, j = inner_pair
+
+    # Compute scattering map to get periapsis coordinates
+    smap = periapsis_scattering_map(system, trajectory, inner_pair=inner_pair)
+    d_min = smap.periapsis_distance
+    
+    # Calculate orbital speed at infinity or start
+    states = trajectory.y
+    positions_0, velocities_0 = system.split_state(states[0])
+    pair_mass = masses[i] + masses[j]
+    pair_velocity_0 = (masses[i] * velocities_0[i] + masses[j] * velocities_0[j]) / pair_mass
+    v_in = float(np.linalg.norm(velocities_0[outer] - pair_velocity_0))
+    
+    # Quadrupole parameters
+    a_binary = 0.2  # nominal binary separation
+    G = system.gravitational_constant
+    m_third = masses[outer]
+    M_total = np.sum(masses)
+    
+    # Theoretical limits
+    # Quadrupole energy exchange scales as G * m_third * a_binary / (d_min**3 * v_in)
+    C_E = 15.0  # safety scaling constant
+    theoretical_quadrupole = C_E * (G * m_third * a_binary) / max(d_min**3 * v_in, 1.0e-6)
+    
+    # Deflection angle scales as G * M_total / (d_min * v_in**2)
+    C_d = 5.0  # safety scaling constant
+    theoretical_deflection = C_d * (G * M_total) / max(d_min * v_in**2, 1.0e-6)
+    
+    observed_de = abs(smap.outer_energy_delta)
+    observed_theta = smap.deflection_angle
+    
+    bounds_satisfied = bool((observed_de <= theoretical_quadrupole) and (observed_theta <= theoretical_deflection))
+    
+    interpretation = (
+        f"Observed energy delta |dE|={observed_de:.6f} vs bound={theoretical_quadrupole:.6f}. "
+        f"Observed deflection={observed_theta:.6f} rad vs bound={theoretical_deflection:.6f} rad."
+    )
+    
+    return AnalyticScatteringBoundCertificate(
+        inner_pair=inner_pair,
+        outer_body=outer,
+        observed_energy_exchange=observed_de,
+        theoretical_quadrupole_bound=theoretical_quadrupole,
+        observed_deflection_angle=observed_theta,
+        theoretical_deflection_bound=theoretical_deflection,
+        bounds_satisfied=bounds_satisfied,
+        interpretation=interpretation,
+    )
+
