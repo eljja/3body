@@ -32,10 +32,7 @@ class ContentPanel:
 FLOATING_MENU_ITEMS: tuple[MenuItem, ...] = (
     MenuItem("threebody-answer", "Three-body answer", "삼체 답변", "3B"),
     MenuItem("closed-form-route", "Closed-form route", "닫힌형 경로", "CF"),
-    MenuItem("riemann-hypothesis", "Riemann Hypothesis", "리만 가설", "RH"),
     MenuItem("collatz-conjecture", "Collatz Conjecture", "콜라츠 추측", "C"),
-    MenuItem("goldbach-conjecture", "Goldbach Conjecture", "골드바흐 추측", "G"),
-    MenuItem("twin-prime", "Twin Prime Workbench", "쌍둥이 소수", "TP"),
     MenuItem("progress-map", "Progress", "진행도", "P"),
     MenuItem("public-audit", "Audit", "감사", "A"),
     MenuItem("build-provenance", "Build", "빌드", "B"),
@@ -103,33 +100,6 @@ CONTENT_PANELS: tuple[ContentPanel, ...] = (
         status_ko="계약 구현",
     ),
     ContentPanel(
-        panel_id="riemann-hypothesis",
-        title="Riemann Hypothesis",
-        title_ko="리만 가설",
-        lead=(
-            "This panel is a future research slot, not a claimed proof. It frames the hypothesis as "
-            "a reproducible verification workflow: statements, equivalent criteria, computed evidence, "
-            "and explicit failure modes."
-        ),
-        lead_ko=(
-            "이 패널은 미래 연구 슬롯이며 증명 주장이 아니다. 명제, 동치 조건, 계산 증거, "
-            "실패 조건을 분리한 재현 가능한 검증 workflow로 다룬다."
-        ),
-        equation="zeta(s)=0, 0 < Re(s) < 1  =>  Re(s)=1/2",
-        bullets=(
-            "Track equivalent formulations separately from numerical zero checks.",
-            "Require interval or certified arithmetic before promoting any computational statement.",
-            "Keep every claim scoped: finite verification evidence is not a proof of the full theorem.",
-        ),
-        bullets_ko=(
-            "동치 정식화와 수치적 영점 확인을 분리한다.",
-            "계산 명제를 승격하기 전 구간/인증 산술을 요구한다.",
-            "모든 주장을 범위 안에 둔다. 유한 검증 증거는 전체 정리의 증명이 아니다.",
-        ),
-        status="research-outline",
-        status_ko="연구 개요",
-    ),
-    ContentPanel(
         panel_id="collatz-conjecture",
         title="Collatz Conjecture",
         title_ko="콜라츠 추측",
@@ -154,58 +124,6 @@ CONTENT_PANELS: tuple[ContentPanel, ...] = (
         ),
         status="research-outline",
         status_ko="연구 개요",
-    ),
-    ContentPanel(
-        panel_id="goldbach-conjecture",
-        title="Goldbach Conjecture",
-        title_ko="골드바흐 추측",
-        lead=(
-            "This panel treats Goldbach as a certificate search problem: each even integer is paired "
-            "with a verifiable prime decomposition, while asymptotic arguments stay clearly separated."
-        ),
-        lead_ko=(
-            "이 패널은 골드바흐 문제를 certificate search로 다룬다. 각 짝수는 검증 가능한 "
-            "소수 분해 witness와 연결하고, 점근 논증은 별도로 둔다."
-        ),
-        equation="For every even N > 2,  N = p + q with p,q prime",
-        bullets=(
-            "Expose witness pairs and primality certificates instead of only counts.",
-            "Separate finite range verification from analytic density estimates.",
-            "Use hashed witness tables when publishing large computational ranges.",
-        ),
-        bullets_ko=(
-            "개수만 공개하지 말고 witness 쌍과 소수성 certificate를 노출한다.",
-            "유한 범위 검증과 해석적 밀도 추정을 분리한다.",
-            "큰 계산 범위를 공개할 때 hashed witness table을 사용한다.",
-        ),
-        status="implemented",
-        status_ko="구현됨",
-    ),
-    ContentPanel(
-        panel_id="twin-prime",
-        title="Twin Prime Workbench",
-        title_ko="쌍둥이 소수 워크벤치",
-        lead=(
-            "This panel is a future interface for bounded-gap prime evidence and admissible tuple "
-            "experiments. It does not assert the twin prime conjecture."
-        ),
-        lead_ko=(
-            "이 패널은 bounded-gap prime 증거와 admissible tuple 실험을 위한 미래 인터페이스다. "
-            "쌍둥이 소수 추측을 주장하지 않는다."
-        ),
-        equation="infinitely many p such that p and p+2 are prime",
-        bullets=(
-            "Keep bounded-gap theorems, sieve experiments, and direct twin-prime witnesses in separate tracks.",
-            "Attach primality certificates and search-range digests to published witness data.",
-            "State which claims are heuristic, computational, or theorem-backed.",
-        ),
-        bullets_ko=(
-            "bounded-gap 정리, sieve 실험, 직접 witness를 분리된 track으로 관리한다.",
-            "공개 witness data에 소수성 certificate와 search-range digest를 붙인다.",
-            "각 주장이 휴리스틱, 계산, 정리 기반 중 무엇인지 명시한다.",
-        ),
-        status="implemented",
-        status_ko="구현됨",
     ),
 )
 

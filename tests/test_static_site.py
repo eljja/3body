@@ -53,17 +53,17 @@ def test_static_site_builder_writes_index(monkeypatch, tmp_path) -> None:
     assert 'aria-label="Content panel navigation"' in content
     assert 'data-panel-target="threebody-answer"' in content
     assert 'data-panel-target="closed-form-route"' in content
-    assert 'data-panel-target="riemann-hypothesis"' in content
     assert 'data-panel-target="collatz-conjecture"' in content
-    assert 'data-panel-target="goldbach-conjecture"' in content
-    assert 'data-panel-target="twin-prime"' in content
+    assert 'data-panel-target="riemann-hypothesis"' not in content
+    assert 'data-panel-target="goldbach-conjecture"' not in content
+    assert 'data-panel-target="twin-prime"' not in content
     assert "Research content workspace" in content
     assert "Global closed-form route" in content
     assert "Sundman-style regularized convergent series contract" in content
-    assert "Riemann Hypothesis" in content
     assert "Collatz Conjecture" in content
-    assert "Goldbach Conjecture" in content
-    assert "Twin Prime Workbench" in content
+    assert "Riemann Hypothesis" not in content
+    assert "Goldbach Conjecture" not in content
+    assert "Twin Prime Workbench" not in content
     assert "Proof Workbench" not in content
     assert 'href="https://github.com/eljja/3body"' in content
     assert 'target="_blank" rel="noopener noreferrer">' in content
