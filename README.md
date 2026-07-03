@@ -25,6 +25,8 @@ claims must be read through
 [Validation Guardrails](docs/VALIDATION_GUARDRAILS.md).
 If another LLM or research agent continues this work, start from
 [LLM Handoff: Three-Body Challenge](docs/LLM_HANDOFF_THREE_BODY_CHALLENGE.md).
+Before putting the project into a quiet maintenance period, use
+[Maintenance Freeze Review](docs/MAINTENANCE_FREEZE_REVIEW.md).
 
 **논문용 상태 메모.** 이 저장소는 연구 증거 패키지이며, 일반 뉴턴 삼체
 문제가 해결되었다는 주장이 아니다. 논문 제출용 주장은 반드시
@@ -33,6 +35,8 @@ If another LLM or research agent continues this work, start from
 다른 LLM이나 연구 에이전트가 이 작업을 이어갈 때는
 [LLM Handoff: Three-Body Challenge](docs/LLM_HANDOFF_THREE_BODY_CHALLENGE.md)를
 먼저 읽어야 한다.
+한동안 유지보수 모드로 둘 때는
+[Maintenance Freeze Review](docs/MAINTENANCE_FREEZE_REVIEW.md)를 기준으로 삼는다.
 
 ## Korean Summary
 
@@ -140,6 +144,7 @@ from threebody_engine import (
     solve_three_body_prediction_problem,
     solve_three_body_target_positions,
     score_three_body_position_hypothesis,
+    three_body_maintenance_readiness_report,
     tune_jacobi_picard,
     validate_three_body_problem_answer,
     validate_three_body_target_prediction_certificate,
@@ -150,6 +155,18 @@ from threebody_engine import (
     verify_public_static_artifacts_from_url,
 )
 ```
+
+For a one-command maintenance freeze check:
+
+```powershell
+threebody maintenance-readiness --output maintenance-readiness.json
+```
+
+The same report is available from Python as
+`threebody_engine.three_body_maintenance_readiness_report()`. It states that the
+engine is sufficient for finite-time position-or-distribution interpretation,
+not for a finite elementary global closed-form solution of the generic
+three-body problem.
 
 For a finite admissible Newtonian three-body initial state and a declared finite target time,
 use the prediction API rather than a claimed global closed-form solution. If the trajectory

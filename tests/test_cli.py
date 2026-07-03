@@ -161,6 +161,22 @@ def test_closed_form_cli_writes_global_series_contract_assessment(tmp_path) -> N
     assert "series_coefficient_generator" in payload["contract"]["implementation_status"]
 
 
+def test_maintenance_readiness_cli_writes_freeze_report(tmp_path) -> None:
+    output_path = tmp_path / "maintenance-readiness.json"
+
+    exit_code = main(["maintenance-readiness", "--output", str(output_path)])
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    assert payload["report_type"] == "three-body-maintenance-readiness"
+    assert payload["maintenance_decision"]["status"] == "ready-for-maintenance-window"
+    assert payload["readiness_checks"]["finite_time_point_answer_api"] is True
+    assert payload["readiness_checks"]["global_closed_form_solution_claimed"] is False
+    assert "threebody predict --input examples/figure_eight_answer_input.json --answer" in (
+        payload["maintenance_commands"][0]["command"]
+    )
+
+
 def test_random_demo_cli_writes_successful_prediction_report(tmp_path) -> None:
     output_path = tmp_path / "random-demo.json"
 

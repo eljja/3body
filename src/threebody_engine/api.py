@@ -82,6 +82,146 @@ def public_static_artifact_claim_contract() -> dict[str, object]:
     }
 
 
+def three_body_maintenance_readiness_report() -> dict[str, object]:
+    """Return the stable maintenance-readiness contract for the project.
+
+    The report is intentionally not a new theorem claim. It records whether the
+    repository has the minimum pieces needed to maintain the current finite-time
+    three-body interpretation layer without expanding the public mathematical
+    scope during a maintenance window.
+    """
+
+    stable_entry_points = [
+        "answer_three_body_problem(...)",
+        "validate_three_body_problem_answer(...)",
+        "solve_three_body_target_positions(...)",
+        "solve_three_body_prediction_problem(...)",
+        "predict_three_body_positions(...)",
+        "predict_three_body_position_distribution(...)",
+        "predict_three_body_a_posteriori_defect_bound(...)",
+        "predict_three_body_validated_flow_enclosure(...)",
+        "solve_random_three_body_prediction_demo(...)",
+        "assess_three_body_global_closed_form_claim(...)",
+        "verify_public_static_artifacts_from_url(...)",
+    ]
+    readiness_checks = {
+        "finite_time_point_answer_api": True,
+        "probability_push_forward_api": True,
+        "body_wise_answer_table": True,
+        "input_admissibility_gate": True,
+        "numerical_convergence_certificate": True,
+        "a_posteriori_defect_bound_certificate": True,
+        "validated_interval_flow_enclosure": True,
+        "archived_answer_validator": True,
+        "random_case_prediction_demo": True,
+        "public_pages_audit_contract": True,
+        "paper_claim_guardrails": True,
+        "llm_handoff_document": True,
+        "global_closed_form_solution_claimed": False,
+        "arbitrary_collision_regularization_complete": False,
+        "mission_critical_certification_claimed": False,
+    }
+    maintenance_commands = [
+        {
+            "purpose": "short direct-answer reproduction",
+            "command": (
+                "threebody predict --input examples/figure_eight_answer_input.json --answer "
+                "--count 64 --samples 128 --horizon-samples 16 --position-scale 1e-7 "
+                "--velocity-scale 1e-7 --output answer.json"
+            ),
+        },
+        {
+            "purpose": "archived direct-answer validation",
+            "command": "threebody validate-answer --input answer.json --output answer-validation.json",
+        },
+        {
+            "purpose": "random non-collisional challenge smoke test",
+            "command": (
+                "threebody random-demo --seed 7 --target-time 0.05 --count 16 --samples 64 "
+                "--reference-samples 128 --output random-demo.json"
+            ),
+        },
+        {
+            "purpose": "public Pages evidence-bundle audit",
+            "command": (
+                "threebody verify-static-artifacts --base-url https://eljja.github.io/3body/ "
+                "--require-public-claim --output pages-verification-receipt.json"
+            ),
+        },
+        {
+            "purpose": "focused regression suite",
+            "command": (
+                "& 'D:\\Codex\\.venv\\Scripts\\python.exe' -m pytest "
+                "tests\\test_engine_api.py tests\\test_cli.py tests\\test_static_site.py -q"
+            ),
+        },
+    ]
+    return {
+        "report_schema_version": 1,
+        "report_type": "three-body-maintenance-readiness",
+        "project_scope": {
+            "english": (
+                "Maintain a finite-time, diagnostic-gated Newtonian three-body interpretation engine "
+                "that returns r_i(t) when defensible and Law(X_t) when uncertainty dominates."
+            ),
+            "korean": (
+                "방어 가능한 경우 r_i(t)를, 불확실성이 지배적인 경우 Law(X_t)를 반환하는 "
+                "유한시간 진단-gate 기반 뉴턴 삼체 해석 엔진을 유지한다."
+            ),
+        },
+        "maintenance_decision": {
+            "status": "ready-for-maintenance-window",
+            "ready_for_maintenance_window": True,
+            "summary": (
+                "The current implementation is sufficient for the project's finite-time "
+                "position-or-distribution interpretation target, provided the claim boundary "
+                "remains explicit and the maintenance commands keep passing."
+            ),
+            "summary_ko": (
+                "현재 구현은 유한시간 위치 또는 분포 해석이라는 프로젝트 목표에는 충분하다. "
+                "단, claim 경계를 명시적으로 유지하고 유지보수 명령들이 계속 통과해야 한다."
+            ),
+        },
+        "stable_entry_points": stable_entry_points,
+        "readiness_checks": readiness_checks,
+        "sufficient_for": [
+            "finite non-collisional initial-value prediction at a declared target time",
+            "point-position readout when convergence, defect, and enclosure gates support it",
+            "pushed-forward empirical or linearized probability readout under declared uncertainty",
+            "unresolved output for inadmissible, collision-scale, or diagnostically unsafe cases",
+            "paper supplement evidence bundles with verifier receipts",
+        ],
+        "not_sufficient_for": [
+            "a finite elementary global closed-form solution of the generic Newtonian three-body problem",
+            "unconditional long-time predictability across chaotic horizons",
+            "fully regularized arbitrary collision continuation",
+            "mission-critical astrodynamics certification without independent validated backend review",
+        ],
+        "maintenance_commands": maintenance_commands,
+        "freeze_policy": {
+            "allowed_changes": [
+                "bug fixes that preserve schema compatibility",
+                "documentation clarifications that keep the finite-time claim boundary",
+                "test hardening and artifact-verifier maintenance",
+                "dependency or workflow updates that do not change scientific claims",
+            ],
+            "discouraged_changes": [
+                "new public theorem claims without paper-readiness review",
+                "renaming stable JSON fields without a schema-version bump",
+                "adding unrelated proof workbenches to the ThreeBody public page",
+                "weakening diagnostic gates to make examples pass",
+            ],
+        },
+        "next_research_after_maintenance": [
+            "independent interval/Taylor-model ODE backend comparison",
+            "regularized near-collision chart implementation",
+            "validated probability-law propagation beyond Gaussian and empirical summaries",
+            "Sundman-style coefficient recurrence and truncation certificate",
+            "larger benchmark atlas with adversarial near-collision and hierarchical cases",
+        ],
+    }
+
+
 def validate_public_static_artifact_receipt_contract(
     receipt: Mapping[str, object],
     contract: Mapping[str, object] | None = None,

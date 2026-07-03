@@ -399,6 +399,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate_answer.add_argument("--output", type=Path, default=None, help="Optional validation JSON output path.")
     validate_answer.set_defaults(func=run_validate_answer_command)
+    maintenance = subparsers.add_parser(
+        "maintenance-readiness",
+        help="Report whether the current finite-time three-body engine is ready for a maintenance window.",
+    )
+    maintenance.add_argument("--output", type=Path, default=None, help="Optional maintenance-readiness JSON output path.")
+    maintenance.set_defaults(func=run_maintenance_readiness_command)
     closed_form = subparsers.add_parser(
         "closed-form",
         help="Assess whether a general three-body initial state passes the global closed-form series contract.",
@@ -882,6 +888,17 @@ def run_validate_answer_command(args: argparse.Namespace) -> int:
     if args.output is not None:
         print(f"wrote {args.output}")
     return 0 if result.get("valid") is True else 1
+
+
+def run_maintenance_readiness_command(args: argparse.Namespace) -> int:
+    from threebody_engine import three_body_maintenance_readiness_report
+
+    result = three_body_maintenance_readiness_report()
+    _write_json_result(result, args.output)
+    if args.output is not None:
+        print(f"wrote {args.output}")
+    decision = result.get("maintenance_decision", {})
+    return 0 if isinstance(decision, Mapping) and decision.get("ready_for_maintenance_window") is True else 1
 
 
 def run_closed_form_command(args: argparse.Namespace) -> int:

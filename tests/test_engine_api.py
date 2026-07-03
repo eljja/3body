@@ -34,6 +34,7 @@ from threebody_engine import (
     solve_three_body_prediction_problem,
     solve_three_body_target_positions,
     score_three_body_position_hypothesis,
+    three_body_maintenance_readiness_report,
     tune_jacobi_picard,
     validate_three_body_problem_answer,
     validate_three_body_target_prediction_certificate,
@@ -56,12 +57,29 @@ def test_engine_api_integrates_reference_scenario() -> None:
     assert callable(validate_three_body_target_prediction_certificate)
     assert callable(validate_three_body_problem_answer)
     assert callable(answer_three_body_problem)
+    assert callable(three_body_maintenance_readiness_report)
 
     scenario, trajectory = integrate_reference_scenario("figure-eight", periods=0.02, samples=30)
 
     assert scenario.name == "general-figure-eight"
     assert trajectory.success is True
     assert len(trajectory.t) == 30
+
+
+def test_engine_api_reports_maintenance_readiness() -> None:
+    report = three_body_maintenance_readiness_report()
+
+    assert report["report_type"] == "three-body-maintenance-readiness"
+    assert report["maintenance_decision"]["ready_for_maintenance_window"] is True
+    assert report["readiness_checks"]["finite_time_point_answer_api"] is True
+    assert report["readiness_checks"]["probability_push_forward_api"] is True
+    assert report["readiness_checks"]["validated_interval_flow_enclosure"] is True
+    assert report["readiness_checks"]["global_closed_form_solution_claimed"] is False
+    assert "answer_three_body_problem(...)" in report["stable_entry_points"]
+    assert "a finite elementary global closed-form solution of the generic Newtonian three-body problem" in (
+        report["not_sufficient_for"]
+    )
+    assert report["maintenance_commands"]
 
 
 def test_engine_api_assesses_global_closed_form_contract() -> None:
@@ -1123,5 +1141,4 @@ def test_engine_api_validated_flow_enclosures() -> None:
     assert flow_cert["certificate_type"] == "validated-flow-enclosure"
     assert flow_cert["validated_flow_certified"] is True
     assert answer["answer_consistency_certificate"]["valid"] is True
-
 
